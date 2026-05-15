@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const templatesTable = pgTable("templates", {
   id: serial("id").primaryKey(),
+  userId: text("user_id"),
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull(),
