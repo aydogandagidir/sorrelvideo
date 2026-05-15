@@ -304,6 +304,59 @@ paths:
         "204":
           description: Deleted
 
+  /projects/{id}/render:
+    post:
+      operationId: startProjectRender
+      tags: [projects]
+      summary: Start a render job for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "202":
+          description: Render started — project status set to rendering
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+        "409":
+          description: Render already in progress
+
+  /projects/{id}/video:
+    get:
+      operationId: getProjectVideo
+      tags: [projects]
+      summary: Stream the rendered video file for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: MP4 video stream
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Video not available yet
+
   /brand:
     get:
       operationId: getBrandKit
@@ -523,6 +576,8 @@ components:
           type: ["string", "null"]
         duration:
           type: ["integer", "null"]
+        renderError:
+          type: ["string", "null"]
         createdAt:
           type: string
         updatedAt:

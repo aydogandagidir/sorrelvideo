@@ -168,6 +168,7 @@ export const ListProjectsResponseItem = zod.object({
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -202,6 +203,7 @@ export const GetProjectResponse = zod.object({
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -232,6 +234,7 @@ export const UpdateProjectResponse = zod.object({
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -241,6 +244,22 @@ export const UpdateProjectResponse = zod.object({
  * @summary Delete a project
  */
 export const DeleteProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Start a render job for a project
+ */
+export const StartProjectRenderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Stream the rendered video file for a project
+ */
+export const GetProjectVideoParams = zod.object({
   "id": zod.coerce.number()
 })
 
@@ -317,6 +336,7 @@ export const GetStatsResponse = zod.object({
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })).optional()

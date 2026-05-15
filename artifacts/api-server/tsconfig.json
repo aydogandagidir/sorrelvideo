@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": ["node", "@webgpu/types"]
   },
   "include": ["src"],
   "references": [

@@ -102,6 +102,8 @@ export interface Project {
   videoUrl?: string | null;
   /** @nullable */
   duration?: number | null;
+  /** @nullable */
+  renderError?: string | null;
   createdAt: string;
   updatedAt: string;
 }

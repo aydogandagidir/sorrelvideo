@@ -13,6 +13,7 @@ export const projectsTable = pgTable("projects", {
   thumbnailUrl: text("thumbnail_url"),
   videoUrl: text("video_url"),
   duration: integer("duration"),
+  renderError: text("render_error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

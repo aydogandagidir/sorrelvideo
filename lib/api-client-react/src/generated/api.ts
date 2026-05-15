@@ -1192,6 +1192,153 @@ export const useDeleteProject = <TError = ErrorType<unknown>,
       return useMutation(getDeleteProjectMutationOptions(options));
     }
 
+export const getStartProjectRenderUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/render`
+}
+
+/**
+ * @summary Start a render job for a project
+ */
+export const startProjectRender = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getStartProjectRenderUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getStartProjectRenderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startProjectRender>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['startProjectRender'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startProjectRender>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  startProjectRender(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartProjectRenderMutationResult = NonNullable<Awaited<ReturnType<typeof startProjectRender>>>
+
+    export type StartProjectRenderMutationError = ErrorType<void>
+
+    /**
+ * @summary Start a render job for a project
+ */
+export const useStartProjectRender = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startProjectRender>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getStartProjectRenderMutationOptions(options));
+    }
+
+export const getGetProjectVideoUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/video`
+}
+
+/**
+ * @summary Stream the rendered video file for a project
+ */
+export const getProjectVideo = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetProjectVideoUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectVideoQueryKey = (id: number,) => {
+    return [
+    `/api/projects/${id}/video`
+    ] as const;
+    }
+
+
+export const getGetProjectVideoQueryOptions = <TData = Awaited<ReturnType<typeof getProjectVideo>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectVideo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectVideoQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectVideo>>> = ({ signal }) => getProjectVideo(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectVideo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectVideoQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectVideo>>>
+export type GetProjectVideoQueryError = ErrorType<void>
+
+
+/**
+ * @summary Stream the rendered video file for a project
+ */
+
+export function useGetProjectVideo<TData = Awaited<ReturnType<typeof getProjectVideo>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectVideo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectVideoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetBrandKitUrl = () => {
 
 
