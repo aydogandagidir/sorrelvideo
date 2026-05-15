@@ -178,12 +178,12 @@ function ProjectCard({ project }: { project: Project }) {
               </Tooltip>
             </TooltipProvider>
 
-            {/* Render button — shown when not ready/rendering */}
-            {project.status !== "ready" && project.status !== "rendering" && (
+            {/* Render button — shown only for draft status */}
+            {project.status === "draft" && (
               <Button
                 variant="outline"
                 onClick={handleRender}
-                disabled={renderMutation.isPending || isRendering}
+                disabled={renderMutation.isPending}
               >
                 {renderMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

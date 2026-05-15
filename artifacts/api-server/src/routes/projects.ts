@@ -191,12 +191,17 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
     return;
   }
 
-  // Fire-and-forget render job; status is updated async
+  // Set status synchronously so the 202 response always reflects "rendering"
+  await db
+    .update(projectsTable)
+    .set({ status: "rendering", renderError: null })
+    .where(eq(projectsTable.id, id));
+
+  // Fire-and-forget: startRender picks up from "rendering" and updates to ready/failed
   startRender(id, project.module, project.templateId).catch((err) => {
     req.log.error({ projectId: id, err }, "Unhandled render error");
   });
 
-  // Status will be set to "rendering" inside startRender; re-fetch
   const [updated] = await db
     .select()
     .from(projectsTable)
