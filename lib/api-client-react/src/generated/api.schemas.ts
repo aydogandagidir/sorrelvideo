@@ -175,6 +175,54 @@ export interface Module {
   features?: string[];
 }
 
+export type BillingInfoPlan = typeof BillingInfoPlan[keyof typeof BillingInfoPlan];
+
+
+export const BillingInfoPlan = {
+  free: 'free',
+  pro: 'pro',
+} as const;
+
+export interface BillingInfo {
+  plan: BillingInfoPlan;
+  renderCount: number;
+  /** @nullable */
+  renderLimit?: number | null;
+  /** @nullable */
+  renderResetAt?: string | null;
+  /** @nullable */
+  stripeCustomerId?: string | null;
+}
+
+export interface CheckoutRequest {
+  priceId: string;
+}
+
+export interface CheckoutResponse {
+  /** @nullable */
+  url: string | null;
+}
+
+export interface PortalResponse {
+  /** @nullable */
+  url: string | null;
+}
+
+export interface BillingPrice {
+  id: string;
+  /** @nullable */
+  unitAmount?: number | null;
+  currency: string;
+  /** @nullable */
+  interval?: string | null;
+  /** @nullable */
+  productName?: string | null;
+}
+
+export interface PricesResponse {
+  prices: BillingPrice[];
+}
+
 export interface PlatformStats {
   totalProjects: number;
   totalTemplates: number;

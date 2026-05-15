@@ -9,7 +9,9 @@ import {
   Video,
   LogOut,
   Settings,
+  Zap,
 } from "lucide-react";
+import { useBillingInfo } from "@/hooks/useBilling";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +25,18 @@ const NAV_ITEMS = [
   { href: "/modules", label: "Modules", icon: Blocks },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+function PlanBadge() {
+  const { data: billing } = useBillingInfo();
+  if (!billing || billing.plan !== "pro") return null;
+  return (
+    <div className="px-4 pb-2">
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
+        <Zap className="h-3 w-3" /> Pro
+      </span>
+    </div>
+  );
+}
 
 function UserFooter() {
   const { user, logout } = useAuth();
@@ -40,8 +54,9 @@ function UserFooter() {
     "User";
 
   return (
-    <div className="border-t p-4">
-      <div className="flex items-center gap-3 mb-3">
+    <div className="border-t pt-2">
+      <PlanBadge />
+      <div className="flex items-center gap-3 px-4 pb-3">
         <Avatar className="h-8 w-8">
           {user.profileImageUrl && (
             <AvatarImage src={user.profileImageUrl} alt={displayName} />

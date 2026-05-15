@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Video, Zap, Layers, Sparkles, MonitorPlay } from "lucide-react";
+import { ArrowRight, Video, Zap, Layers, Sparkles, MonitorPlay, Check as CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function HeroSection() {
@@ -116,7 +116,57 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="py-24 px-4 bg-muted/30 border-y">
+        <section id="pricing" className="py-24 px-4 bg-muted/30 border-y">
+          <div className="container mx-auto max-w-5xl">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Simple, transparent pricing</h2>
+              <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
+                Start free, upgrade when you need more. No surprises.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              <div className="rounded-2xl border bg-card p-8 flex flex-col gap-6">
+                <div>
+                  <h3 className="text-lg font-bold mb-1">Free</h3>
+                  <div className="text-4xl font-extrabold">$0</div>
+                </div>
+                <ul className="space-y-2 flex-1 text-sm text-muted-foreground">
+                  {["3 renders per month", "Standard templates", "720p output", "Community support"].map(f => (
+                    <li key={f} className="flex items-center gap-2"><CheckIcon className="h-4 w-4 text-primary shrink-0" />{f}</li>
+                  ))}
+                </ul>
+                <Link href="/dashboard" className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted transition-colors">
+                  Get Started Free
+                </Link>
+              </div>
+              <div className="relative rounded-2xl border border-primary bg-primary/5 p-8 flex flex-col gap-6 shadow-lg shadow-primary/10">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="inline-flex items-center rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground">Most Popular</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-bold">Pro</h3>
+                    <Zap className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-extrabold">$29</span>
+                    <span className="text-muted-foreground">/month</span>
+                  </div>
+                </div>
+                <ul className="space-y-2 flex-1 text-sm">
+                  {["Unlimited renders", "All premium templates", "1080p output", "Priority queue", "Advanced analytics", "Priority support"].map(f => (
+                    <li key={f} className="flex items-center gap-2"><CheckIcon className="h-4 w-4 text-primary shrink-0" />{f}</li>
+                  ))}
+                </ul>
+                <Link href="/pricing" className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                  <Zap className="mr-2 h-4 w-4" />Get Started
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-24 px-4 bg-background">
           <div className="container mx-auto max-w-4xl text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-8">Ready to scale your video production?</h2>
             <Link href="/dashboard" className="inline-flex h-14 items-center justify-center rounded-md bg-primary px-8 text-base font-bold text-primary-foreground transition-colors hover:bg-primary/90">

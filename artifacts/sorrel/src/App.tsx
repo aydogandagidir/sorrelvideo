@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@workspace/replit-auth-web";
 
 import Home from "./pages/home";
+import Pricing from "./pages/pricing";
 import Dashboard from "./pages/dashboard";
 import Templates from "./pages/templates";
 import Projects from "./pages/projects";
@@ -46,6 +47,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/dashboard">
         <ProtectedRoute component={Dashboard} />
       </Route>

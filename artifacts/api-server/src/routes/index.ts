@@ -6,6 +6,7 @@ import projectsRouter from "./projects";
 import brandRouter from "./brand";
 import modulesRouter from "./modules";
 import statsRouter from "./stats";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(projectsRouter);
 router.use(brandRouter);
 router.use(modulesRouter);
 router.use(statsRouter);
+router.use(billingRouter);
 
 export default router;

@@ -319,6 +319,52 @@ export const ListModulesResponse = zod.array(ListModulesResponseItem)
 
 
 /**
+ * @summary Get current user billing info and plan
+ */
+export const GetBillingInfoResponse = zod.object({
+  "plan": zod.enum(['free', 'pro']),
+  "renderCount": zod.number(),
+  "renderLimit": zod.number().nullish(),
+  "renderResetAt": zod.string().nullish(),
+  "stripeCustomerId": zod.string().nullish()
+})
+
+
+/**
+ * @summary Create a Stripe Checkout session for upgrading to Pro
+ */
+export const CreateCheckoutSessionBody = zod.object({
+  "priceId": zod.string()
+})
+
+export const CreateCheckoutSessionResponse = zod.object({
+  "url": zod.string().nullable()
+})
+
+
+/**
+ * @summary Create a Stripe Customer Portal session for managing subscriptions
+ */
+export const CreatePortalSessionResponse = zod.object({
+  "url": zod.string().nullable()
+})
+
+
+/**
+ * @summary List active Stripe prices for Pro plan
+ */
+export const ListBillingPricesResponse = zod.object({
+  "prices": zod.array(zod.object({
+  "id": zod.string(),
+  "unitAmount": zod.number().nullish(),
+  "currency": zod.string(),
+  "interval": zod.string().nullish(),
+  "productName": zod.string().nullish()
+}))
+})
+
+
+/**
  * @summary Get platform usage statistics
  */
 export const GetStatsResponse = zod.object({

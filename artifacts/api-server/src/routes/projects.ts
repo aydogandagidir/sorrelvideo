@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, projectsTable } from "@workspace/db";
+import { db, projectsTable, templatesTable, usersTable } from "@workspace/db";
 import {
   ListProjectsResponse,
   CreateProjectBody,
@@ -12,6 +12,7 @@ import {
   DeleteProjectParams,
 } from "@workspace/api-zod";
 import { startRender, renderFileExists, getRenderFilePath } from "../services/renderService";
+import { checkAndIncrementRenderCount, getUserPlan } from "../services/billingService";
 
 const router: IRouter = Router();
 
@@ -189,6 +190,42 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
   if (project.status === "rendering") {
     res.status(409).json({ error: "Render already in progress" });
     return;
+  }
+
+  // Check premium template access (pro users only)
+  if (project.templateId) {
+    const [template] = await db
+      .select()
+      .from(templatesTable)
+      .where(eq(templatesTable.id, project.templateId));
+    if (template?.isPremium) {
+      const [userRow] = await db
+        .select({ stripeCustomerId: usersTable.stripeCustomerId })
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user.id));
+      const userPlan = await getUserPlan(userRow?.stripeCustomerId ?? null);
+      if (userPlan !== "pro") {
+        res.status(403).json({
+          error: "Premium templates require Pro plan",
+          reason: "upgrade_required",
+        });
+        return;
+      }
+    }
+  }
+
+  // Check + increment monthly render count (gated for free plan)
+  try {
+    await checkAndIncrementRenderCount(req.user.id);
+  } catch (err: any) {
+    if (err.reason === "upgrade_required") {
+      res.status(403).json({
+        error: err.message,
+        reason: "upgrade_required",
+      });
+      return;
+    }
+    throw err;
   }
 
   // Set status synchronously so the 202 response always reflects "rendering"
