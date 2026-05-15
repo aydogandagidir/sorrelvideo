@@ -21,13 +21,14 @@ async function initStripe(): Promise<void> {
 
     const stripeSync = await getStripeSync();
 
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-    // Register the canonical webhook path; /api/stripe/webhook is kept as a
-    // legacy alias in app.ts for stripe-replit-sync compatibility.
-    await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/billing/webhook`,
-    );
-    logger.info("Stripe webhook configured");
+    const primaryDomain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
+    if (!primaryDomain) {
+      logger.warn("REPLIT_DOMAINS not set — skipping webhook registration");
+    } else {
+      await stripeSync.findOrCreateManagedWebhook(
+        `https://${primaryDomain}/api/billing/webhook`,
+      );
+    }
 
     stripeSync.syncBackfill().then(() => {
       logger.info("Stripe backfill complete");

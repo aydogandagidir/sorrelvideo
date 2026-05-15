@@ -19,9 +19,10 @@ export const usersTable = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  // Billing columns — kept in sync by the webhook handler (see webhookHandlers.ts).
-  // Source of truth for plan is stripe.subscriptions (synced by stripe-replit-sync);
-  // these columns are a local cache that avoids cross-schema joins on every request.
+  // Billing. stripeCustomerId is written on first checkout.
+  // plan and stripeSubscriptionId are reserved for future use; current plan is
+  // derived at runtime by querying stripe.subscriptions (synced by stripe-replit-sync)
+  // so they should not be treated as the source of truth.
   plan: varchar("plan", { enum: ["free", "pro"] }).notNull().default("free"),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
