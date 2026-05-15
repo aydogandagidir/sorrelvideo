@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 type Project = {
   id: number;
@@ -71,6 +72,8 @@ function ProjectCard({ project }: { project: Project }) {
   const deleteProject = useDeleteProject();
   const renderMutation = useStartProjectRender();
   const [showVideo, setShowVideo] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<"render_limit" | "premium_template">("render_limit");
 
   const isRendering = project.status === "rendering";
   const isReady = project.status === "ready";
@@ -84,6 +87,19 @@ function ProjectCard({ project }: { project: Project }) {
       {
         onSuccess: () => {
           void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+        },
+        onError: (err: any) => {
+          // Check for upgrade_required 403 from backend
+          const reason = err?.response?.data?.reason ?? err?.data?.reason;
+          const error = err?.response?.data?.error ?? err?.data?.error ?? err?.message ?? "";
+          if (reason === "upgrade_required" || err?.status === 403) {
+            if (error.toLowerCase().includes("template")) {
+              setUpgradeReason("premium_template");
+            } else {
+              setUpgradeReason("render_limit");
+            }
+            setUpgradeOpen(true);
+          }
         },
       },
     );
@@ -233,6 +249,13 @@ function ProjectCard({ project }: { project: Project }) {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Upgrade modal — shown when render is blocked due to plan limits */}
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        reason={upgradeReason}
+      />
     </Card>
   );
 }

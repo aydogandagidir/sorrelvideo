@@ -4,6 +4,55 @@ import { getUncachableStripeClient } from "../stripeClient";
 
 const router: IRouter = Router();
 
+/**
+ * Fetches Pro Plan prices from Stripe, filtered to only the "Sorrel Pro" product.
+ * Returns a stable list so the UI can display them without auth.
+ */
+async function getProPrices() {
+  const stripe = await getUncachableStripeClient();
+  const prices = await stripe.prices.list({
+    active: true,
+    expand: ["data.product"],
+  });
+
+  return prices.data
+    .filter((p) => {
+      if (p.type !== "recurring") return false;
+      const product = p.product as any;
+      // Only expose prices belonging to the Sorrel Pro product
+      return (
+        product &&
+        typeof product === "object" &&
+        (product.metadata?.plan === "pro" ||
+          product.name === "Sorrel Pro")
+      );
+    })
+    .map((p) => ({
+      id: p.id,
+      unitAmount: p.unit_amount,
+      currency: p.currency,
+      interval: (p.recurring?.interval) ?? null,
+      productName:
+        typeof p.product === "object" && p.product !== null && "name" in p.product
+          ? (p.product as any).name
+          : null,
+    }));
+}
+
+// GET /api/billing/prices — public; lists Sorrel Pro prices only
+// Auth not required so the landing/pricing page can show prices to visitors
+router.get("/billing/prices", async (req, res): Promise<void> => {
+  try {
+    const prices = await getProPrices();
+    res.json({ prices });
+  } catch (err: any) {
+    // Log only when a request logger is available (authenticated request)
+    if (req.log) req.log.warn({ err }, "Failed to fetch Stripe prices");
+    // Return static fallback so the pricing UI is never broken
+    res.json({ prices: [] });
+  }
+});
+
 // GET /api/billing/me — current plan info
 router.get("/billing/me", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
@@ -28,6 +77,22 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     return;
   }
 
+  // Server-side allowlist: only allow Pro Plan prices
+  let allowedPrices: string[];
+  try {
+    const prices = await getProPrices();
+    allowedPrices = prices.map((p) => p.id);
+  } catch (err: any) {
+    req.log.error({ err }, "Could not verify Pro prices for allowlist");
+    res.status(500).json({ error: "Billing service unavailable" });
+    return;
+  }
+
+  if (!allowedPrices.includes(priceId)) {
+    res.status(400).json({ error: "Invalid or unauthorized price" });
+    return;
+  }
+
   const customerId = await ensureStripeCustomer(
     req.user.id,
     req.user.email ?? null,
@@ -44,7 +109,7 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     line_items: [{ price: priceId, quantity: 1 }],
     mode: "subscription",
     success_url: `${origin}/settings?upgraded=1`,
-    cancel_url: `${origin}/settings`,
+    cancel_url: `${origin}/pricing`,
   });
 
   res.json({ url: session.url });
@@ -75,40 +140,6 @@ router.post("/billing/portal", async (req, res): Promise<void> => {
   });
 
   res.json({ url: portalSession.url });
-});
-
-// GET /api/billing/prices — list active Pro Plan prices from Stripe
-router.get("/billing/prices", async (req, res): Promise<void> => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
-  try {
-    const stripe = await getUncachableStripeClient();
-    const prices = await stripe.prices.list({
-      active: true,
-      expand: ["data.product"],
-    });
-
-    const formatted = prices.data
-      .filter((p) => p.type === "recurring")
-      .map((p) => ({
-        id: p.id,
-        unitAmount: p.unit_amount,
-        currency: p.currency,
-        interval: p.recurring?.interval,
-        productName:
-          typeof p.product === "object" && p.product !== null && "name" in p.product
-            ? (p.product as any).name
-            : null,
-      }));
-
-    res.json({ prices: formatted });
-  } catch (err: any) {
-    req.log.error({ err }, "Failed to fetch Stripe prices");
-    res.json({ prices: [] });
-  }
 });
 
 export default router;

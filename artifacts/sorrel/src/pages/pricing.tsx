@@ -41,6 +41,7 @@ function PricingCard({
 
   const handleUpgrade = async () => {
     if (!isAuthenticated) {
+      // Redirect to login; after login they'll land back at /pricing
       login();
       return;
     }
@@ -93,14 +94,14 @@ function PricingCard({
         <Button
           className="w-full"
           onClick={handleUpgrade}
-          disabled={checkoutMutation.isPending || !priceId}
+          disabled={checkoutMutation.isPending}
         >
           {checkoutMutation.isPending ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Zap className="mr-2 h-4 w-4" />
           )}
-          Get Started
+          {isAuthenticated ? "Get Started" : "Sign up & Get Started"}
         </Button>
       ) : (
         <Link

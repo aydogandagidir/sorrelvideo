@@ -23,7 +23,8 @@ async function fetchBillingInfo(): Promise<BillingInfo> {
 }
 
 async function fetchBillingPrices(): Promise<{ prices: BillingPrice[] }> {
-  const res = await fetch("/api/billing/prices", { credentials: "include" });
+  // Public endpoint — no auth required so the pricing page works for visitors
+  const res = await fetch("/api/billing/prices");
   if (!res.ok) throw new Error("Failed to fetch prices");
   return res.json();
 }
