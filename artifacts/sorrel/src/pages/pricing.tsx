@@ -49,7 +49,9 @@ function PricingCard({
     try {
       const { url } = await checkoutMutation.mutateAsync({ priceId });
       if (url) window.location.href = url;
-    } catch {}
+    } catch (err) {
+      console.error("Checkout failed", err);
+    }
   };
 
   return (

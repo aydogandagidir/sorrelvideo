@@ -64,7 +64,9 @@ export function UpgradeModal({
         priceId: monthlyPrice.id,
       });
       if (url) window.location.href = url;
-    } catch {}
+    } catch (err) {
+      console.error("Checkout failed", err);
+    }
   };
 
   return (
