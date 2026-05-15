@@ -116,10 +116,9 @@ export async function checkAndIncrementRenderCount(
     const plan = await getUserPlan(row.stripe_customer_id);
 
     if (plan === "pro") {
-      await client.query(
-        `UPDATE users SET render_count = render_count + 1 WHERE id = $1`,
-        [userId],
-      );
+      // Pro users have unlimited renders; do not increment render_count so that
+      // if the user later downgrades, their Free quota is not pre-consumed by
+      // renders made while on a paid plan.
       await client.query("COMMIT");
       return;
     }
