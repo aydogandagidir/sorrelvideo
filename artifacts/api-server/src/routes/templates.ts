@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, or, isNull } from "drizzle-orm";
-import { db, templatesTable } from "@workspace/db";
+import { db, templatesTable, usersTable } from "@workspace/db";
 import {
   ListTemplatesQueryParams,
   ListTemplatesResponse,
@@ -8,6 +8,7 @@ import {
   GetTemplateParams,
   GetTemplateResponse,
 } from "@workspace/api-zod";
+import { getUserPlan } from "../services/billingService";
 
 const router: IRouter = Router();
 
@@ -37,6 +38,21 @@ router.get("/templates", async (req, res): Promise<void> => {
   }
   if (parsed.data.module) {
     conditions.push(eq(templatesTable.module, parsed.data.module));
+  }
+
+  const plan = await getUserPlan(
+    (
+      await db
+        .select({ stripeCustomerId: usersTable.stripeCustomerId })
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user.id))
+        .limit(1)
+    )[0]?.stripeCustomerId ?? null,
+  );
+
+  // Free-plan users only see non-premium templates
+  if (plan === "free") {
+    conditions.push(eq(templatesTable.isPremium, false));
   }
 
   const templates = await db

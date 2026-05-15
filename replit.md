@@ -53,6 +53,12 @@ Modular video production SaaS platform — create, render, and manage branded vi
 - **Templates**: Platform templates (visible to all) + user-scoped templates.
 - **Modules**: Studio, Brand, AI, Bulk, Analytics, Collab.
 
+## Billing architecture
+
+- **Plan derivation**: `getUserPlan(stripeCustomerId)` queries the `stripe.subscriptions` table synced by `stripe-replit-sync`. It is the source of truth for Free/Pro status. `users.plan` and `users.stripeSubscriptionId` are reserved columns (schema compatibility) but are **not** used as source-of-truth — do not read them for plan checks.
+- **Render quota**: Free users are limited to 3 renders/month. `checkAndIncrementRenderCount` uses a pg row-lock transaction. Pro renders are not counted so Free quota is not pre-consumed on downgrade.
+- **Premium templates**: The `/templates` list endpoint filters out `isPremium=true` rows for Free-plan users. Premium access is also enforced at render time in `POST /projects/:id/render`.
+
 ## Gotchas
 
 - `pnpm --filter @workspace/db run push` must be run after schema changes before the API server restarts.

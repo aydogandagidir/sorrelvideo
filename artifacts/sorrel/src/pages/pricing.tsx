@@ -96,14 +96,19 @@ function PricingCard({
         <Button
           className="w-full"
           onClick={handleUpgrade}
-          disabled={checkoutMutation.isPending}
+          disabled={checkoutMutation.isPending || !priceId}
+          title={!priceId ? "Pricing unavailable — try again shortly" : undefined}
         >
           {checkoutMutation.isPending ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Zap className="mr-2 h-4 w-4" />
           )}
-          {isAuthenticated ? "Get Started" : "Sign up & Get Started"}
+          {!priceId
+            ? "Unavailable"
+            : isAuthenticated
+              ? "Get Started"
+              : "Sign up & Get Started"}
         </Button>
       ) : (
         <Link
