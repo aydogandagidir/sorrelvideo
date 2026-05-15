@@ -473,6 +473,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PricesResponse"
 
+
   /stats/overview:
     get:
       operationId: getStats

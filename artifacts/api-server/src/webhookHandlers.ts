@@ -7,12 +7,8 @@ export class WebhookHandlers {
   ): Promise<void> {
     if (!Buffer.isBuffer(payload)) {
       throw new Error(
-        "STRIPE WEBHOOK ERROR: Payload must be a Buffer. " +
-          "Received type: " +
-          typeof payload +
-          ". " +
-          "This usually means express.json() parsed the body before reaching this handler. " +
-          "FIX: Ensure webhook route is registered BEFORE app.use(express.json()).",
+        `Webhook payload must be a raw Buffer (got ${typeof payload}). ` +
+          "Ensure the webhook route is registered before express.json().",
       );
     }
 

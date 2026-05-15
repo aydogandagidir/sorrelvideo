@@ -180,7 +180,7 @@ export default function Pricing() {
           )}
 
           <p className="text-center text-sm text-muted-foreground mt-8">
-            All plans include a 7-day free trial. Cancel anytime.
+            No credit card required for the free plan. Cancel anytime.
           </p>
         </div>
       </main>
