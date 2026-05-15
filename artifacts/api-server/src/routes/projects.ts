@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, projectsTable } from "@workspace/db";
 import {
   ListProjectsResponse,
@@ -65,15 +65,15 @@ router.get("/projects/:id", async (req, res): Promise<void> => {
   const [project] = await db
     .select()
     .from(projectsTable)
-    .where(
-      and(
-        eq(projectsTable.id, params.data.id),
-        eq(projectsTable.userId, req.user.id),
-      ),
-    );
+    .where(eq(projectsTable.id, params.data.id));
 
   if (!project) {
     res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -98,21 +98,26 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const [project] = await db
-    .update(projectsTable)
-    .set(parsed.data)
-    .where(
-      and(
-        eq(projectsTable.id, params.data.id),
-        eq(projectsTable.userId, req.user.id),
-      ),
-    )
-    .returning();
+  const [existing] = await db
+    .select({ userId: projectsTable.userId })
+    .from(projectsTable)
+    .where(eq(projectsTable.id, params.data.id));
 
-  if (!project) {
+  if (!existing) {
     res.status(404).json({ error: "Project not found" });
     return;
   }
+
+  if (existing.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [project] = await db
+    .update(projectsTable)
+    .set(parsed.data)
+    .where(eq(projectsTable.id, params.data.id))
+    .returning();
 
   res.json(UpdateProjectResponse.parse(serializeDates(project)));
 });
@@ -129,20 +134,24 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const [project] = await db
-    .delete(projectsTable)
-    .where(
-      and(
-        eq(projectsTable.id, params.data.id),
-        eq(projectsTable.userId, req.user.id),
-      ),
-    )
-    .returning();
+  const [existing] = await db
+    .select({ userId: projectsTable.userId })
+    .from(projectsTable)
+    .where(eq(projectsTable.id, params.data.id));
 
-  if (!project) {
+  if (!existing) {
     res.status(404).json({ error: "Project not found" });
     return;
   }
+
+  if (existing.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  await db
+    .delete(projectsTable)
+    .where(eq(projectsTable.id, params.data.id));
 
   res.sendStatus(204);
 });

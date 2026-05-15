@@ -8,7 +8,7 @@ import {
   Menu,
   Video,
   LogOut,
-  User,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/templates", label: "Templates", icon: Film },
   { href: "/brand", label: "Brand Kit", icon: Palette },
   { href: "/modules", label: "Modules", icon: Blocks },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 function UserFooter() {

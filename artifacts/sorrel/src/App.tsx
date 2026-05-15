@@ -11,6 +11,7 @@ import Templates from "./pages/templates";
 import Projects from "./pages/projects";
 import Brand from "./pages/brand";
 import Modules from "./pages/modules";
+import Settings from "./pages/settings";
 import NotFound from "./pages/not-found";
 
 const queryClient = new QueryClient({
@@ -59,6 +60,9 @@ function Router() {
       </Route>
       <Route path="/modules">
         <ProtectedRoute component={Modules} />
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute component={Settings} />
       </Route>
       <Route component={NotFound} />
     </Switch>

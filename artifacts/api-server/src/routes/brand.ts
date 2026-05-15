@@ -9,6 +9,10 @@ import {
 
 const router: IRouter = Router();
 
+function serializeDates<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
 router.get("/brand", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Unauthorized" });
@@ -30,11 +34,11 @@ router.get("/brand", async (req, res): Promise<void> => {
         fontFamily: "Inter",
       })
       .returning();
-    res.json(GetBrandKitResponse.parse(created));
+    res.json(GetBrandKitResponse.parse(serializeDates(created)));
     return;
   }
 
-  res.json(GetBrandKitResponse.parse(kit));
+  res.json(GetBrandKitResponse.parse(serializeDates(kit)));
 });
 
 router.put("/brand", async (req, res): Promise<void> => {
@@ -55,12 +59,16 @@ router.put("/brand", async (req, res): Promise<void> => {
     .limit(1);
 
   if (existing) {
+    if (existing.userId !== req.user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
     const [kit] = await db
       .update(brandKitTable)
       .set(parsed.data)
       .where(eq(brandKitTable.userId, req.user.id))
       .returning();
-    res.json(UpdateBrandKitResponse.parse(kit));
+    res.json(UpdateBrandKitResponse.parse(serializeDates(kit)));
   } else {
     const [kit] = await db
       .insert(brandKitTable)
@@ -72,7 +80,7 @@ router.put("/brand", async (req, res): Promise<void> => {
         ...parsed.data,
       })
       .returning();
-    res.json(UpdateBrandKitResponse.parse(kit));
+    res.json(UpdateBrandKitResponse.parse(serializeDates(kit)));
   }
 });
 

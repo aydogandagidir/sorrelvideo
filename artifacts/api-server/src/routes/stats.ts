@@ -9,21 +9,33 @@ function serializeDates<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));
 }
 
-router.get("/stats/overview", async (_req, res): Promise<void> => {
-  const [totalProjectsResult, totalTemplatesResult, activeModulesResult, recentProjects] =
+router.get("/stats/overview", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const userId = req.user.id;
+
+  const [allProjects, totalTemplatesResult, activeModulesResult, recentProjects] =
     await Promise.all([
-      db.select().from(projectsTable),
+      db.select().from(projectsTable).where(eq(projectsTable.userId, userId)),
       db.select().from(templatesTable),
       db.select().from(modulesTable).where(eq(modulesTable.status, "active")),
-      db.select().from(projectsTable).orderBy(desc(projectsTable.updatedAt)).limit(5),
+      db
+        .select()
+        .from(projectsTable)
+        .where(eq(projectsTable.userId, userId))
+        .orderBy(desc(projectsTable.updatedAt))
+        .limit(5),
     ]);
 
-  const videosRendered = totalProjectsResult.filter((p) => p.status === "ready").length;
+  const videosRendered = allProjects.filter((p) => p.status === "ready").length;
 
   res.json(
     GetStatsResponse.parse(
       serializeDates({
-        totalProjects: totalProjectsResult.length,
+        totalProjects: allProjects.length,
         totalTemplates: totalTemplatesResult.length,
         videosRendered,
         activeModules: activeModulesResult.length,
