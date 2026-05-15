@@ -19,7 +19,11 @@ export const usersTable = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  // Billing — plan is derived at runtime from stripe.subscriptions (via stripe-replit-sync)
+  // but stored here as a cache for fast reads; updated by webhooks.
+  plan: varchar("plan", { enum: ["free", "pro"] }).notNull().default("free"),
   stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
   renderCount: integer("render_count").notNull().default(0),
   renderResetAt: timestamp("render_reset_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

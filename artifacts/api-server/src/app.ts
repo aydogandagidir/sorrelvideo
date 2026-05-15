@@ -52,30 +52,37 @@ app.use(
   }),
 );
 
-// Stripe webhook MUST be registered BEFORE express.json() so the raw Buffer
-// body reaches the handler intact. stripe-replit-sync validates the signature
-// against the raw payload — a parsed JSON body will fail verification.
-app.post(
-  "/api/stripe/webhook",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-    const signature = req.headers["stripe-signature"];
-    if (!signature) {
-      res.status(400).json({ error: "Missing stripe-signature" });
-      return;
-    }
+// Stripe webhook handler — must be registered BEFORE express.json() so the
+// raw Buffer body reaches stripe-replit-sync's signature verifier intact.
+// Mounted on both canonical path (/api/billing/webhook) and the legacy path
+// (/api/stripe/webhook) that Replit-sync registers by default.
+async function handleStripeWebhook(
+  req: express.Request,
+  res: express.Response,
+): Promise<void> {
+  const signature = req.headers["stripe-signature"];
+  if (!signature) {
+    res.status(400).json({ error: "Missing stripe-signature" });
+    return;
+  }
 
-    const sig = Array.isArray(signature) ? signature[0] : signature;
+  const sig = Array.isArray(signature) ? signature[0] : signature;
 
-    try {
-      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
-      res.status(200).json({ received: true });
-    } catch (err: any) {
-      logger.error({ err }, "Stripe webhook processing error");
-      res.status(400).json({ error: "Webhook processing error" });
-    }
-  },
-);
+  try {
+    await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+    res.status(200).json({ received: true });
+  } catch (err) {
+    logger.error({ err }, "Stripe webhook processing error");
+    res.status(400).json({ error: "Webhook processing error" });
+  }
+}
+
+const rawBody = express.raw({ type: "application/json" });
+
+// Canonical path expected by the task contract
+app.post("/api/billing/webhook", rawBody, handleStripeWebhook);
+// Legacy path registered by stripe-replit-sync's findOrCreateManagedWebhook
+app.post("/api/stripe/webhook", rawBody, handleStripeWebhook);
 
 app.use(cookieParser());
 app.use(express.json());

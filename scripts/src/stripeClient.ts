@@ -1,6 +1,19 @@
 import Stripe from "stripe";
 import { StripeSync } from "stripe-replit-sync";
 
+interface ConnectorSettings {
+  publishable: string;
+  secret: string;
+}
+
+interface ConnectorItem {
+  settings: ConnectorSettings;
+}
+
+interface ConnectorResponse {
+  items: ConnectorItem[];
+}
+
 async function getCredentials(): Promise<{
   publishableKey: string;
   secretKey: string;
@@ -37,8 +50,8 @@ async function getCredentials(): Promise<{
     );
   }
 
-  const data = await response.json();
-  const settings = data.items?.[0]?.settings;
+  const data = (await response.json()) as ConnectorResponse;
+  const settings = data.items[0]?.settings;
 
   if (!settings?.publishable || !settings?.secret) {
     throw new Error(
@@ -55,6 +68,6 @@ async function getCredentials(): Promise<{
 export async function getUncachableStripeClient(): Promise<Stripe> {
   const { secretKey } = await getCredentials();
   return new Stripe(secretKey, {
-    apiVersion: "2025-08-27.basil" as any,
+    apiVersion: "2026-04-22.dahlia",
   });
 }

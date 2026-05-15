@@ -28,11 +28,27 @@ const NAV_ITEMS = [
 
 function PlanBadge() {
   const { data: billing } = useBillingInfo();
-  if (!billing || billing.plan !== "pro") return null;
+  if (!billing) return null;
+
+  if (billing.plan === "pro") {
+    return (
+      <div className="px-4 pb-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
+          <Zap className="h-3 w-3" /> Pro
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 pb-2">
-      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
-        <Zap className="h-3 w-3" /> Pro
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+        Free
+        {billing.renderLimit != null && (
+          <span className="ml-1 opacity-70">
+            · {billing.renderCount}/{billing.renderLimit}
+          </span>
+        )}
       </span>
     </div>
   );

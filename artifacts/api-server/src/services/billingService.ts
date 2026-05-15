@@ -108,10 +108,10 @@ export async function checkAndIncrementRenderCount(
   }
 
   if (renderCount >= FREE_RENDER_LIMIT) {
-    const err = new Error("Render limit reached — upgrade to Pro");
-    (err as any).reason = "upgrade_required";
-    (err as any).status = 403;
-    throw err;
+    throw Object.assign(new Error("Render limit reached — upgrade to Pro"), {
+      reason: "upgrade_required",
+      status: 403,
+    });
   }
 
   await db

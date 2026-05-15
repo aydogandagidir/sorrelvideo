@@ -1,8 +1,11 @@
 import { Router, type IRouter } from "express";
 import { getBillingInfo, ensureStripeCustomer } from "../services/billingService";
 import { getUncachableStripeClient } from "../stripeClient";
+import type Stripe from "stripe";
 
 const router: IRouter = Router();
+
+type StripeProduct = Stripe.Product;
 
 /**
  * Fetches Pro Plan prices from Stripe, filtered to only the "Sorrel Pro" product.
@@ -16,39 +19,38 @@ async function getProPrices() {
   });
 
   return prices.data
-    .filter((p) => {
+    .filter((p): boolean => {
       if (p.type !== "recurring") return false;
-      const product = p.product as any;
-      // Only expose prices belonging to the Sorrel Pro product
+      if (!p.product || typeof p.product !== "object") return false;
+      const product = p.product as StripeProduct;
       return (
-        product &&
-        typeof product === "object" &&
-        (product.metadata?.plan === "pro" ||
-          product.name === "Sorrel Pro")
+        product.metadata?.["plan"] === "pro" ||
+        product.name === "Sorrel Pro"
       );
     })
-    .map((p) => ({
-      id: p.id,
-      unitAmount: p.unit_amount,
-      currency: p.currency,
-      interval: (p.recurring?.interval) ?? null,
-      productName:
-        typeof p.product === "object" && p.product !== null && "name" in p.product
-          ? (p.product as any).name
-          : null,
-    }));
+    .map((p) => {
+      const product =
+        p.product && typeof p.product === "object"
+          ? (p.product as StripeProduct)
+          : null;
+      return {
+        id: p.id,
+        unitAmount: p.unit_amount,
+        currency: p.currency,
+        interval: p.recurring?.interval ?? null,
+        productName: product?.name ?? null,
+      };
+    });
 }
 
 // GET /api/billing/prices — public; lists Sorrel Pro prices only
-// Auth not required so the landing/pricing page can show prices to visitors
+// No auth required so the landing/pricing page works for logged-out visitors
 router.get("/billing/prices", async (req, res): Promise<void> => {
   try {
     const prices = await getProPrices();
     res.json({ prices });
-  } catch (err: any) {
-    // Log only when a request logger is available (authenticated request)
-    if (req.log) req.log.warn({ err }, "Failed to fetch Stripe prices");
-    // Return static fallback so the pricing UI is never broken
+  } catch (err) {
+    req.log?.warn({ err }, "Failed to fetch Stripe prices");
     res.json({ prices: [] });
   }
 });
@@ -71,18 +73,19 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     return;
   }
 
-  const { priceId } = req.body as { priceId?: string };
+  const body = req.body as Record<string, unknown>;
+  const priceId = body["priceId"];
   if (!priceId || typeof priceId !== "string") {
     res.status(400).json({ error: "priceId is required" });
     return;
   }
 
-  // Server-side allowlist: only allow Pro Plan prices
+  // Server-side allowlist: only allow Sorrel Pro prices
   let allowedPrices: string[];
   try {
     const prices = await getProPrices();
     allowedPrices = prices.map((p) => p.id);
-  } catch (err: any) {
+  } catch (err) {
     req.log.error({ err }, "Could not verify Pro prices for allowlist");
     res.status(500).json({ error: "Billing service unavailable" });
     return;
@@ -99,7 +102,7 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
   );
 
   const origin = process.env.REPLIT_DOMAINS
-    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
+    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]!.trim()}`
     : `${req.protocol}://${req.get("host")}`;
 
   const stripe = await getUncachableStripeClient();
@@ -130,7 +133,7 @@ router.post("/billing/portal", async (req, res): Promise<void> => {
   }
 
   const origin = process.env.REPLIT_DOMAINS
-    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
+    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]!.trim()}`
     : `${req.protocol}://${req.get("host")}`;
 
   const stripe = await getUncachableStripeClient();
