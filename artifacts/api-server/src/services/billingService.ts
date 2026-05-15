@@ -47,7 +47,11 @@ export async function getUserPlan(
   }
 }
 
-/** Returns billing info for a user. */
+/** Returns billing info for a user.
+ *
+ * If the monthly period has rolled over, the counter is reset in the DB so
+ * that the next call (and the render-count check) see a consistent zero value.
+ */
 export async function getBillingInfo(userId: string): Promise<BillingInfo> {
   const [user] = await db
     .select()
@@ -64,6 +68,11 @@ export async function getBillingInfo(userId: string): Promise<BillingInfo> {
   if (isNewMonth(renderResetAt)) {
     renderCount = 0;
     renderResetAt = null;
+    // Persist the reset so subsequent reads are consistent
+    await db
+      .update(usersTable)
+      .set({ renderCount: 0, renderResetAt: null })
+      .where(eq(usersTable.id, userId));
   }
 
   return {

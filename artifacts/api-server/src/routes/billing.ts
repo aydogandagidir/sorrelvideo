@@ -13,34 +13,34 @@ type StripeProduct = Stripe.Product;
  */
 async function getProPrices() {
   const stripe = await getUncachableStripeClient();
-  const prices = await stripe.prices.list({
-    active: true,
-    expand: ["data.product"],
+
+  // Search for prices scoped to the Sorrel Pro product by name + metadata.
+  // Using products.search avoids iterating all account prices across pages.
+  const products = await stripe.products.search({
+    query: "name:'Sorrel Pro' AND active:'true'",
   });
 
-  return prices.data
-    .filter((p): boolean => {
-      if (p.type !== "recurring") return false;
-      if (!p.product || typeof p.product !== "object") return false;
-      const product = p.product as StripeProduct;
-      return (
-        product.metadata?.["plan"] === "pro" ||
-        product.name === "Sorrel Pro"
-      );
-    })
-    .map((p) => {
-      const product =
-        p.product && typeof p.product === "object"
-          ? (p.product as StripeProduct)
-          : null;
-      return {
-        id: p.id,
-        unitAmount: p.unit_amount,
-        currency: p.currency,
-        interval: p.recurring?.interval ?? null,
-        productName: product?.name ?? null,
-      };
-    });
+  const proProduct = products.data.find(
+    (p) => p.metadata?.["plan"] === "pro" || p.name === "Sorrel Pro",
+  );
+
+  if (!proProduct) return [];
+
+  // Paginate prices for this product (handles accounts with many prices)
+  const pricePages = await stripe.prices.list({
+    product: proProduct.id,
+    active: true,
+    type: "recurring",
+    limit: 100,
+  });
+
+  return pricePages.data.map((p) => ({
+    id: p.id,
+    unitAmount: p.unit_amount,
+    currency: p.currency,
+    interval: p.recurring?.interval ?? null,
+    productName: proProduct.name,
+  }));
 }
 
 // GET /api/billing/prices — public; lists Sorrel Pro prices only
