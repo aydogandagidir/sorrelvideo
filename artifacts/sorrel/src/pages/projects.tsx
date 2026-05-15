@@ -88,12 +88,13 @@ function ProjectCard({ project }: { project: Project }) {
         onSuccess: () => {
           void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
         },
-        onError: (err: any) => {
+        onError: (err) => {
           // Check for upgrade_required 403 from backend
-          const reason = err?.response?.data?.reason ?? err?.data?.reason;
-          const error = err?.response?.data?.error ?? err?.data?.error ?? err?.message ?? "";
-          if (reason === "upgrade_required" || err?.status === 403) {
-            if (error.toLowerCase().includes("template")) {
+          const e = err as { response?: { data?: { reason?: string; error?: string } }; data?: { reason?: string; error?: string }; status?: number; message?: string };
+          const reason = e.response?.data?.reason ?? e.data?.reason;
+          const errorMsg = e.response?.data?.error ?? e.data?.error ?? e.message ?? "";
+          if (reason === "upgrade_required" || e.status === 403) {
+            if (errorMsg.toLowerCase().includes("template")) {
               setUpgradeReason("premium_template");
             } else {
               setUpgradeReason("render_limit");

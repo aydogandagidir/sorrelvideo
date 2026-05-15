@@ -463,7 +463,8 @@ paths:
     get:
       operationId: listBillingPrices
       tags: [billing]
-      summary: List active Stripe prices for Pro plan
+      summary: List active Stripe prices for Pro plan (public, no auth required)
+      security: []
       responses:
         "200":
           description: List of prices
@@ -471,8 +472,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PricesResponse"
-        "401":
-          description: Unauthorized
 
   /stats/overview:
     get:

@@ -217,10 +217,11 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
   // Check + increment monthly render count (gated for free plan)
   try {
     await checkAndIncrementRenderCount(req.user.id);
-  } catch (err: any) {
-    if (err.reason === "upgrade_required") {
+  } catch (err) {
+    const e = err as { reason?: string; message?: string };
+    if (e.reason === "upgrade_required") {
       res.status(403).json({
-        error: err.message,
+        error: e.message ?? "Render limit reached",
         reason: "upgrade_required",
       });
       return;

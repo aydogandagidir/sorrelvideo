@@ -1796,7 +1796,7 @@ export const getListBillingPricesUrl = () => {
 }
 
 /**
- * @summary List active Stripe prices for Pro plan
+ * @summary List active Stripe prices for Pro plan (public, no auth required)
  */
 export const listBillingPrices = async ( options?: RequestInit): Promise<PricesResponse> => {
 
@@ -1820,7 +1820,7 @@ export const getListBillingPricesQueryKey = () => {
     }
 
 
-export const getListBillingPricesQueryOptions = <TData = Awaited<ReturnType<typeof listBillingPrices>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBillingPrices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListBillingPricesQueryOptions = <TData = Awaited<ReturnType<typeof listBillingPrices>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBillingPrices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1839,14 +1839,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListBillingPricesQueryResult = NonNullable<Awaited<ReturnType<typeof listBillingPrices>>>
-export type ListBillingPricesQueryError = ErrorType<void>
+export type ListBillingPricesQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List active Stripe prices for Pro plan
+ * @summary List active Stripe prices for Pro plan (public, no auth required)
  */
 
-export function useListBillingPrices<TData = Awaited<ReturnType<typeof listBillingPrices>>, TError = ErrorType<void>>(
+export function useListBillingPrices<TData = Awaited<ReturnType<typeof listBillingPrices>>, TError = ErrorType<unknown>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBillingPrices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

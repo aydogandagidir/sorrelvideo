@@ -351,7 +351,7 @@ export const CreatePortalSessionResponse = zod.object({
 
 
 /**
- * @summary List active Stripe prices for Pro plan
+ * @summary List active Stripe prices for Pro plan (public, no auth required)
  */
 export const ListBillingPricesResponse = zod.object({
   "prices": zod.array(zod.object({

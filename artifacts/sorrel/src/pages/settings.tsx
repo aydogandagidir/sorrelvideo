@@ -39,10 +39,28 @@ function BillingCard() {
   const queryClient = useQueryClient();
   const search = useSearch();
 
+  // After a successful Stripe checkout, the webhook may take a few seconds to
+  // arrive and update the subscription record. We poll /billing/me until the
+  // plan flips to "pro" (or we give up after 30 seconds) so the UI updates
+  // reliably without waiting for a manual page refresh.
   useEffect(() => {
-    if (search.includes("upgraded=1")) {
+    if (!search.includes("upgraded=1")) return;
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 10;
+    const INTERVAL_MS = 3000;
+
+    const poll = setInterval(() => {
+      attempts++;
       queryClient.invalidateQueries({ queryKey: ["billing"] });
-    }
+
+      const cached = queryClient.getQueryData<{ plan: string }>(["billing", "me"]);
+      if (cached?.plan === "pro" || attempts >= MAX_ATTEMPTS) {
+        clearInterval(poll);
+      }
+    }, INTERVAL_MS);
+
+    return () => clearInterval(poll);
   }, [search, queryClient]);
 
   const monthlyPrice = pricesData?.prices?.find((p) => p.interval === "month");
