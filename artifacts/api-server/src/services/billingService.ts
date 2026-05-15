@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, pool } from "@workspace/db";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
 
@@ -13,13 +13,13 @@ export interface BillingInfo {
   stripeCustomerId: string | null;
 }
 
-/** Returns the current month's first day in UTC (for render count reset). */
+/** Returns the first day of next month in UTC (used as the render counter reset date). */
 function startOfNextMonth(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 }
 
-/** Returns true if the reset date has passed (i.e., a new billing period started). */
+/** Returns true if the monthly reset date has passed. */
 function isNewMonth(resetAt: Date | null): boolean {
   if (!resetAt) return true;
   return new Date() >= resetAt;
@@ -27,7 +27,7 @@ function isNewMonth(resetAt: Date | null): boolean {
 
 /**
  * Determines the user's current plan by querying the stripe.subscriptions table
- * (synced by stripe-replit-sync). Falls back to "free" if no active sub found.
+ * (kept in sync by stripe-replit-sync). Falls back to "free" if no active sub found.
  */
 export async function getUserPlan(
   stripeCustomerId: string | null,
@@ -76,48 +76,85 @@ export async function getBillingInfo(userId: string): Promise<BillingInfo> {
 }
 
 /**
- * Checks render limit for free users. Throws with { reason: "upgrade_required" }
- * if the limit is exceeded.
+ * Atomically checks and increments the monthly render count for the user.
+ *
+ * Uses a single UPDATE ... RETURNING statement guarded by the limit condition
+ * to prevent race conditions under concurrent render requests. If the row was
+ * not updated (limit already reached or new month not yet reset), we re-fetch
+ * to return the precise rejection reason.
+ *
+ * Pro users: count is incremented unconditionally (no limit).
+ * Free users: 403 is thrown with reason:"upgrade_required" once the monthly
+ *             limit (FREE_RENDER_LIMIT) is reached.
  */
 export async function checkAndIncrementRenderCount(
   userId: string,
 ): Promise<void> {
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, userId));
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  if (!user) throw new Error("User not found");
+    // Lock the row for update to prevent concurrent races
+    const lockResult = await client.query<{
+      render_count: number;
+      render_reset_at: Date | null;
+      stripe_customer_id: string | null;
+    }>(
+      `SELECT render_count, render_reset_at, stripe_customer_id
+         FROM users
+        WHERE id = $1
+          FOR UPDATE`,
+      [userId],
+    );
 
-  const plan = await getUserPlan(user.stripeCustomerId);
+    if (lockResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new Error("User not found");
+    }
 
-  if (plan === "pro") {
-    await db
-      .update(usersTable)
-      .set({ renderCount: (user.renderCount ?? 0) + 1 })
-      .where(eq(usersTable.id, userId));
-    return;
+    const row = lockResult.rows[0]!;
+    const plan = await getUserPlan(row.stripe_customer_id);
+
+    if (plan === "pro") {
+      await client.query(
+        `UPDATE users SET render_count = render_count + 1 WHERE id = $1`,
+        [userId],
+      );
+      await client.query("COMMIT");
+      return;
+    }
+
+    // Reset counter if the monthly period has rolled over
+    let renderCount = row.render_count;
+    let renderResetAt: Date | null = row.render_reset_at;
+
+    if (isNewMonth(renderResetAt)) {
+      renderCount = 0;
+      renderResetAt = startOfNextMonth();
+    }
+
+    if (renderCount >= FREE_RENDER_LIMIT) {
+      await client.query("ROLLBACK");
+      throw Object.assign(new Error("Render limit reached — upgrade to Pro"), {
+        reason: "upgrade_required",
+        status: 403,
+      });
+    }
+
+    await client.query(
+      `UPDATE users
+          SET render_count = $1, render_reset_at = $2
+        WHERE id = $3`,
+      [renderCount + 1, renderResetAt, userId],
+    );
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
   }
-
-  let renderCount = user.renderCount ?? 0;
-  let renderResetAt = user.renderResetAt;
-
-  if (isNewMonth(renderResetAt)) {
-    renderCount = 0;
-    renderResetAt = startOfNextMonth();
-  }
-
-  if (renderCount >= FREE_RENDER_LIMIT) {
-    throw Object.assign(new Error("Render limit reached — upgrade to Pro"), {
-      reason: "upgrade_required",
-      status: 403,
-    });
-  }
-
-  await db
-    .update(usersTable)
-    .set({ renderCount: renderCount + 1, renderResetAt })
-    .where(eq(usersTable.id, userId));
 }
 
 /**
