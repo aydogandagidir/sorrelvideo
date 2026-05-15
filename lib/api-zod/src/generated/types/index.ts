@@ -36,3 +36,5 @@ export * from './projectUpdate';
 export * from './projectUpdateStatus';
 export * from './template';
 export * from './templateInput';
+export * from './uploadUrlRequest';
+export * from './uploadUrlResponse';
