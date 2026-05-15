@@ -3,13 +3,24 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Sorrel - Modular Video Production Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: templates
+    description: Video template operations
+  - name: projects
+    description: Video project operations
+  - name: brand
+    description: Brand kit operations
+  - name: modules
+    description: Platform modules
+  - name: stats
+    description: Platform statistics
+
 paths:
   /healthz:
     get:
@@ -24,6 +35,216 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /templates:
+    get:
+      operationId: listTemplates
+      tags: [templates]
+      summary: List video templates
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: module
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+    post:
+      operationId: createTemplate
+      tags: [templates]
+      summary: Create a template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateInput"
+      responses:
+        "201":
+          description: Created template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+
+  /templates/{id}:
+    get:
+      operationId: getTemplate
+      tags: [templates]
+      summary: Get a template by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        "404":
+          description: Not found
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List video projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new video project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /brand:
+    get:
+      operationId: getBrandKit
+      tags: [brand]
+      summary: Get the current brand kit
+      responses:
+        "200":
+          description: Brand kit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKit"
+    put:
+      operationId: updateBrandKit
+      tags: [brand]
+      summary: Update the brand kit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandKitInput"
+      responses:
+        "200":
+          description: Updated brand kit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKit"
+
+  /modules:
+    get:
+      operationId: listModules
+      tags: [modules]
+      summary: List available platform modules
+      responses:
+        "200":
+          description: List of modules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Module"
+
+  /stats/overview:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get platform usage statistics
+      responses:
+        "200":
+          description: Platform stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +255,185 @@ components:
       required:
         - status
 
+    Template:
+      type: object
+      required: [id, name, category, module, thumbnailUrl, duration, isPremium]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        category:
+          type: string
+        module:
+          type: string
+        thumbnailUrl:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds
+        isPremium:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+
+    TemplateInput:
+      type: object
+      required: [name, category, module, thumbnailUrl, duration]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        module:
+          type: string
+        thumbnailUrl:
+          type: string
+        duration:
+          type: integer
+        isPremium:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+
+    Project:
+      type: object
+      required: [id, name, status, module, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, rendering, ready, failed]
+        module:
+          type: string
+        templateId:
+          type: ["integer", "null"]
+        thumbnailUrl:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+        duration:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ProjectInput:
+      type: object
+      required: [name, module]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        module:
+          type: string
+        templateId:
+          type: integer
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, rendering, ready, failed]
+        thumbnailUrl:
+          type: string
+        videoUrl:
+          type: string
+
+    BrandKit:
+      type: object
+      required: [id, primaryColor, secondaryColor, fontFamily, updatedAt]
+      properties:
+        id:
+          type: integer
+        logoUrl:
+          type: ["string", "null"]
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        accentColor:
+          type: ["string", "null"]
+        fontFamily:
+          type: string
+        companyName:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+
+    BrandKitInput:
+      type: object
+      properties:
+        logoUrl:
+          type: string
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        accentColor:
+          type: string
+        fontFamily:
+          type: string
+        companyName:
+          type: string
+
+    Module:
+      type: object
+      required: [id, name, slug, description, icon, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        status:
+          type: string
+          enum: [active, coming_soon, beta]
+        features:
+          type: array
+          items:
+            type: string
+
+    PlatformStats:
+      type: object
+      required: [totalProjects, totalTemplates, videosRendered, activeModules]
+      properties:
+        totalProjects:
+          type: integer
+        totalTemplates:
+          type: integer
+        videosRendered:
+          type: integer
+        activeModules:
+          type: integer
+        recentProjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
