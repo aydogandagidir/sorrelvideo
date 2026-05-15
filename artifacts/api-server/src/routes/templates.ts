@@ -40,21 +40,6 @@ router.get("/templates", async (req, res): Promise<void> => {
     conditions.push(eq(templatesTable.module, parsed.data.module));
   }
 
-  const plan = await getUserPlan(
-    (
-      await db
-        .select({ stripeCustomerId: usersTable.stripeCustomerId })
-        .from(usersTable)
-        .where(eq(usersTable.id, req.user.id))
-        .limit(1)
-    )[0]?.stripeCustomerId ?? null,
-  );
-
-  // Free-plan users only see non-premium templates
-  if (plan === "free") {
-    conditions.push(eq(templatesTable.isPremium, false));
-  }
-
   const templates = await db
     .select()
     .from(templatesTable)
@@ -108,6 +93,23 @@ router.get("/templates/:id", async (req, res): Promise<void> => {
   if (template.userId !== null && template.userId !== req.user.id) {
     res.status(403).json({ error: "Forbidden" });
     return;
+  }
+
+  // Deny access to premium templates for Free-plan users
+  if (template.isPremium) {
+    const stripeCustomerId =
+      (
+        await db
+          .select({ stripeCustomerId: usersTable.stripeCustomerId })
+          .from(usersTable)
+          .where(eq(usersTable.id, req.user.id))
+          .limit(1)
+      )[0]?.stripeCustomerId ?? null;
+    const plan = await getUserPlan(stripeCustomerId);
+    if (plan === "free") {
+      res.status(403).json({ error: "Forbidden", reason: "upgrade_required" });
+      return;
+    }
   }
 
   res.json(GetTemplateResponse.parse(serializeDates(template)));
