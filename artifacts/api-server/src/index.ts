@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
+import { applyBillingMigration } from "./lib/applyBillingMigration";
 
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
@@ -11,6 +12,9 @@ async function initStripe(): Promise<void> {
   }
 
   try {
+    // Ensure billing columns exist on the users table before any request touches them.
+    await applyBillingMigration();
+
     logger.info("Initializing Stripe schema...");
     await runMigrations({ databaseUrl });
     logger.info("Stripe schema ready");
@@ -18,8 +22,10 @@ async function initStripe(): Promise<void> {
     const stripeSync = await getStripeSync();
 
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+    // Register the canonical webhook path; /api/stripe/webhook is kept as a
+    // legacy alias in app.ts for stripe-replit-sync compatibility.
     await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`,
+      `${webhookBaseUrl}/api/billing/webhook`,
     );
     logger.info("Stripe webhook configured");
 

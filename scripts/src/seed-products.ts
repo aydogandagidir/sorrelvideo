@@ -45,8 +45,9 @@ async function createProducts() {
 
     console.log("\nAll done! Webhooks will sync this to the database.");
     console.log("Monthly price ID to use in checkout:", monthlyPrice.id);
-  } catch (error: any) {
-    console.error("Error creating products:", error.message);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Error creating products:", msg);
     process.exit(1);
   }
 }
