@@ -52,10 +52,8 @@ app.use(
   }),
 );
 
-// Stripe webhook handler — must be registered BEFORE express.json() so the
-// raw Buffer body reaches stripe-replit-sync's signature verifier intact.
-// Mounted on both canonical path (/api/billing/webhook) and the legacy path
-// (/api/stripe/webhook) that Replit-sync registers by default.
+// Stripe webhook — registered before express.json() to preserve the raw body
+// required for signature verification. Mounted on both canonical and legacy paths.
 async function handleStripeWebhook(
   req: express.Request,
   res: express.Response,

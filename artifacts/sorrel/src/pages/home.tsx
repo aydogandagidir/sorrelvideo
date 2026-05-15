@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Video, Zap, Layers, Sparkles, MonitorPlay, Check as CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useBillingPrices } from "@/hooks/useBilling";
 
 function HeroSection() {
   return (
@@ -45,7 +46,21 @@ function HeroSection() {
   );
 }
 
-function FeatureCard({ icon: Icon, title, description, delay }: { icon: any, title: string, description: string, delay: number }) {
+function ProPrice() {
+  const { data: pricesData } = useBillingPrices();
+  const monthly = pricesData?.prices?.find((p) => p.interval === "month");
+  const display = monthly
+    ? `$${((monthly.unitAmount ?? 0) / 100).toFixed(0)}`
+    : "$29";
+  return (
+    <div className="flex items-baseline gap-1">
+      <span className="text-4xl font-extrabold">{display}</span>
+      <span className="text-muted-foreground">/month</span>
+    </div>
+  );
+}
+
+function FeatureCard({ icon: Icon, title, description, delay }: { icon: React.ElementType, title: string, description: string, delay: number }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -148,10 +163,7 @@ export default function Home() {
                     <h3 className="text-lg font-bold">Pro</h3>
                     <Zap className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold">$29</span>
-                    <span className="text-muted-foreground">/month</span>
-                  </div>
+                  <ProPrice />
                 </div>
                 <ul className="space-y-2 flex-1 text-sm">
                   {["Unlimited renders", "All premium templates", "1080p output", "Priority queue", "Advanced analytics", "Priority support"].map(f => (

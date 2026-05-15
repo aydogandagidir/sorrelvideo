@@ -1,15 +1,20 @@
-import React from "react";
+import React, { useState } from "react";
 import { Layout } from "@/components/layout";
 import { useListTemplates } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Clock, Tag } from "lucide-react";
+import { AlertCircle, Clock, Lock, Tag } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { UpgradeModal } from "@/components/upgrade-modal";
+import { useBillingInfo } from "@/hooks/useBilling";
 
 export default function Templates() {
   const { data: templates, isLoading, isError } = useListTemplates();
+  const { data: billing } = useBillingInfo();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const isPro = billing?.plan === "pro";
 
   if (isError) {
     return (
@@ -89,7 +94,18 @@ export default function Templates() {
                 </div>
               </CardContent>
               <CardFooter className="pt-0">
-                <Button className="w-full">Use Template</Button>
+                {template.isPremium && !isPro ? (
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => setUpgradeOpen(true)}
+                  >
+                    <Lock className="mr-2 h-4 w-4" />
+                    Unlock Template
+                  </Button>
+                ) : (
+                  <Button className="w-full">Use Template</Button>
+                )}
               </CardFooter>
             </Card>
           ))
@@ -99,6 +115,12 @@ export default function Templates() {
           </div>
         )}
       </div>
+
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        reason="premium_template"
+      />
     </Layout>
   );
 }
