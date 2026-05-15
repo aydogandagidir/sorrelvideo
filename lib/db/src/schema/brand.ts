@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const brandKitTable = pgTable("brand_kit", {
   id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().default(""),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").notNull().default("#6366f1"),
   secondaryColor: text("secondary_color").notNull().default("#8b5cf6"),

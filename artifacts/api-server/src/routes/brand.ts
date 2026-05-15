@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { eq } from "drizzle-orm";
 import { db, brandKitTable } from "@workspace/db";
 import {
   GetBrandKitResponse,
@@ -8,14 +9,22 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/brand", async (_req, res): Promise<void> => {
-  const [kit] = await db.select().from(brandKitTable).limit(1);
+router.get("/brand", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const [kit] = await db
+    .select()
+    .from(brandKitTable)
+    .where(eq(brandKitTable.userId, req.user.id))
+    .limit(1);
 
   if (!kit) {
-    // Auto-create default brand kit
     const [created] = await db
       .insert(brandKitTable)
       .values({
+        userId: req.user.id,
         primaryColor: "#6366f1",
         secondaryColor: "#8b5cf6",
         fontFamily: "Inter",
@@ -29,25 +38,34 @@ router.get("/brand", async (_req, res): Promise<void> => {
 });
 
 router.put("/brand", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   const parsed = UpdateBrandKitBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  // Upsert: update existing or create if none
-  const [existing] = await db.select().from(brandKitTable).limit(1);
+  const [existing] = await db
+    .select()
+    .from(brandKitTable)
+    .where(eq(brandKitTable.userId, req.user.id))
+    .limit(1);
 
   if (existing) {
     const [kit] = await db
       .update(brandKitTable)
       .set(parsed.data)
+      .where(eq(brandKitTable.userId, req.user.id))
       .returning();
     res.json(UpdateBrandKitResponse.parse(kit));
   } else {
     const [kit] = await db
       .insert(brandKitTable)
       .values({
+        userId: req.user.id,
         primaryColor: "#6366f1",
         secondaryColor: "#8b5cf6",
         fontFamily: "Inter",

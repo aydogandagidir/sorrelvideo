@@ -11,6 +11,10 @@ import {
 
 const router: IRouter = Router();
 
+function serializeDates<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
 router.get("/templates", async (req, res): Promise<void> => {
   const parsed = ListTemplatesQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -32,7 +36,7 @@ router.get("/templates", async (req, res): Promise<void> => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(templatesTable.id);
 
-  res.json(ListTemplatesResponse.parse(templates));
+  res.json(ListTemplatesResponse.parse(serializeDates(templates)));
 });
 
 router.post("/templates", async (req, res): Promise<void> => {
@@ -43,7 +47,7 @@ router.post("/templates", async (req, res): Promise<void> => {
   }
 
   const [template] = await db.insert(templatesTable).values(parsed.data).returning();
-  res.status(201).json(GetTemplateResponse.parse(template));
+  res.status(201).json(GetTemplateResponse.parse(serializeDates(template)));
 });
 
 router.get("/templates/:id", async (req, res): Promise<void> => {
@@ -64,7 +68,7 @@ router.get("/templates/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetTemplateResponse.parse(template));
+  res.json(GetTemplateResponse.parse(serializeDates(template)));
 });
 
 export default router;

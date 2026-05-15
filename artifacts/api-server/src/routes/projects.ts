@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, projectsTable } from "@workspace/db";
 import {
   ListProjectsResponse,
@@ -14,27 +14,47 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/projects", async (_req, res): Promise<void> => {
+function serializeDates<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
+router.get("/projects", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   const projects = await db
     .select()
     .from(projectsTable)
+    .where(eq(projectsTable.userId, req.user.id))
     .orderBy(projectsTable.updatedAt);
 
-  res.json(ListProjectsResponse.parse(projects));
+  res.json(ListProjectsResponse.parse(serializeDates(projects)));
 });
 
 router.post("/projects", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   const parsed = CreateProjectBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  const [project] = await db.insert(projectsTable).values(parsed.data).returning();
-  res.status(201).json(GetProjectResponse.parse(project));
+  const [project] = await db
+    .insert(projectsTable)
+    .values({ ...parsed.data, userId: req.user.id })
+    .returning();
+  res.status(201).json(GetProjectResponse.parse(serializeDates(project)));
 });
 
 router.get("/projects/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetProjectParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -45,17 +65,26 @@ router.get("/projects/:id", async (req, res): Promise<void> => {
   const [project] = await db
     .select()
     .from(projectsTable)
-    .where(eq(projectsTable.id, params.data.id));
+    .where(
+      and(
+        eq(projectsTable.id, params.data.id),
+        eq(projectsTable.userId, req.user.id),
+      ),
+    );
 
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
   }
 
-  res.json(GetProjectResponse.parse(project));
+  res.json(GetProjectResponse.parse(serializeDates(project)));
 });
 
 router.patch("/projects/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdateProjectParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
@@ -72,7 +101,12 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
   const [project] = await db
     .update(projectsTable)
     .set(parsed.data)
-    .where(eq(projectsTable.id, params.data.id))
+    .where(
+      and(
+        eq(projectsTable.id, params.data.id),
+        eq(projectsTable.userId, req.user.id),
+      ),
+    )
     .returning();
 
   if (!project) {
@@ -80,10 +114,14 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(UpdateProjectResponse.parse(project));
+  res.json(UpdateProjectResponse.parse(serializeDates(project)));
 });
 
 router.delete("/projects/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteProjectParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -93,7 +131,12 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
 
   const [project] = await db
     .delete(projectsTable)
-    .where(eq(projectsTable.id, params.data.id))
+    .where(
+      and(
+        eq(projectsTable.id, params.data.id),
+        eq(projectsTable.userId, req.user.id),
+      ),
+    )
     .returning();
 
   if (!project) {

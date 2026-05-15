@@ -1,8 +1,9 @@
-import React from "react";
+import { type ComponentType } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@workspace/replit-auth-web";
 
 import Home from "./pages/home";
 import Dashboard from "./pages/dashboard";
@@ -21,15 +22,44 @@ const queryClient = new QueryClient({
   },
 });
 
+function ProtectedRoute({ component: Component }: { component: ComponentType }) {
+  const { isAuthenticated, isLoading, login } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    login();
+    return null;
+  }
+
+  return <Component />;
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/templates" component={Templates} />
-      <Route path="/projects" component={Projects} />
-      <Route path="/brand" component={Brand} />
-      <Route path="/modules" component={Modules} />
+      <Route path="/dashboard">
+        <ProtectedRoute component={Dashboard} />
+      </Route>
+      <Route path="/templates">
+        <ProtectedRoute component={Templates} />
+      </Route>
+      <Route path="/projects">
+        <ProtectedRoute component={Projects} />
+      </Route>
+      <Route path="/brand">
+        <ProtectedRoute component={Brand} />
+      </Route>
+      <Route path="/modules">
+        <ProtectedRoute component={Modules} />
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

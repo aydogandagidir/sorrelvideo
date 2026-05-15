@@ -5,6 +5,10 @@ import { GetStatsResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
+function serializeDates<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
 router.get("/stats/overview", async (_req, res): Promise<void> => {
   const [totalProjectsResult, totalTemplatesResult, activeModulesResult, recentProjects] =
     await Promise.all([
@@ -17,13 +21,15 @@ router.get("/stats/overview", async (_req, res): Promise<void> => {
   const videosRendered = totalProjectsResult.filter((p) => p.status === "ready").length;
 
   res.json(
-    GetStatsResponse.parse({
-      totalProjects: totalProjectsResult.length,
-      totalTemplates: totalTemplatesResult.length,
-      videosRendered,
-      activeModules: activeModulesResult.length,
-      recentProjects,
-    })
+    GetStatsResponse.parse(
+      serializeDates({
+        totalProjects: totalProjectsResult.length,
+        totalTemplates: totalTemplatesResult.length,
+        videosRendered,
+        activeModules: activeModulesResult.length,
+        recentProjects,
+      }),
+    ),
   );
 });
 
