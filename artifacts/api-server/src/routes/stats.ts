@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, projectsTable, templatesTable, modulesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or, isNull } from "drizzle-orm";
 import { GetStatsResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -17,10 +17,15 @@ router.get("/stats/overview", async (req, res): Promise<void> => {
 
   const userId = req.user.id;
 
+  const visibleTemplatesFilter = or(
+    isNull(templatesTable.userId),
+    eq(templatesTable.userId, userId),
+  );
+
   const [allProjects, totalTemplatesResult, activeModulesResult, recentProjects] =
     await Promise.all([
       db.select().from(projectsTable).where(eq(projectsTable.userId, userId)),
-      db.select().from(templatesTable),
+      db.select().from(templatesTable).where(visibleTemplatesFilter),
       db.select().from(modulesTable).where(eq(modulesTable.status, "active")),
       db
         .select()
