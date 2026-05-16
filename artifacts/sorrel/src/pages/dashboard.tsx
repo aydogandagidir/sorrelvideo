@@ -1,14 +1,13 @@
-import React from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { useGetStats } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Film, Video, Plus, Layers, AlertCircle } from "lucide-react";
+import { Film, Video, Plus, Layers, AlertCircle, type LucideIcon } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-function StatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: any, description: string }) {
+function StatCard({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: LucideIcon, description: string }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

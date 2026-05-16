@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowRight, Video, Zap, Layers, Sparkles, MonitorPlay, Check as CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBillingPrices } from "@/hooks/useBilling";

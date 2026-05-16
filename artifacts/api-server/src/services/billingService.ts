@@ -127,12 +127,12 @@ export async function checkAndIncrementRenderCount(
       [userId],
     );
 
-    if (lockResult.rows.length === 0) {
+    const row = lockResult.rows[0];
+    if (!row) {
       await client.query("ROLLBACK");
       throw new Error("User not found");
     }
 
-    const row = lockResult.rows[0]!;
     const plan = await getUserPlan(row.stripe_customer_id);
 
     if (plan === "pro") {

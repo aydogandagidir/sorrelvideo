@@ -15,7 +15,10 @@ type ToasterToast = ToastProps & {
   action?: ToastActionElement
 }
 
-const actionTypes = {
+// Kept as `_actionTypes` (underscore-prefixed) because the value is only ever
+// read via `typeof _actionTypes` below — ESLint's value/type tracking can't
+// see across that boundary, so we opt out of the unused-value warning.
+const _actionTypes = {
   ADD_TOAST: "ADD_TOAST",
   UPDATE_TOAST: "UPDATE_TOAST",
   DISMISS_TOAST: "DISMISS_TOAST",
@@ -29,7 +32,7 @@ function genId() {
   return count.toString()
 }
 
-type ActionType = typeof actionTypes
+type ActionType = typeof _actionTypes
 
 type Action =
   | {

@@ -60,8 +60,8 @@ function UserFooter() {
   if (!user) return null;
 
   const initials = [user.firstName, user.lastName]
-    .filter(Boolean)
-    .map((n) => n![0].toUpperCase())
+    .filter((name): name is string => Boolean(name))
+    .map((n) => n[0]?.toUpperCase() ?? "")
     .join("") || user.email?.[0]?.toUpperCase() || "U";
 
   const displayName =

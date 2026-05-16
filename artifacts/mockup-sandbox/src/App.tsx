@@ -48,7 +48,7 @@ function PreviewRenderer({
         if (cancelled) {
           return;
         }
-        const name = componentPath.split("/").pop()!;
+        const name = componentPath.split("/").pop() ?? componentPath;
         const comp = _resolveComponent(mod, name);
         if (!comp) {
           setError(

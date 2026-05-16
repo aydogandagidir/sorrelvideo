@@ -196,6 +196,9 @@ limiting are deliberately deferred — see "Future work" below.
 - Use `req.user.id` without first calling `req.isAuthenticated()`
 - Run `pnpm --filter @workspace/db run push` against a production database
   automatically (e.g. from a post-merge or CI hook)
+- Bypass lint errors with `// eslint-disable` or `// @ts-ignore` — the config
+  is strict on purpose. Fix the code, narrow the type, or open a PR that
+  revises the rule itself with rationale
 
 ## Testing strategy
 
@@ -212,9 +215,23 @@ Playwright / E2E can wait until there is meaningful UI surface to cover.
 
 ## Lint & format
 
-Prettier 3 is configured at the root. **No ESLint yet** — adding flat-config
-ESLint with `typescript-eslint` + `react-hooks` + `unused-imports` is the next
-planned cleanup pass.
+ESLint 9 flat config lives at the workspace root in `eslint.config.mjs`. It
+runs in **strict mode** — every rule is `error`, there are no warnings to
+ignore. Run `pnpm run lint` to check and `pnpm run lint:fix` to auto-fix.
+Prettier 3 handles formatting; ESLint defers to it via `eslint-config-prettier`
+(loaded last). Generated files (`lib/api-{zod,client-react}/src/generated/**`)
+and HTML compositions are excluded from linting.
+
+Notable rule decisions:
+- `@typescript-eslint/no-explicit-any` and `no-non-null-assertion` are
+  **errors** — narrow types or use a guarded check (`if (!x) throw …`)
+- `unused-imports/no-unused-imports` is error with auto-fix; underscore-prefixed
+  vars (`^_`) are intentionally ignored
+- `react-refresh/only-export-components` is **off** — Shadcn/cva re-exports
+  variants alongside components and the rule fights that idiom
+- `react/no-unknown-property` has `cmdk-input-wrapper` allowlisted
+- `@typescript-eslint/no-namespace` allows `declare namespace` (used for Express
+  request augmentation)
 
 ## Deployment
 
@@ -233,7 +250,8 @@ frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **ESLint + tree-wide cleanup** (next planned pass)
+1. **Husky + lint-staged** — run ESLint + Prettier on staged files pre-commit,
+   fail PRs on lint errors
 2. **Vitest skeleton + first tests** (billing race, auth paths, render service)
 3. **Email verification + password reset** (`emailVerifiedAt` column already
    reserved)

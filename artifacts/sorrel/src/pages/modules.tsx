@@ -3,7 +3,6 @@ import { Layout } from "@/components/layout";
 import { useListModules } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { AlertCircle, CheckCircle2, Blocks } from "lucide-react";

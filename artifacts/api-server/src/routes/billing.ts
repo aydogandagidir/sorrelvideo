@@ -1,11 +1,8 @@
 import { Router, type IRouter } from "express";
 import { getBillingInfo, ensureStripeCustomer } from "../services/billingService";
 import { getUncachableStripeClient } from "../stripeClient";
-import type Stripe from "stripe";
 
 const router: IRouter = Router();
-
-type StripeProduct = Stripe.Product;
 
 /**
  * Fetches Pro Plan prices from Stripe, filtered to only the "Sorrel Pro" product.

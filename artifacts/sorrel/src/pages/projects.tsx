@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import {
   useListProjects,
@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Film, Play, Trash2, Clock, Plus, Loader2, Clapperboard, Video, AlertTriangle } from "lucide-react";
+import { AlertCircle, Film, Play, Trash2, Clock, Plus, Loader2, Clapperboard, AlertTriangle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,

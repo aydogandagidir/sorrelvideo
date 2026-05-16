@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "wouter";
 import { Check, Zap, Video, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
