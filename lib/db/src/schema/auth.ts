@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessionsTable = pgTable(
   "sessions",
   {
@@ -12,17 +11,21 @@ export const sessionsTable = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  // Argon2id hash. Null for users created via OAuth (future) — at least one
+  // credential (password or OAuth identity) must exist for sign-in.
+  passwordHash: varchar("password_hash"),
+  // Reserved for future email verification flow. Null = unverified.
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   // Billing. stripeCustomerId is written on first checkout.
-  // plan and stripeSubscriptionId are reserved for future use; current plan is
-  // derived at runtime by querying stripe.subscriptions (synced by stripe-replit-sync)
-  // so they should not be treated as the source of truth.
+  // plan and stripeSubscriptionId are reserved columns; current plan is
+  // derived at runtime by querying the local stripe_subscriptions cache
+  // (synced from Stripe webhooks). Never treat these columns as the source of truth.
   plan: varchar("plan", { enum: ["free", "pro"] }).notNull().default("free"),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),

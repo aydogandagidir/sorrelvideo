@@ -3,6 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
+    "composite": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
     "jsx": "react-jsx",
     "lib": ["esnext", "dom", "dom.iterable"]
   },

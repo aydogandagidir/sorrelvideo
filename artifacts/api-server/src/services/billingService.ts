@@ -1,5 +1,10 @@
-import { eq, sql } from "drizzle-orm";
-import { db, usersTable, pool } from "@workspace/db";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  db,
+  pool,
+  stripeSubscriptionsTable,
+  usersTable,
+} from "@workspace/db";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
 
@@ -26,8 +31,9 @@ function isNewMonth(resetAt: Date | null): boolean {
 }
 
 /**
- * Determines the user's current plan by querying the stripe.subscriptions table
- * (kept in sync by stripe-replit-sync). Falls back to "free" if no active sub found.
+ * Determines the user's current plan by reading the local stripe_subscriptions
+ * cache (populated by webhook events). Falls back to "free" if no active or
+ * trialing subscription is found for the customer.
  */
 export async function getUserPlan(
   stripeCustomerId: string | null,
@@ -35,14 +41,19 @@ export async function getUserPlan(
   if (!stripeCustomerId) return "free";
 
   try {
-    const result = await db.execute(
-      sql`SELECT id FROM stripe.subscriptions
-          WHERE customer = ${stripeCustomerId}
-            AND status IN ('active', 'trialing')
-          LIMIT 1`,
-    );
-    return result.rows.length > 0 ? "pro" : "free";
-  } catch {
+    const rows = await db
+      .select({ id: stripeSubscriptionsTable.id })
+      .from(stripeSubscriptionsTable)
+      .where(
+        and(
+          eq(stripeSubscriptionsTable.customerId, stripeCustomerId),
+          inArray(stripeSubscriptionsTable.status, ["active", "trialing"]),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0 ? "pro" : "free";
+  } catch (err) {
+    logger.warn({ err, stripeCustomerId }, "getUserPlan lookup failed");
     return "free";
   }
 }

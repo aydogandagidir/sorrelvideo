@@ -1,31 +1,36 @@
-import * as client from "openid-client";
 import crypto from "crypto";
 import { type Request, type Response } from "express";
+import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2";
 import { db, sessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import type { AuthUser } from "@workspace/api-zod";
 
-export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "sid";
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
+// OWASP recommended Argon2id parameters (m=19 MiB, t=2, p=1).
+const ARGON2_OPTIONS = {
+  memoryCost: 19_456,
+  timeCost: 2,
+  parallelism: 1,
+} as const;
+
 export interface SessionData {
-  user: AuthUser;
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
+  userId: string;
 }
 
-let oidcConfig: client.Configuration | null = null;
+export async function hashPassword(plain: string): Promise<string> {
+  return argon2Hash(plain, ARGON2_OPTIONS);
+}
 
-export async function getOidcConfig(): Promise<client.Configuration> {
-  if (!oidcConfig) {
-    oidcConfig = await client.discovery(
-      new URL(ISSUER_URL),
-      process.env.REPL_ID!,
-    );
+export async function verifyPassword(
+  hash: string,
+  plain: string,
+): Promise<boolean> {
+  try {
+    return await argon2Verify(hash, plain);
+  } catch {
+    return false;
   }
-  return oidcConfig;
 }
 
 export async function createSession(data: SessionData): Promise<string> {
@@ -83,4 +88,14 @@ export function getSessionId(req: Request): string | undefined {
     return authHeader.slice(7);
   }
   return req.cookies?.[SESSION_COOKIE];
+}
+
+export function setSessionCookie(res: Response, sid: string): void {
+  res.cookie(SESSION_COOKIE, sid, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL,
+  });
 }

@@ -9,11 +9,11 @@ import { WebhookHandlers } from "./webhookHandlers";
 
 const app: Express = express();
 
-// In production, REPLIT_DOMAINS is a comma-separated list of allowed origins.
-// In development, allow any origin so the Vite dev server can reach the API
-// through the shared Replit proxy.
-const allowedOrigins: string[] = process.env.REPLIT_DOMAINS
-  ? process.env.REPLIT_DOMAINS.split(",").map((d) => `https://${d.trim()}`)
+// In production, ALLOWED_ORIGINS is a comma-separated list of full origin URLs
+// (e.g. "https://app.example.com,https://www.example.com").
+// In development, allow any origin so the Vite dev server can reach the API.
+const allowedOrigins: string[] = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
   : [];
 
 app.use(
@@ -77,10 +77,10 @@ async function handleStripeWebhook(
 
 const rawBody = express.raw({ type: "application/json" });
 
-// Canonical path expected by the task contract
+// Stripe webhook URL must be configured in the Stripe Dashboard as
+// `${APP_URL}/api/billing/webhook`. The raw body is preserved above so the
+// signature can be verified by stripe.webhooks.constructEvent.
 app.post("/api/billing/webhook", rawBody, handleStripeWebhook);
-// Legacy path registered by stripe-replit-sync's findOrCreateManagedWebhook
-app.post("/api/stripe/webhook", rawBody, handleStripeWebhook);
 
 app.use(cookieParser());
 app.use(express.json());

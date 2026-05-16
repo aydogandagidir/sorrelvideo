@@ -4,7 +4,7 @@ import { Check, Zap, Video, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBillingPrices, useBillingCheckout } from "@/hooks/useBilling";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@workspace/auth-web";
 
 const FREE_FEATURES = [
   "3 renders per month",

@@ -3,10 +3,12 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@workspace/auth-web";
 
 import Home from "./pages/home";
 import Pricing from "./pages/pricing";
+import Login from "./pages/login";
+import Signup from "./pages/signup";
 import Dashboard from "./pages/dashboard";
 import Templates from "./pages/templates";
 import Projects from "./pages/projects";
@@ -48,6 +50,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
       <Route path="/dashboard">
         <ProtectedRoute component={Dashboard} />
       </Route>

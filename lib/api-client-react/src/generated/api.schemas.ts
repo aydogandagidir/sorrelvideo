@@ -25,21 +25,40 @@ export interface ErrorEnvelope {
   error: string;
 }
 
-export interface MobileTokenExchangeRequest {
-  /** @minLength 1 */
-  code: string;
-  /** @minLength 1 */
-  code_verifier: string;
-  /** @minLength 1 */
-  redirect_uri: string;
-  /** @minLength 1 */
-  state: string;
-  /** @minLength 1 */
-  nonce?: string;
+export interface SignupRequest {
+  /**
+     * @minLength 3
+     * @maxLength 254
+     */
+  email: string;
+  /**
+     * @minLength 8
+     * @maxLength 256
+     */
+  password: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  firstName?: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  lastName?: string | null;
 }
 
-export interface MobileTokenExchangeSuccess {
-  token: string;
+export interface LoginRequest {
+  /**
+     * @minLength 3
+     * @maxLength 254
+     */
+  email: string;
+  /**
+     * @minLength 1
+     * @maxLength 256
+     */
+  password: string;
 }
 
 export const LogoutSuccessValue = {
@@ -264,12 +283,6 @@ export type AuthorizationSessionHeaderParameter = string;
 
 export type BeginBrowserLoginParams = {
 returnTo?: string;
-};
-
-export type HandleBrowserLoginCallbackParams = {
-code?: string;
-state?: string;
-iss?: string;
 };
 
 export type ListTemplatesParams = {

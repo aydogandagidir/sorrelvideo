@@ -9,16 +9,26 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+// FIXME: object storage credentials and signed-URL minting still come from a
+// local sidecar at 127.0.0.1:1106 (the legacy Replit object-storage sidecar).
+// Outside that environment the bucket calls below will not work. Replace with a
+// regular GCS service-account JSON (GOOGLE_APPLICATION_CREDENTIALS) and use
+// `bucket.file(name).getSignedUrl(...)` instead — tracked under "Future work"
+// in CLAUDE.md.
+const OBJECT_STORAGE_SIDECAR_URL =
+  process.env.OBJECT_STORAGE_SIDECAR_URL ?? "http://127.0.0.1:1106";
 
 export const objectStorageClient = new Storage({
+  // External-account credentials configured to talk to the local object-storage
+  // sidecar (legacy from the Replit hosting environment). Replace with a
+  // service-account JSON when migrating to direct GCS auth.
   credentials: {
-    audience: "replit",
+    audience: "object-storage-sidecar",
     subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
+    token_url: `${OBJECT_STORAGE_SIDECAR_URL}/token`,
     type: "external_account",
     credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
+      url: `${OBJECT_STORAGE_SIDECAR_URL}/credential`,
       format: {
         type: "json",
         subject_token_field_name: "access_token",
@@ -245,7 +255,7 @@ async function signObjectURL({
     expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
   };
   const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
+    `${OBJECT_STORAGE_SIDECAR_URL}/object-storage/signed-object-url`,
     {
       method: "POST",
       headers: {
@@ -257,8 +267,8 @@ async function signObjectURL({
   );
   if (!response.ok) {
     throw new Error(
-      `Failed to sign object URL, errorcode: ${response.status}, ` +
-        `make sure you're running on Replit`
+      `Failed to sign object URL (${response.status}). ` +
+        `Make sure the object-storage sidecar at ${OBJECT_STORAGE_SIDECAR_URL} is reachable.`
     );
   }
 

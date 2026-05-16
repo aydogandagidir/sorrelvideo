@@ -71,7 +71,11 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
     response.headers.forEach((value, key) => res.setHeader(key, value));
 
     if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
+      const nodeStream = Readable.fromWeb(
+        // The downloadObject helper returns a Fetch-style ReadableStream<Uint8Array>;
+        // node:stream's typings expect the looser ReadableStream<any>, so widen here.
+        response.body as unknown as Parameters<typeof Readable.fromWeb>[0],
+      );
       nodeStream.pipe(res);
     } else {
       res.end();
@@ -96,7 +100,7 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
-    // --- Protected route example (uncomment when using replit-auth) ---
+    // --- Protected route example (uncomment to gate behind a logged-in user) ---
     // if (!req.isAuthenticated()) {
     //   res.status(401).json({ error: "Unauthorized" });
     //   return;
@@ -117,7 +121,11 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     response.headers.forEach((value, key) => res.setHeader(key, value));
 
     if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
+      const nodeStream = Readable.fromWeb(
+        // The downloadObject helper returns a Fetch-style ReadableStream<Uint8Array>;
+        // node:stream's typings expect the looser ReadableStream<any>, so widen here.
+        response.body as unknown as Parameters<typeof Readable.fromWeb>[0],
+      );
       nodeStream.pipe(res);
     } else {
       res.end();

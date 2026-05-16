@@ -18,13 +18,13 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
+    "@node-rs/argon2": "^2.0.2",
     "express": "^5.2.1",
     "google-auth-library": "^10.6.2",
-    "openid-client": "^6.8.4",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
     "stripe": "^22.1.1",
-    "stripe-replit-sync": "^1.0.0"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

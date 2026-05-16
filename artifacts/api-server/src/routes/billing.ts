@@ -101,9 +101,7 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     req.user.email ?? null,
   );
 
-  const origin = process.env.REPLIT_DOMAINS
-    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]!.trim()}`
-    : `${req.protocol}://${req.get("host")}`;
+  const origin = process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
 
   const stripe = await getUncachableStripeClient();
   const session = await stripe.checkout.sessions.create({
@@ -132,9 +130,7 @@ router.post("/billing/portal", async (req, res): Promise<void> => {
     return;
   }
 
-  const origin = process.env.REPLIT_DOMAINS
-    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]!.trim()}`
-    : `${req.protocol}://${req.get("host")}`;
+  const origin = process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
 
   const stripe = await getUncachableStripeClient();
   const portalSession = await stripe.billingPortal.sessions.create({

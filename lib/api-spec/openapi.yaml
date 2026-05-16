@@ -43,11 +43,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthUserEnvelope'
+  /auth/signup:
+    post:
+      tags: [Auth]
+      operationId: signupWithPassword
+      summary: Create a new account with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: Account created and session established.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+        '400':
+          description: Invalid input (e.g. password too short).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: An account already exists with this email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: loginWithPassword
+      summary: Authenticate with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated successfully; session cookie set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+        '400':
+          description: Missing or invalid fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Email or password did not match.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutSession
+      summary: Clear the current session
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Session cleared.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
   /login:
     get:
       tags: [Auth]
       operationId: beginBrowserLogin
-      summary: Start the browser OIDC login flow
+      summary: Redirect helper that sends the browser to the frontend login page
       parameters:
         - name: returnTo
           in: query
@@ -56,93 +131,18 @@ paths:
             type: string
       responses:
         '302':
-          description: Redirect to the OIDC authorization endpoint.
-  /callback:
-    get:
-      tags: [Auth]
-      operationId: handleBrowserLoginCallback
-      summary: Complete the browser OIDC login flow
-      parameters:
-        - name: code
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: state
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: iss
-          in: query
-          required: false
-          schema:
-            type: string
-            format: uri
-      responses:
-        '302':
-          description: Redirect on success or failure.
+          description: Redirect to the frontend /login page.
   /logout:
     get:
       tags: [Auth]
       operationId: logoutBrowserSession
-      summary: Clear the session and begin OIDC logout
+      summary: Clear the session and redirect to the home page
       parameters:
         - $ref: '#/components/parameters/AuthorizationSessionHeader'
         - $ref: '#/components/parameters/SessionCookie'
       responses:
         '302':
-          description: Redirect to the OIDC provider logout URL.
-  /mobile-auth/token-exchange:
-    post:
-      tags: [Auth]
-      operationId: exchangeMobileAuthorizationCode
-      summary: Exchange a mobile OIDC code for a session token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MobileTokenExchangeRequest'
-      responses:
-        '200':
-          description: Session created successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
-        '400':
-          description: Missing or invalid required fields.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Token did not contain usable claims.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Token exchange failed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /mobile-auth/logout:
-    post:
-      tags: [Auth]
-      operationId: logoutMobileSession
-      summary: Delete a mobile session token
-      parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-      responses:
-        '200':
-          description: Logout processed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LogoutSuccess'
+          description: Redirect to the home page after clearing the session.
   /healthz:
     get:
       operationId: healthCheck
@@ -619,32 +619,38 @@ components:
       properties:
         error:
           type: string
-    MobileTokenExchangeRequest:
+    SignupRequest:
       type: object
-      required: [code, code_verifier, redirect_uri, state]
+      required: [email, password]
       properties:
-        code:
+        email:
           type: string
-          minLength: 1
-        code_verifier:
+          format: email
+          minLength: 3
+          maxLength: 254
+        password:
           type: string
-          minLength: 1
-        redirect_uri:
-          type: string
-          minLength: 1
-          format: uri
-        state:
-          type: string
-          minLength: 1
-        nonce:
-          type: string
-          minLength: 1
-    MobileTokenExchangeSuccess:
+          minLength: 8
+          maxLength: 256
+        firstName:
+          type: ["string", "null"]
+          maxLength: 100
+        lastName:
+          type: ["string", "null"]
+          maxLength: 100
+    LoginRequest:
       type: object
-      required: [token]
+      required: [email, password]
       properties:
-        token:
+        email:
           type: string
+          format: email
+          minLength: 3
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
     LogoutSuccess:
       type: object
       required: [success]
