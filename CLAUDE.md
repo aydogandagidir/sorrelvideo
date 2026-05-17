@@ -27,23 +27,25 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 
 ## Required env
 
-| Var                                                             | Required by                            | Purpose                                                                                  |
-| --------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                                  | api-server, db push                    | Postgres connection string                                                               |
-| `SESSION_SECRET`                                                | api-server                             | Session signing (reserved for future use; currently unused but expected to be set)       |
-| `PORT`                                                          | api-server, sorrel, mockup-sandbox     | HTTP listen port (each process needs its own)                                            |
-| `BASE_PATH`                                                     | sorrel, mockup-sandbox                 | Vite base path (use `/` locally)                                                         |
-| `ALLOWED_ORIGINS`                                               | api-server (production only)           | Comma-separated full origin URLs allowed by CORS                                         |
-| `APP_URL`                                                       | docs/operations                        | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`)        |
-| `STRIPE_SECRET_KEY`                                             | api-server, scripts                    | Stripe API key                                                                           |
-| `STRIPE_PUBLISHABLE_KEY`                                        | api-server (only if frontend reads it) | Publishable key for client-side checkout                                                 |
-| `STRIPE_WEBHOOK_SECRET`                                         | api-server                             | Verifies signatures on POST `/api/billing/webhook`                                       |
-| `GCS_SERVICE_ACCOUNT_KEY` _or_ `GOOGLE_APPLICATION_CREDENTIALS` | api-server (object uploads)            | GCS auth — base64 JSON _or_ path to JSON. Falls back to Application Default Credentials. |
-| `GCS_PROJECT_ID`                                                | api-server                             | GCP project id. Inferred from JSON in `GCS_SERVICE_ACCOUNT_KEY` mode.                    |
-| `PUBLIC_OBJECT_SEARCH_PATHS`                                    | api-server (object uploads)            | Comma-separated bucket paths searched by `GET /api/storage/public-objects/*`             |
-| `PRIVATE_OBJECT_DIR`                                            | api-server (object uploads)            | Private bucket prefix for user uploads (`/<bucket>/<dir>`)                               |
-| `RESEND_API_KEY`                                                | api-server (auth emails, optional)     | Resend API key. If unset, emails are logged to stdout instead of sent (dev-friendly).    |
-| `EMAIL_FROM`                                                    | api-server (when RESEND_API_KEY set)   | From header for auth emails — e.g. `Sorrel <noreply@sorrel.video>`                       |
+| Var                                                             | Required by                            | Purpose                                                                                          |
+| --------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                                  | api-server, db push                    | Postgres connection string                                                                       |
+| `SESSION_SECRET`                                                | api-server                             | Session signing (reserved for future use; currently unused but expected to be set)               |
+| `PORT`                                                          | api-server, sorrel, mockup-sandbox     | HTTP listen port (each process needs its own)                                                    |
+| `BASE_PATH`                                                     | sorrel, mockup-sandbox                 | Vite base path (use `/` locally)                                                                 |
+| `ALLOWED_ORIGINS`                                               | api-server (production only)           | Comma-separated full origin URLs allowed by CORS                                                 |
+| `APP_URL`                                                       | docs/operations                        | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`)                |
+| `STRIPE_SECRET_KEY`                                             | api-server, scripts                    | Stripe API key                                                                                   |
+| `STRIPE_PUBLISHABLE_KEY`                                        | api-server (only if frontend reads it) | Publishable key for client-side checkout                                                         |
+| `STRIPE_WEBHOOK_SECRET`                                         | api-server                             | Verifies signatures on POST `/api/billing/webhook`                                               |
+| `GCS_SERVICE_ACCOUNT_KEY` _or_ `GOOGLE_APPLICATION_CREDENTIALS` | api-server (object uploads)            | GCS auth — base64 JSON _or_ path to JSON. Falls back to Application Default Credentials.         |
+| `GCS_PROJECT_ID`                                                | api-server                             | GCP project id. Inferred from JSON in `GCS_SERVICE_ACCOUNT_KEY` mode.                            |
+| `PUBLIC_OBJECT_SEARCH_PATHS`                                    | api-server (object uploads)            | Comma-separated bucket paths searched by `GET /api/storage/public-objects/*`                     |
+| `PRIVATE_OBJECT_DIR`                                            | api-server (object uploads)            | Private bucket prefix for user uploads (`/<bucket>/<dir>`)                                       |
+| `RESEND_API_KEY`                                                | api-server (auth emails, optional)     | Resend API key. If unset, emails are logged to stdout instead of sent (dev-friendly).            |
+| `EMAIL_FROM`                                                    | api-server (when RESEND_API_KEY set)   | From header for auth emails — e.g. `Sorrel <noreply@sorrel.video>`                               |
+| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`         | api-server (optional)                  | Enables the "Continue with GitHub" button. Callback: `${APP_URL}/api/auth/oauth/github/callback` |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`         | api-server (optional)                  | Enables the "Continue with Google" button. Callback: `${APP_URL}/api/auth/oauth/google/callback` |
 
 ## Stack
 
@@ -162,7 +164,22 @@ per IP+email, `/api/auth/signup` 3/hour per IP, `/api/auth/forgot-password`
 unset (typical local dev) it logs the message body instead — the app keeps
 working without an external dependency.
 
-OAuth (GitHub/Google) is the next planned auth feature — see "Future work".
+**OAuth (GitHub + Google)**: optional, gated by env. When
+`GITHUB_OAUTH_*` / `GOOGLE_OAUTH_*` are set, login and signup show
+"Continue with …" buttons that bounce through
+`/api/auth/oauth/<provider>` → provider authorize URL → callback. The
+callback exchanges the code via `arctic`, fetches the provider profile,
+and calls `findOrCreateOAuthUser`:
+
+- If the `(provider, providerAccountId)` pair already maps to a user →
+  log them in.
+- Else if the provider's verified email matches an existing user → link
+  the identity and log them in.
+- Else create a new user. Email coming from the provider counts as
+  verified — `users.emailVerifiedAt` is set immediately.
+
+The OAuth identity row lives in `oauth_accounts`. No provider tokens are
+stored; we only need the identity for sign-in.
 
 ## Billing
 
@@ -292,12 +309,11 @@ Render / Vercel for the frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **OAuth providers** via `arctic` (GitHub + Google planned)
-2. **Studio module MVP**: parametric compositions + brand-kit injection +
+1. **Studio module MVP**: parametric compositions + brand-kit injection +
    render flow
-3. **Test depth**: add a Postgres testcontainer so `billingService` race
+2. **Test depth**: add a Postgres testcontainer so `billingService` race
    tests and `webhookHandlers.upsertSubscription` can run against a real DB
-4. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
+3. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
    needs a spec before implementation
 
 ## User preferences

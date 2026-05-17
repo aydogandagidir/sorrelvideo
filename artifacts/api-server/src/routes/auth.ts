@@ -20,6 +20,15 @@ import {
 } from "../lib/auth";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../lib/email";
 import {
+  findOrCreateOAuthUser,
+  generateCodeVerifier,
+  generateState,
+  getGitHubClient,
+  getGoogleClient,
+  isProviderConfigured,
+  type OAuthProvider,
+} from "../lib/oauth";
+import {
   forgotPasswordLimiter,
   loginLimiter,
   signupLimiter,
@@ -114,11 +123,9 @@ router.post(
   async (req: Request, res: Response) => {
     const parsed = SignupBody.safeParse(req.body);
     if (!parsed.success) {
-      res
-        .status(400)
-        .json({
-          error: parsed.error.issues[0]?.message ?? "Invalid signup payload",
-        });
+      res.status(400).json({
+        error: parsed.error.issues[0]?.message ?? "Invalid signup payload",
+      });
       return;
     }
 
@@ -346,6 +353,186 @@ router.post(
     }
 
     res.status(200).json({ success: true });
+  },
+);
+
+// --- OAuth (GitHub + Google) ----------------------------------------------
+
+const OAUTH_COOKIE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function parseProvider(value: unknown): OAuthProvider | null {
+  if (value === "github" || value === "google") return value;
+  return null;
+}
+
+function setOauthCookie(res: Response, name: string, value: string): void {
+  res.cookie(name, value, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    // OAuth callbacks redirect cross-site → cookie must travel with the
+    // top-level navigation. `lax` is the safest level that still works.
+    sameSite: "lax",
+    path: "/",
+    maxAge: OAUTH_COOKIE_TTL_MS,
+  });
+}
+
+function clearOauthCookies(res: Response): void {
+  res.clearCookie("oauth_state", { path: "/" });
+  res.clearCookie("oauth_code_verifier", { path: "/" });
+  res.clearCookie("oauth_return_to", { path: "/" });
+}
+
+router.get("/auth/oauth/:provider", (req: Request, res: Response): void => {
+  const provider = parseProvider(req.params.provider);
+  if (!provider) {
+    res.status(404).json({ error: "Unknown OAuth provider" });
+    return;
+  }
+  if (!isProviderConfigured(provider)) {
+    res
+      .status(503)
+      .json({ error: `OAuth provider '${provider}' is not configured` });
+    return;
+  }
+
+  const state = generateState();
+  const returnTo = getSafeReturnTo(req.query.returnTo);
+  setOauthCookie(res, "oauth_state", state);
+  setOauthCookie(res, "oauth_return_to", returnTo);
+
+  let url: URL;
+  if (provider === "github") {
+    url = getGitHubClient().createAuthorizationURL(state, ["user:email"]);
+  } else {
+    const codeVerifier = generateCodeVerifier();
+    setOauthCookie(res, "oauth_code_verifier", codeVerifier);
+    url = getGoogleClient().createAuthorizationURL(state, codeVerifier, [
+      "openid",
+      "email",
+      "profile",
+    ]);
+  }
+
+  res.redirect(url.toString());
+});
+
+router.get(
+  "/auth/oauth/:provider/callback",
+  async (req: Request, res: Response): Promise<void> => {
+    const provider = parseProvider(req.params.provider);
+    if (!provider) {
+      res.status(404).json({ error: "Unknown OAuth provider" });
+      return;
+    }
+
+    const code = typeof req.query.code === "string" ? req.query.code : null;
+    const state = typeof req.query.state === "string" ? req.query.state : null;
+    const expectedState = req.cookies?.oauth_state;
+    const returnTo = getSafeReturnTo(req.cookies?.oauth_return_to);
+
+    if (!code || !state || !expectedState || state !== expectedState) {
+      clearOauthCookies(res);
+      res.redirect("/login?oauth=invalid");
+      return;
+    }
+
+    try {
+      let profileEmail: string | null = null;
+      let providerAccountId: string;
+      let firstName: string | null = null;
+      let lastName: string | null = null;
+      let profileImageUrl: string | null = null;
+
+      if (provider === "github") {
+        const client = getGitHubClient();
+        const tokens = await client.validateAuthorizationCode(code);
+        const accessToken = tokens.accessToken();
+        const userRes = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!userRes.ok) throw new Error(`GitHub user fetch ${userRes.status}`);
+        const ghUser = (await userRes.json()) as {
+          id: number;
+          email: string | null;
+          name: string | null;
+          login: string;
+          avatar_url: string | null;
+        };
+        providerAccountId = String(ghUser.id);
+        profileImageUrl = ghUser.avatar_url;
+        const fullName = (ghUser.name ?? ghUser.login).trim();
+        const space = fullName.indexOf(" ");
+        firstName = space > 0 ? fullName.slice(0, space) : fullName;
+        lastName = space > 0 ? fullName.slice(space + 1) : null;
+
+        // GitHub may hide the primary email; fetch /user/emails to find a
+        // verified primary, falling back to the noreply alias.
+        profileEmail = ghUser.email;
+        if (!profileEmail) {
+          const emailsRes = await fetch("https://api.github.com/user/emails", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (emailsRes.ok) {
+            const emails = (await emailsRes.json()) as Array<{
+              email: string;
+              primary: boolean;
+              verified: boolean;
+            }>;
+            const primary = emails.find((e) => e.primary && e.verified);
+            profileEmail = primary?.email ?? null;
+          }
+        }
+      } else {
+        const codeVerifier = req.cookies?.oauth_code_verifier;
+        if (!codeVerifier) {
+          clearOauthCookies(res);
+          res.redirect("/login?oauth=invalid");
+          return;
+        }
+        const client = getGoogleClient();
+        const tokens = await client.validateAuthorizationCode(
+          code,
+          codeVerifier,
+        );
+        const accessToken = tokens.accessToken();
+        const userRes = await fetch(
+          "https://openidconnect.googleapis.com/v1/userinfo",
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        if (!userRes.ok) throw new Error(`Google userinfo ${userRes.status}`);
+        const gUser = (await userRes.json()) as {
+          sub: string;
+          email: string | null;
+          email_verified?: boolean;
+          given_name: string | null;
+          family_name: string | null;
+          picture: string | null;
+        };
+        providerAccountId = gUser.sub;
+        profileEmail = gUser.email_verified ? gUser.email : null;
+        firstName = gUser.given_name;
+        lastName = gUser.family_name;
+        profileImageUrl = gUser.picture;
+      }
+
+      const user = await findOrCreateOAuthUser(provider, {
+        providerAccountId,
+        email: profileEmail,
+        firstName,
+        lastName,
+        profileImageUrl,
+      });
+
+      clearOauthCookies(res);
+      const sid = await createSession({ userId: user.id });
+      setSessionCookie(res, sid);
+      res.redirect(returnTo);
+    } catch (err) {
+      req.log.error({ err, provider }, "OAuth callback failed");
+      clearOauthCookies(res);
+      res.redirect("/login?oauth=error");
+    }
   },
 );
 

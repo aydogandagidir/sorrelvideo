@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OAuthButtons } from "@/components/oauth-buttons";
 
 function getReturnTo(search: string): string {
   const params = new URLSearchParams(search);
@@ -63,6 +64,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <OAuthButtons />
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

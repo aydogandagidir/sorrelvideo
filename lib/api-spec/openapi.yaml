@@ -192,6 +192,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GenericSuccess"
+  # OAuth GET endpoints (/auth/oauth/{provider}, /auth/oauth/{provider}/callback)
+  # are intentionally omitted from the spec — they are browser-only redirects
+  # invoked via window.location.href, never typed React Query hooks, so no
+  # codegen output is required. See artifacts/api-server/src/routes/auth.ts
+  # and CLAUDE.md "Auth model" for behavior.
   /login:
     get:
       tags: [Auth]

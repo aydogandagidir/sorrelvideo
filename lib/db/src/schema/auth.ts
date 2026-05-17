@@ -5,6 +5,7 @@ import {
   jsonb,
   pgTable,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -103,5 +104,39 @@ export const passwordResetsTable = pgTable(
   (table) => [
     index("IDX_password_resets_user").on(table.userId),
     index("IDX_password_resets_token").on(table.tokenHash),
+  ],
+);
+
+/**
+ * Links external OAuth identities (GitHub / Google) to a Sorrel user.
+ * UNIQUE(provider, providerAccountId) — one row per identity. A single
+ * user may have multiple rows (one per provider).
+ *
+ * No access/refresh tokens are stored: we only need the identity for
+ * sign-in, not provider-side API access. Add a token column later if a
+ * feature ever needs to call the provider on the user's behalf.
+ */
+export const oauthAccountsTable = pgTable(
+  "oauth_accounts",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    provider: varchar("provider", { enum: ["github", "google"] }).notNull(),
+    providerAccountId: varchar("provider_account_id").notNull(),
+    providerEmail: varchar("provider_email"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("UQ_oauth_accounts_provider_account").on(
+      table.provider,
+      table.providerAccountId,
+    ),
+    index("IDX_oauth_accounts_user").on(table.userId),
   ],
 );
