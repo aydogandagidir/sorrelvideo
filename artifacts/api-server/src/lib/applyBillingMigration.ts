@@ -16,7 +16,14 @@ export async function applyBillingMigration(): Promise<void> {
         ADD COLUMN IF NOT EXISTS stripe_customer_id varchar,
         ADD COLUMN IF NOT EXISTS stripe_subscription_id varchar,
         ADD COLUMN IF NOT EXISTS render_count      integer DEFAULT 0 NOT NULL,
-        ADD COLUMN IF NOT EXISTS render_reset_at   timestamptz
+        ADD COLUMN IF NOT EXISTS render_reset_at   timestamptz,
+        ADD COLUMN IF NOT EXISTS ai_count          integer DEFAULT 0 NOT NULL,
+        ADD COLUMN IF NOT EXISTS ai_reset_at       timestamptz
+    `);
+    await client.query(`
+      ALTER TABLE brand_kit
+        ADD COLUMN IF NOT EXISTS brand_voice       text,
+        ADD COLUMN IF NOT EXISTS voice_description text
     `);
     logger.info("Billing migration applied (idempotent)");
   } catch (err) {

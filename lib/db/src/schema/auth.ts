@@ -43,6 +43,10 @@ export const usersTable = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   renderCount: integer("render_count").notNull().default(0),
   renderResetAt: timestamp("render_reset_at", { withTimezone: true }),
+  // AI suggest usage — same pattern as render counts. checkAndIncrementAiCount
+  // (services/billingService.ts) takes a row lock and bumps these atomically.
+  aiCount: integer("ai_count").notNull().default(0),
+  aiResetAt: timestamp("ai_reset_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

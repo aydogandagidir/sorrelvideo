@@ -382,12 +382,24 @@ export const GetBrandKitResponse = zod.object({
   accentColor: zod.string().nullish(),
   fontFamily: zod.string(),
   companyName: zod.string().nullish(),
+  brandVoice: zod
+    .union([
+      zod.literal("professional"),
+      zod.literal("playful"),
+      zod.literal("bold"),
+      zod.literal("minimal"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  voiceDescription: zod.string().nullish(),
   updatedAt: zod.string(),
 });
 
 /**
  * @summary Update the brand kit
  */
+export const updateBrandKitBodyVoiceDescriptionMax = 500;
+
 export const UpdateBrandKitBody = zod.object({
   logoUrl: zod.string().optional(),
   primaryColor: zod.string().optional(),
@@ -395,6 +407,13 @@ export const UpdateBrandKitBody = zod.object({
   accentColor: zod.string().optional(),
   fontFamily: zod.string().optional(),
   companyName: zod.string().optional(),
+  brandVoice: zod
+    .enum(["professional", "playful", "bold", "minimal"])
+    .optional(),
+  voiceDescription: zod
+    .string()
+    .max(updateBrandKitBodyVoiceDescriptionMax)
+    .optional(),
 });
 
 export const UpdateBrandKitResponse = zod.object({
@@ -405,6 +424,16 @@ export const UpdateBrandKitResponse = zod.object({
   accentColor: zod.string().nullish(),
   fontFamily: zod.string(),
   companyName: zod.string().nullish(),
+  brandVoice: zod
+    .union([
+      zod.literal("professional"),
+      zod.literal("playful"),
+      zod.literal("bold"),
+      zod.literal("minimal"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  voiceDescription: zod.string().nullish(),
   updatedAt: zod.string(),
 });
 
@@ -430,7 +459,26 @@ export const GetBillingInfoResponse = zod.object({
   renderCount: zod.number(),
   renderLimit: zod.number().nullish(),
   renderResetAt: zod.string().nullish(),
+  aiCount: zod.number(),
+  aiLimit: zod.number().nullish(),
+  aiResetAt: zod.string().nullish(),
   stripeCustomerId: zod.string().nullish(),
+});
+
+/**
+ * @summary Generate Studio copy (headline, bodyText, ctaText) for a brief
+ */
+export const aiSuggestBodyPromptMin = 3;
+export const aiSuggestBodyPromptMax = 500;
+
+export const AiSuggestBody = zod.object({
+  prompt: zod.string().min(aiSuggestBodyPromptMin).max(aiSuggestBodyPromptMax),
+});
+
+export const AiSuggestResponse = zod.object({
+  headline: zod.string(),
+  bodyText: zod.string(),
+  ctaText: zod.string(),
 });
 
 /**

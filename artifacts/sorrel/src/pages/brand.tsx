@@ -1,13 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
-import { useGetBrandKit, useUpdateBrandKit, getGetBrandKitQueryKey } from "@workspace/api-client-react";
+import {
+  useGetBrandKit,
+  useUpdateBrandKit,
+  getGetBrandKitQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Save, Loader2, Image as ImageIcon, Upload } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertCircle,
+  Save,
+  Loader2,
+  Image as ImageIcon,
+  Upload,
+} from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,7 +40,9 @@ export default function Brand() {
     secondaryColor: "",
     accentColor: "",
     fontFamily: "",
-    logoUrl: ""
+    logoUrl: "",
+    brandVoice: "" as "" | "professional" | "playful" | "bold" | "minimal",
+    voiceDescription: "",
   });
 
   // Init form data when brand kit loads
@@ -35,36 +54,55 @@ export default function Brand() {
         secondaryColor: brandKit.secondaryColor || "#ffffff",
         accentColor: brandKit.accentColor || "#000000",
         fontFamily: brandKit.fontFamily || "Inter",
-        logoUrl: brandKit.logoUrl || ""
+        logoUrl: brandKit.logoUrl || "",
+        brandVoice:
+          (brandKit.brandVoice as
+            | ""
+            | "professional"
+            | "playful"
+            | "bold"
+            | "minimal") || "",
+        voiceDescription: brandKit.voiceDescription || "",
       });
     }
   }, [brandKit]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    updateBrandKit.mutate({
-      data: formData
-    }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetBrandKitQueryKey() });
-        toast({
-          title: "Brand kit updated",
-          description: "Your changes have been saved successfully.",
-        });
+    // Omit brandVoice if user didn't pick one — backend accepts only the enum
+    // values, not the empty string the select uses as its placeholder.
+    const { brandVoice, ...rest } = formData;
+    const payload = brandVoice ? { ...rest, brandVoice } : rest;
+    updateBrandKit.mutate(
+      {
+        data: payload,
       },
-      onError: () => {
-        toast({
-          title: "Error",
-          description: "Failed to update brand kit. Please try again.",
-          variant: "destructive"
-        });
-      }
-    });
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetBrandKitQueryKey() });
+          toast({
+            title: "Brand kit updated",
+            description: "Your changes have been saved successfully.",
+          });
+        },
+        onError: () => {
+          toast({
+            title: "Error",
+            description: "Failed to update brand kit. Please try again.",
+            variant: "destructive",
+          });
+        },
+      },
+    );
   };
 
   if (isError) {
@@ -73,7 +111,9 @@ export default function Brand() {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>Failed to load brand kit. Please try again later.</AlertDescription>
+          <AlertDescription>
+            Failed to load brand kit. Please try again later.
+          </AlertDescription>
         </Alert>
       </Layout>
     );
@@ -84,7 +124,9 @@ export default function Brand() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Brand Kit</h1>
-          <p className="text-muted-foreground">Manage your visual identity across all videos.</p>
+          <p className="text-muted-foreground">
+            Manage your visual identity across all videos.
+          </p>
         </div>
       </div>
 
@@ -110,18 +152,19 @@ export default function Brand() {
               <Card>
                 <CardHeader>
                   <CardTitle>Brand Assets</CardTitle>
-                  <CardDescription>Configure your global brand styling.</CardDescription>
+                  <CardDescription>
+                    Configure your global brand styling.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  
                   <div className="space-y-2">
                     <Label htmlFor="companyName">Company Name</Label>
-                    <Input 
-                      id="companyName" 
-                      name="companyName" 
-                      value={formData.companyName} 
-                      onChange={handleChange} 
-                      placeholder="Acme Corp" 
+                    <Input
+                      id="companyName"
+                      name="companyName"
+                      value={formData.companyName}
+                      onChange={handleChange}
+                      placeholder="Acme Corp"
                     />
                   </div>
 
@@ -130,20 +173,29 @@ export default function Brand() {
                     <div className="flex items-center gap-4">
                       <div className="w-20 h-20 rounded-md border bg-muted flex items-center justify-center overflow-hidden">
                         {formData.logoUrl ? (
-                          <img src={formData.logoUrl} alt="Logo preview" className="w-full h-full object-contain p-2" />
+                          <img
+                            src={formData.logoUrl}
+                            alt="Logo preview"
+                            className="w-full h-full object-contain p-2"
+                          />
                         ) : (
                           <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <Input 
-                          id="logoUrl" 
-                          name="logoUrl" 
-                          value={formData.logoUrl} 
-                          onChange={handleChange} 
-                          placeholder="https://example.com/logo.png" 
+                        <Input
+                          id="logoUrl"
+                          name="logoUrl"
+                          value={formData.logoUrl}
+                          onChange={handleChange}
+                          placeholder="https://example.com/logo.png"
                         />
-                        <Button type="button" variant="outline" size="sm" className="w-full">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                        >
                           <Upload className="mr-2 h-4 w-4" /> Upload Custom Logo
                         </Button>
                       </div>
@@ -152,7 +204,7 @@ export default function Brand() {
 
                   <div className="space-y-2">
                     <Label htmlFor="fontFamily">Typography</Label>
-                    <select 
+                    <select
                       id="fontFamily"
                       name="fontFamily"
                       value={formData.fontFamily}
@@ -170,64 +222,105 @@ export default function Brand() {
                     <div className="space-y-2">
                       <Label htmlFor="primaryColor">Primary</Label>
                       <div className="flex gap-2">
-                        <Input 
-                          type="color" 
-                          id="primaryColor" 
-                          name="primaryColor" 
-                          value={formData.primaryColor} 
-                          onChange={handleChange} 
-                          className="w-12 h-10 p-1 px-1 cursor-pointer" 
+                        <Input
+                          type="color"
+                          id="primaryColor"
+                          name="primaryColor"
+                          value={formData.primaryColor}
+                          onChange={handleChange}
+                          className="w-12 h-10 p-1 px-1 cursor-pointer"
                         />
-                        <Input 
-                          value={formData.primaryColor} 
-                          onChange={handleChange} 
-                          name="primaryColor" 
-                          className="flex-1 font-mono uppercase" 
+                        <Input
+                          value={formData.primaryColor}
+                          onChange={handleChange}
+                          name="primaryColor"
+                          className="flex-1 font-mono uppercase"
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="secondaryColor">Secondary</Label>
                       <div className="flex gap-2">
-                        <Input 
-                          type="color" 
-                          id="secondaryColor" 
-                          name="secondaryColor" 
-                          value={formData.secondaryColor} 
-                          onChange={handleChange} 
-                          className="w-12 h-10 p-1 px-1 cursor-pointer" 
+                        <Input
+                          type="color"
+                          id="secondaryColor"
+                          name="secondaryColor"
+                          value={formData.secondaryColor}
+                          onChange={handleChange}
+                          className="w-12 h-10 p-1 px-1 cursor-pointer"
                         />
-                        <Input 
-                          value={formData.secondaryColor} 
-                          onChange={handleChange} 
-                          name="secondaryColor" 
-                          className="flex-1 font-mono uppercase" 
+                        <Input
+                          value={formData.secondaryColor}
+                          onChange={handleChange}
+                          name="secondaryColor"
+                          className="flex-1 font-mono uppercase"
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="accentColor">Accent</Label>
                       <div className="flex gap-2">
-                        <Input 
-                          type="color" 
-                          id="accentColor" 
-                          name="accentColor" 
-                          value={formData.accentColor} 
-                          onChange={handleChange} 
-                          className="w-12 h-10 p-1 px-1 cursor-pointer" 
+                        <Input
+                          type="color"
+                          id="accentColor"
+                          name="accentColor"
+                          value={formData.accentColor}
+                          onChange={handleChange}
+                          className="w-12 h-10 p-1 px-1 cursor-pointer"
                         />
-                        <Input 
-                          value={formData.accentColor} 
-                          onChange={handleChange} 
-                          name="accentColor" 
-                          className="flex-1 font-mono uppercase" 
+                        <Input
+                          value={formData.accentColor}
+                          onChange={handleChange}
+                          name="accentColor"
+                          className="flex-1 font-mono uppercase"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={updateBrandKit.isPending}>
-                    {updateBrandKit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label htmlFor="brandVoice">Brand voice</Label>
+                    <select
+                      id="brandVoice"
+                      name="brandVoice"
+                      value={formData.brandVoice}
+                      onChange={handleChange}
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">— Choose a tone —</option>
+                      <option value="professional">Professional</option>
+                      <option value="playful">Playful</option>
+                      <option value="bold">Bold</option>
+                      <option value="minimal">Minimal</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      Feeds the AI copy suggester. Optional.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="voiceDescription">Voice notes</Label>
+                    <Textarea
+                      id="voiceDescription"
+                      name="voiceDescription"
+                      rows={3}
+                      maxLength={500}
+                      value={formData.voiceDescription}
+                      onChange={handleChange}
+                      placeholder="Optional: e.g. 'We're clinical, no exclamation marks, plural pronouns only.'"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={updateBrandKit.isPending}
+                  >
+                    {updateBrandKit.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
                     Save Brand Kit
                   </Button>
                 </CardContent>
@@ -242,38 +335,55 @@ export default function Brand() {
             <CardHeader className="bg-muted/50 border-b">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
                 <span>Live Preview</span>
-                <span className="text-xs text-muted-foreground font-normal">Video Title Card</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  Video Title Card
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div 
+              <div
                 className="aspect-video w-full flex flex-col items-center justify-center p-8 relative transition-colors duration-500"
                 style={{ backgroundColor: formData.secondaryColor }}
               >
                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,black_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-                
+
                 <div className="z-10 flex flex-col items-center text-center gap-6">
                   {formData.logoUrl ? (
-                    <img src={formData.logoUrl} alt="Logo" className="h-16 object-contain" />
+                    <img
+                      src={formData.logoUrl}
+                      alt="Logo"
+                      className="h-16 object-contain"
+                    />
                   ) : (
-                    <div 
+                    <div
                       className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold transition-colors duration-500"
-                      style={{ backgroundColor: formData.primaryColor, color: formData.secondaryColor }}
+                      style={{
+                        backgroundColor: formData.primaryColor,
+                        color: formData.secondaryColor,
+                      }}
                     >
-                      {formData.companyName ? formData.companyName.charAt(0).toUpperCase() : "A"}
+                      {formData.companyName
+                        ? formData.companyName.charAt(0).toUpperCase()
+                        : "A"}
                     </div>
                   )}
-                  
-                  <div 
+
+                  <div
                     className="text-4xl font-bold transition-colors duration-500"
-                    style={{ color: formData.primaryColor, fontFamily: formData.fontFamily }}
+                    style={{
+                      color: formData.primaryColor,
+                      fontFamily: formData.fontFamily,
+                    }}
                   >
                     {formData.companyName || "Your Brand"}
                   </div>
-                  
-                  <div 
+
+                  <div
                     className="px-4 py-1 rounded-full text-sm font-medium transition-colors duration-500"
-                    style={{ backgroundColor: formData.accentColor, color: formData.secondaryColor }}
+                    style={{
+                      backgroundColor: formData.accentColor,
+                      color: formData.secondaryColor,
+                    }}
                   >
                     New Feature Announcement
                   </div>
@@ -281,7 +391,7 @@ export default function Brand() {
 
                 {/* Progress bar simulation */}
                 <div className="absolute bottom-0 left-0 w-full h-2 bg-black/10">
-                  <div 
+                  <div
                     className="h-full w-1/3 transition-colors duration-500"
                     style={{ backgroundColor: formData.primaryColor }}
                   />

@@ -1,20 +1,19 @@
 import { and, eq, inArray } from "drizzle-orm";
-import {
-  db,
-  pool,
-  stripeSubscriptionsTable,
-  usersTable,
-} from "@workspace/db";
+import { db, pool, stripeSubscriptionsTable, usersTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
 
 const FREE_RENDER_LIMIT = 3;
+const FREE_AI_LIMIT = 10;
 
 export interface BillingInfo {
   plan: "free" | "pro";
   renderCount: number;
   renderLimit: number | null;
   renderResetAt: string | null;
+  aiCount: number;
+  aiLimit: number | null;
+  aiResetAt: string | null;
   stripeCustomerId: string | null;
 }
 
@@ -75,15 +74,24 @@ export async function getBillingInfo(userId: string): Promise<BillingInfo> {
 
   let renderCount = user.renderCount;
   let renderResetAt = user.renderResetAt;
+  let aiCount = user.aiCount;
+  let aiResetAt = user.aiResetAt;
 
+  const updates: Partial<typeof usersTable.$inferInsert> = {};
   if (isNewMonth(renderResetAt)) {
     renderCount = 0;
     renderResetAt = null;
-    // Persist the reset so subsequent reads are consistent
-    await db
-      .update(usersTable)
-      .set({ renderCount: 0, renderResetAt: null })
-      .where(eq(usersTable.id, userId));
+    updates.renderCount = 0;
+    updates.renderResetAt = null;
+  }
+  if (isNewMonth(aiResetAt)) {
+    aiCount = 0;
+    aiResetAt = null;
+    updates.aiCount = 0;
+    updates.aiResetAt = null;
+  }
+  if (Object.keys(updates).length > 0) {
+    await db.update(usersTable).set(updates).where(eq(usersTable.id, userId));
   }
 
   return {
@@ -91,6 +99,9 @@ export async function getBillingInfo(userId: string): Promise<BillingInfo> {
     renderCount,
     renderLimit: plan === "free" ? FREE_RENDER_LIMIT : null,
     renderResetAt: renderResetAt ? renderResetAt.toISOString() : null,
+    aiCount,
+    aiLimit: plan === "free" ? FREE_AI_LIMIT : null,
+    aiResetAt: aiResetAt ? aiResetAt.toISOString() : null,
     stripeCustomerId: user.stripeCustomerId,
   };
 }
@@ -177,6 +188,76 @@ export async function checkAndIncrementRenderCount(
 }
 
 /**
+ * Atomically checks and increments the monthly AI suggest count for a user.
+ *
+ * Mirrors checkAndIncrementRenderCount: pg row lock + monthly reset.
+ * Pro users bypass the counter (downgrading later doesn't pre-consume the
+ * Free quota). Free users hit `upgrade_required` after FREE_AI_LIMIT.
+ */
+export async function checkAndIncrementAiCount(userId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const lockResult = await client.query<{
+      ai_count: number;
+      ai_reset_at: Date | null;
+      stripe_customer_id: string | null;
+    }>(
+      `SELECT ai_count, ai_reset_at, stripe_customer_id
+         FROM users
+        WHERE id = $1
+          FOR UPDATE`,
+      [userId],
+    );
+
+    const row = lockResult.rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      throw new Error("User not found");
+    }
+
+    const plan = await getUserPlan(row.stripe_customer_id);
+
+    if (plan === "pro") {
+      // Pro: unlimited AI suggests; don't bump the counter.
+      await client.query("COMMIT");
+      return;
+    }
+
+    let aiCount = row.ai_count;
+    let aiResetAt: Date | null = row.ai_reset_at;
+
+    if (isNewMonth(aiResetAt)) {
+      aiCount = 0;
+      aiResetAt = startOfNextMonth();
+    }
+
+    if (aiCount >= FREE_AI_LIMIT) {
+      await client.query("ROLLBACK");
+      throw Object.assign(
+        new Error("AI suggestion limit reached — upgrade to Pro"),
+        { reason: "upgrade_required", status: 403 },
+      );
+    }
+
+    await client.query(
+      `UPDATE users
+          SET ai_count = $1, ai_reset_at = $2
+        WHERE id = $3`,
+      [aiCount + 1, aiResetAt, userId],
+    );
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Creates or retrieves a Stripe customer for the user, stores the ID in DB.
  */
 export async function ensureStripeCustomer(
@@ -207,4 +288,4 @@ export async function ensureStripeCustomer(
   return customer.id;
 }
 
-export { FREE_RENDER_LIMIT };
+export { FREE_AI_LIMIT, FREE_RENDER_LIMIT };

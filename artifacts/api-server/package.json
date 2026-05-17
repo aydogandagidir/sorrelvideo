@@ -13,6 +13,7 @@
     "@google-cloud/storage": "^7.19.0",
     "@hyperframes/core": "^0.6.6",
     "@hyperframes/producer": "^0.6.6",
+    "@workspace/ai": "workspace:*",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "arctic": "^3.7.0",

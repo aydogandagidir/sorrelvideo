@@ -6,4 +6,5 @@ export default defineWorkspace([
   "./artifacts/api-server/vitest.config.ts",
   "./artifacts/sorrel/vitest.config.ts",
   "./lib/auth-web/vitest.config.ts",
+  "./lib/ai/vitest.config.ts",
 ]);

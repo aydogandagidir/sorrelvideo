@@ -14,7 +14,7 @@ import { useBillingCheckout, useBillingPrices } from "@/hooks/useBilling";
 interface UpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  reason?: "render_limit" | "premium_template" | "general";
+  reason?: "render_limit" | "premium_template" | "ai_limit" | "general";
 }
 
 const REASON_MESSAGES: Record<string, { title: string; description: string }> =
@@ -29,6 +29,11 @@ const REASON_MESSAGES: Record<string, { title: string; description: string }> =
       description:
         "This template is exclusive to Pro users. Upgrade to unlock it and all other premium templates.",
     },
+    ai_limit: {
+      title: "You've hit the free AI limit",
+      description:
+        "Free accounts get 10 AI suggestions per month. Upgrade to Pro for unlimited AI drafts.",
+    },
     general: {
       title: "Upgrade to Sorrel Pro",
       description:
@@ -38,9 +43,9 @@ const REASON_MESSAGES: Record<string, { title: string; description: string }> =
 
 const PRO_FEATURES = [
   "Unlimited renders every month",
+  "Unlimited AI suggestions",
   "All premium templates",
   "Priority render queue",
-  "Advanced analytics",
   "Priority support",
 ];
 
@@ -53,9 +58,7 @@ export function UpgradeModal({
   const checkoutMutation = useBillingCheckout();
 
   const message = REASON_MESSAGES[reason];
-  const monthlyPrice = pricesData?.prices?.find(
-    (p) => p.interval === "month",
-  );
+  const monthlyPrice = pricesData?.prices?.find((p) => p.interval === "month");
 
   const handleUpgrade = async () => {
     if (!monthlyPrice) return;

@@ -198,6 +198,20 @@ export interface ProjectUpdate {
   compositionVars?: ProjectUpdateCompositionVars;
 }
 
+/**
+ * @nullable
+ */
+export type BrandKitBrandVoice =
+  | (typeof BrandKitBrandVoice)[keyof typeof BrandKitBrandVoice]
+  | null;
+
+export const BrandKitBrandVoice = {
+  professional: "professional",
+  playful: "playful",
+  bold: "bold",
+  minimal: "minimal",
+} as const;
+
 export interface BrandKit {
   id: number;
   /** @nullable */
@@ -209,8 +223,22 @@ export interface BrandKit {
   fontFamily: string;
   /** @nullable */
   companyName?: string | null;
+  /** @nullable */
+  brandVoice?: BrandKitBrandVoice;
+  /** @nullable */
+  voiceDescription?: string | null;
   updatedAt: string;
 }
+
+export type BrandKitInputBrandVoice =
+  (typeof BrandKitInputBrandVoice)[keyof typeof BrandKitInputBrandVoice];
+
+export const BrandKitInputBrandVoice = {
+  professional: "professional",
+  playful: "playful",
+  bold: "bold",
+  minimal: "minimal",
+} as const;
 
 export interface BrandKitInput {
   logoUrl?: string;
@@ -219,6 +247,9 @@ export interface BrandKitInput {
   accentColor?: string;
   fontFamily?: string;
   companyName?: string;
+  brandVoice?: BrandKitInputBrandVoice;
+  /** @maxLength 500 */
+  voiceDescription?: string;
 }
 
 export type ModuleStatus = (typeof ModuleStatus)[keyof typeof ModuleStatus];
@@ -254,8 +285,27 @@ export interface BillingInfo {
   renderLimit?: number | null;
   /** @nullable */
   renderResetAt?: string | null;
+  aiCount: number;
+  /** @nullable */
+  aiLimit?: number | null;
+  /** @nullable */
+  aiResetAt?: string | null;
   /** @nullable */
   stripeCustomerId?: string | null;
+}
+
+export interface AiSuggestRequest {
+  /**
+   * @minLength 3
+   * @maxLength 500
+   */
+  prompt: string;
+}
+
+export interface AiSuggestResult {
+  headline: string;
+  bodyText: string;
+  ctaText: string;
 }
 
 export interface CheckoutRequest {

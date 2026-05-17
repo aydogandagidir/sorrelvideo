@@ -26,6 +26,8 @@ tags:
     description: Billing and subscription management
   - name: Storage
     description: Object storage upload and serving endpoints.
+  - name: ai
+    description: LLM-backed content suggestion.
 
 paths:
   /auth/user:
@@ -500,6 +502,55 @@ paths:
         "401":
           description: Unauthorized
 
+  /ai/suggest:
+    post:
+      operationId: aiSuggest
+      tags: [ai]
+      summary: Generate Studio copy (headline, bodyText, ctaText) for a brief
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiSuggestRequest"
+      responses:
+        "200":
+          description: Suggestion produced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSuggestResult"
+        "400":
+          description: Prompt failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: AI quota exhausted — upgrade required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too many requests; back off.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: Provider call failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /billing/checkout:
     post:
       operationId: createCheckoutSession
@@ -923,6 +974,11 @@ components:
           type: string
         companyName:
           type: ["string", "null"]
+        brandVoice:
+          type: ["string", "null"]
+          enum: [professional, playful, bold, minimal, null]
+        voiceDescription:
+          type: ["string", "null"]
         updatedAt:
           type: string
 
@@ -941,6 +997,12 @@ components:
           type: string
         companyName:
           type: string
+        brandVoice:
+          type: string
+          enum: [professional, playful, bold, minimal]
+        voiceDescription:
+          type: string
+          maxLength: 500
 
     Module:
       type: object
@@ -966,7 +1028,7 @@ components:
 
     BillingInfo:
       type: object
-      required: [plan, renderCount]
+      required: [plan, renderCount, aiCount]
       properties:
         plan:
           type: string
@@ -977,8 +1039,34 @@ components:
           type: ["integer", "null"]
         renderResetAt:
           type: ["string", "null"]
+        aiCount:
+          type: integer
+        aiLimit:
+          type: ["integer", "null"]
+        aiResetAt:
+          type: ["string", "null"]
         stripeCustomerId:
           type: ["string", "null"]
+
+    AiSuggestRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          minLength: 3
+          maxLength: 500
+
+    AiSuggestResult:
+      type: object
+      required: [headline, bodyText, ctaText]
+      properties:
+        headline:
+          type: string
+        bodyText:
+          type: string
+        ctaText:
+          type: string
 
     CheckoutRequest:
       type: object

@@ -1,0 +1,16 @@
+{
+  "name": "@workspace/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.1",
+    "openai": "^5.0.0"
+  },
+  "devDependencies": {
+    "zod": "catalog:"
+  }
+}

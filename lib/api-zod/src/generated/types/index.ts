@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./aiSuggestRequest";
+export * from "./aiSuggestResult";
 export * from "./authorizationSessionHeaderParameter";
 export * from "./authUser";
 export * from "./authUserEnvelope";
@@ -14,7 +16,9 @@ export * from "./billingInfo";
 export * from "./billingInfoPlan";
 export * from "./billingPrice";
 export * from "./brandKit";
+export * from "./brandKitBrandVoice";
 export * from "./brandKitInput";
+export * from "./brandKitInputBrandVoice";
 export * from "./checkoutRequest";
 export * from "./checkoutResponse";
 export * from "./consumeEmailVerificationParams";

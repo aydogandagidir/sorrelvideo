@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
-import { useCreateProject, useGetBrandKit } from "@workspace/api-client-react";
+import {
+  useAiSuggest,
+  useCreateProject,
+  useGetBrandKit,
+} from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 const DEFAULT_HEADLINE = "Make something\nthey'll remember.";
 const DEFAULT_BODY =
@@ -24,12 +29,16 @@ export default function StudioPage() {
   const [, setLocation] = useLocation();
   const { data: brandKit } = useGetBrandKit();
   const createProject = useCreateProject();
+  const aiSuggest = useAiSuggest();
 
   const [name, setName] = useState("Untitled Studio Project");
+  const [aiPrompt, setAiPrompt] = useState("");
   const [headline, setHeadline] = useState(DEFAULT_HEADLINE);
   const [bodyText, setBodyText] = useState(DEFAULT_BODY);
   const [ctaText, setCtaText] = useState(DEFAULT_CTA);
   const [error, setError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,6 +58,46 @@ export default function StudioPage() {
       setLocation(`/projects?focus=${project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create project");
+    }
+  }
+
+  async function handleAiSuggest() {
+    setAiError(null);
+    const trimmed = aiPrompt.trim();
+    if (trimmed.length < 3) {
+      setAiError("Tell the AI what you'd like a video about (min 3 chars).");
+      return;
+    }
+    try {
+      const result = await aiSuggest.mutateAsync({ data: { prompt: trimmed } });
+      setHeadline(result.headline);
+      setBodyText(result.bodyText);
+      setCtaText(result.ctaText);
+    } catch (err) {
+      // Surface upgrade_required as an upgrade modal; everything else as text.
+      const anyErr = err as {
+        status?: number;
+        response?: {
+          status?: number;
+          data?: { reason?: string; error?: string };
+        };
+        message?: string;
+      };
+      const status = anyErr.status ?? anyErr.response?.status;
+      const reason = anyErr.response?.data?.reason;
+      if (status === 403 && reason === "upgrade_required") {
+        setShowUpgrade(true);
+        return;
+      }
+      if (status === 429) {
+        setAiError("Slow down a bit — try again in a minute.");
+        return;
+      }
+      setAiError(
+        anyErr.response?.data?.error ??
+          anyErr.message ??
+          "AI suggestion failed",
+      );
     }
   }
 
@@ -77,11 +126,50 @@ export default function StudioPage() {
             <CardHeader>
               <CardTitle>Compose</CardTitle>
               <CardDescription>
-                These fields fill placeholders in the Studio template. Render
-                starts immediately on submit.
+                Write the brief yourself, or describe it to the AI and let it
+                draft the copy.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+              <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <Label htmlFor="aiPrompt" className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  AI brief
+                </Label>
+                <Textarea
+                  id="aiPrompt"
+                  rows={2}
+                  placeholder="e.g. promote our new Q3 marketing automation product to small-business owners"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  maxLength={500}
+                  disabled={aiSuggest.isPending}
+                />
+                {aiError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {aiError}
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleAiSuggest}
+                  disabled={aiSuggest.isPending}
+                >
+                  {aiSuggest.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Fill with AI
+                    </>
+                  )}
+                </Button>
+              </div>
+
               <form onSubmit={handleSubmit} className="space-y-5" noValidate>
                 <div className="space-y-2">
                   <Label htmlFor="name">Project name</Label>
@@ -155,8 +243,8 @@ export default function StudioPage() {
             <CardHeader>
               <CardTitle>Brand preview</CardTitle>
               <CardDescription>
-                Edit on the Brand Kit page — Studio pulls live values at render
-                time.
+                Edit on the Brand Kit page — Studio + AI pull live values at
+                render time.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -193,6 +281,14 @@ export default function StudioPage() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                  Voice
+                </p>
+                <p className="text-sm capitalize">
+                  {brandKit?.brandVoice ?? "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
                   Font
                 </p>
                 <p
@@ -206,6 +302,11 @@ export default function StudioPage() {
           </Card>
         </div>
       </div>
+      <UpgradeModal
+        open={showUpgrade}
+        onOpenChange={setShowUpgrade}
+        reason="ai_limit"
+      />
     </Layout>
   );
 }

@@ -27,25 +27,28 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 
 ## Required env
 
-| Var                                                             | Required by                            | Purpose                                                                                          |
-| --------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                                                  | api-server, db push                    | Postgres connection string                                                                       |
-| `SESSION_SECRET`                                                | api-server                             | Session signing (reserved for future use; currently unused but expected to be set)               |
-| `PORT`                                                          | api-server, sorrel, mockup-sandbox     | HTTP listen port (each process needs its own)                                                    |
-| `BASE_PATH`                                                     | sorrel, mockup-sandbox                 | Vite base path (use `/` locally)                                                                 |
-| `ALLOWED_ORIGINS`                                               | api-server (production only)           | Comma-separated full origin URLs allowed by CORS                                                 |
-| `APP_URL`                                                       | docs/operations                        | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`)                |
-| `STRIPE_SECRET_KEY`                                             | api-server, scripts                    | Stripe API key                                                                                   |
-| `STRIPE_PUBLISHABLE_KEY`                                        | api-server (only if frontend reads it) | Publishable key for client-side checkout                                                         |
-| `STRIPE_WEBHOOK_SECRET`                                         | api-server                             | Verifies signatures on POST `/api/billing/webhook`                                               |
-| `GCS_SERVICE_ACCOUNT_KEY` _or_ `GOOGLE_APPLICATION_CREDENTIALS` | api-server (object uploads)            | GCS auth — base64 JSON _or_ path to JSON. Falls back to Application Default Credentials.         |
-| `GCS_PROJECT_ID`                                                | api-server                             | GCP project id. Inferred from JSON in `GCS_SERVICE_ACCOUNT_KEY` mode.                            |
-| `PUBLIC_OBJECT_SEARCH_PATHS`                                    | api-server (object uploads)            | Comma-separated bucket paths searched by `GET /api/storage/public-objects/*`                     |
-| `PRIVATE_OBJECT_DIR`                                            | api-server (object uploads)            | Private bucket prefix for user uploads (`/<bucket>/<dir>`)                                       |
-| `RESEND_API_KEY`                                                | api-server (auth emails, optional)     | Resend API key. If unset, emails are logged to stdout instead of sent (dev-friendly).            |
-| `EMAIL_FROM`                                                    | api-server (when RESEND_API_KEY set)   | From header for auth emails — e.g. `Sorrel <noreply@sorrel.video>`                               |
-| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`         | api-server (optional)                  | Enables the "Continue with GitHub" button. Callback: `${APP_URL}/api/auth/oauth/github/callback` |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`         | api-server (optional)                  | Enables the "Continue with Google" button. Callback: `${APP_URL}/api/auth/oauth/google/callback` |
+| Var                                                             | Required by                             | Purpose                                                                                          |
+| --------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                                  | api-server, db push                     | Postgres connection string                                                                       |
+| `SESSION_SECRET`                                                | api-server                              | Session signing (reserved for future use; currently unused but expected to be set)               |
+| `PORT`                                                          | api-server, sorrel, mockup-sandbox      | HTTP listen port (each process needs its own)                                                    |
+| `BASE_PATH`                                                     | sorrel, mockup-sandbox                  | Vite base path (use `/` locally)                                                                 |
+| `ALLOWED_ORIGINS`                                               | api-server (production only)            | Comma-separated full origin URLs allowed by CORS                                                 |
+| `APP_URL`                                                       | docs/operations                         | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`)                |
+| `STRIPE_SECRET_KEY`                                             | api-server, scripts                     | Stripe API key                                                                                   |
+| `STRIPE_PUBLISHABLE_KEY`                                        | api-server (only if frontend reads it)  | Publishable key for client-side checkout                                                         |
+| `STRIPE_WEBHOOK_SECRET`                                         | api-server                              | Verifies signatures on POST `/api/billing/webhook`                                               |
+| `GCS_SERVICE_ACCOUNT_KEY` _or_ `GOOGLE_APPLICATION_CREDENTIALS` | api-server (object uploads)             | GCS auth — base64 JSON _or_ path to JSON. Falls back to Application Default Credentials.         |
+| `GCS_PROJECT_ID`                                                | api-server                              | GCP project id. Inferred from JSON in `GCS_SERVICE_ACCOUNT_KEY` mode.                            |
+| `PUBLIC_OBJECT_SEARCH_PATHS`                                    | api-server (object uploads)             | Comma-separated bucket paths searched by `GET /api/storage/public-objects/*`                     |
+| `PRIVATE_OBJECT_DIR`                                            | api-server (object uploads)             | Private bucket prefix for user uploads (`/<bucket>/<dir>`)                                       |
+| `RESEND_API_KEY`                                                | api-server (auth emails, optional)      | Resend API key. If unset, emails are logged to stdout instead of sent (dev-friendly).            |
+| `EMAIL_FROM`                                                    | api-server (when RESEND_API_KEY set)    | From header for auth emails — e.g. `Sorrel <noreply@sorrel.video>`                               |
+| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`         | api-server (optional)                   | Enables the "Continue with GitHub" button. Callback: `${APP_URL}/api/auth/oauth/github/callback` |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`         | api-server (optional)                   | Enables the "Continue with Google" button. Callback: `${APP_URL}/api/auth/oauth/google/callback` |
+| `AI_PROVIDER`                                                   | api-server (AI suggest)                 | `anthropic` (default) or `openai`. Picks which provider `lib/ai` routes calls to.                |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`                         | api-server (when AI_PROVIDER=anthropic) | API key + optional model override (defaults to `claude-haiku-4-5`).                              |
+| `OPENAI_API_KEY` / `OPENAI_MODEL`                               | api-server (when AI_PROVIDER=openai)    | API key + optional model override (defaults to `gpt-4o-mini`).                                   |
 
 ## Stack
 
@@ -72,6 +75,7 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `lib/api-client-react`     | Generated React Query hooks — **do not edit by hand**                  |
 | `lib/auth-web`             | Frontend `useAuth` hook (provider-agnostic; talks to `/api/auth/*`)    |
 | `lib/object-storage-web`   | Google Cloud Storage helper                                            |
+| `lib/ai`                   | Provider-agnostic LLM adapter (Anthropic / OpenAI) for AI suggest      |
 | `artifacts/api-server`     | Express server, routes, services, render pipeline, Stripe webhooks     |
 | `artifacts/sorrel`         | Main React frontend (the Sorrel app)                                   |
 | `artifacts/mockup-sandbox` | Hyperframes development sandbox                                        |
@@ -164,7 +168,39 @@ per IP+email, `/api/auth/signup` 3/hour per IP, `/api/auth/forgot-password`
 unset (typical local dev) it logs the message body instead — the app keeps
 working without an external dependency.
 
-**OAuth (GitHub + Google)**: optional, gated by env. When
+## AI module
+
+The Studio page exposes an "✨ Fill with AI" button that calls
+`POST /api/ai/suggest { prompt }` and auto-fills the headline, bodyText,
+and ctaText fields. The route lives in
+`artifacts/api-server/src/routes/ai.ts` and delegates to `getProvider()`
+from `@workspace/ai` — a provider-agnostic adapter with two
+implementations (`anthropic`, `openai`). `AI_PROVIDER` env picks one;
+`ANTHROPIC_MODEL` / `OPENAI_MODEL` env optionally override the model.
+
+Brand voice: the user picks one of four canonical tones
+(`professional|playful|bold|minimal`) on the Brand Kit page and can
+attach free-text "voice notes". Both are stored on `brand_kit` and merged
+into the system prompt by `buildSystemPrompt` (`lib/ai/src/prompt.ts`).
+User prompt is treated as separate data (separate role) to soften
+prompt-injection risk; the LLM response is then `SuggestOutputSchema`-
+parsed (`lib/ai/src/schema.ts`) before going back to Studio.
+
+**AI quota**: Free 10/month, Pro unlimited.
+`checkAndIncrementAiCount` in `billingService.ts` mirrors
+`checkAndIncrementRenderCount` (pg row-lock + monthly reset).
+`/api/billing/info` returns `aiCount` + `aiLimit` so the frontend can
+warn before the cap. 403 with `reason: "upgrade_required"` triggers the
+`UpgradeModal` (`reason="ai_limit"`). A separate `aiSuggestLimiter`
+(express-rate-limit, 20 / 15min per IP+user) protects the LLM provider
+from a single account hammering it.
+
+Tokens are deliberately not stored: AI provider keys live only in env,
+and provider response usage is logged but not persisted.
+
+## OAuth (GitHub + Google)
+
+Optional, gated by env. When
 `GITHUB_OAUTH_*` / `GOOGLE_OAUTH_*` are set, login and signup show
 "Continue with …" buttons that bounce through
 `/api/auth/oauth/<provider>` → provider authorize URL → callback. The
@@ -319,10 +355,13 @@ Render / Vercel for the frontend. Whatever the choice:
 Tracked here so it does not get rediscovered each time:
 
 1. **Test depth**: add a Postgres testcontainer so `billingService` race
-   tests and `webhookHandlers.upsertSubscription` can run against a real DB
-2. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
-   needs a spec before implementation
-3. **Studio v2**: timeline / segment editor, custom asset upload, more
+   tests, `checkAndIncrementAiCount`, and `webhookHandlers.upsertSubscription`
+   can run against a real DB
+2. **Module completion (next)**: Bulk, Analytics, Collab — each needs a
+   spec before implementation. AI MVP landed (Tur 7).
+3. **AI v2**: streaming responses, per-field regen, prompt history,
+   custom prompt templates
+4. **Studio v2**: timeline / segment editor, custom asset upload, more
    parametric templates beyond `studio-default.html`
 
 ## User preferences

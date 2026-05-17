@@ -5,7 +5,7 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { BillingInfoPlan } from './billingInfoPlan';
+import type { BillingInfoPlan } from "./billingInfoPlan";
 
 export interface BillingInfo {
   plan: BillingInfoPlan;
@@ -14,6 +14,11 @@ export interface BillingInfo {
   renderLimit?: number | null;
   /** @nullable */
   renderResetAt?: string | null;
+  aiCount: number;
+  /** @nullable */
+  aiLimit?: number | null;
+  /** @nullable */
+  aiResetAt?: string | null;
   /** @nullable */
   stripeCustomerId?: string | null;
 }

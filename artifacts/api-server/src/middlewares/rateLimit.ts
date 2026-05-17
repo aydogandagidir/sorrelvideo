@@ -55,3 +55,11 @@ export const verifyEmailLimiter = createLimiter({
   windowMs: 60 * 60 * 1000,
   max: 10,
 });
+
+// Authenticated AI suggest endpoint. Quota (FREE_AI_LIMIT) is enforced
+// separately in billingService — this limiter is just to keep a single
+// authenticated user from hammering the LLM provider faster than is sane.
+export const aiSuggestLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+});

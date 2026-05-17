@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AiSuggestRequest,
+  AiSuggestResult,
   AuthUserEnvelope,
   BeginBrowserLoginParams,
   BillingInfo,
@@ -2155,6 +2157,92 @@ export function useGetBillingInfo<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+export const getAiSuggestUrl = () => {
+  return `/api/ai/suggest`;
+};
+
+/**
+ * @summary Generate Studio copy (headline, bodyText, ctaText) for a brief
+ */
+export const aiSuggest = async (
+  aiSuggestRequest: AiSuggestRequest,
+  options?: RequestInit,
+): Promise<AiSuggestResult> => {
+  return customFetch<AiSuggestResult>(getAiSuggestUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(aiSuggestRequest),
+  });
+};
+
+export const getAiSuggestMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiSuggest>>,
+    TError,
+    { data: BodyType<AiSuggestRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof aiSuggest>>,
+  TError,
+  { data: BodyType<AiSuggestRequest> },
+  TContext
+> => {
+  const mutationKey = ["aiSuggest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof aiSuggest>>,
+    { data: BodyType<AiSuggestRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return aiSuggest(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AiSuggestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof aiSuggest>>
+>;
+export type AiSuggestMutationBody = BodyType<AiSuggestRequest>;
+export type AiSuggestMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Generate Studio copy (headline, bodyText, ctaText) for a brief
+ */
+export const useAiSuggest = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof aiSuggest>>,
+    TError,
+    { data: BodyType<AiSuggestRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof aiSuggest>>,
+  TError,
+  { data: BodyType<AiSuggestRequest> },
+  TContext
+> => {
+  return useMutation(getAiSuggestMutationOptions(options));
+};
 
 export const getCreateCheckoutSessionUrl = () => {
   return `/api/billing/checkout`;
