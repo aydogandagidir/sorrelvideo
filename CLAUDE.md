@@ -247,9 +247,12 @@ Notable rule decisions:
 
 ## Deployment
 
-TBD. The Replit autoscale deployment was removed; a permanent target has not
-been chosen. Reasonable candidates: Railway / Fly / Render / Vercel for the
-frontend. Whatever the choice:
+CI runs on GitHub Actions (`.github/workflows/ci.yml`): on every PR and on
+`push` to `main` it installs deps, verifies that OpenAPI codegen is in
+sync, lints, typechecks, applies the Drizzle schema to a Postgres service
+container, runs the Vitest suite, and builds every package. A permanent
+hosting target has not been chosen. Reasonable candidates: Railway / Fly /
+Render / Vercel for the frontend. Whatever the choice:
 
 - The API server is a single Node 24 process listening on `PORT`
 - The frontend is a static Vite build (`pnpm --filter @workspace/sorrel run build`
@@ -262,18 +265,17 @@ frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **CI/CD** (GitHub Actions: lint + typecheck + test + build on PR / push)
-2. **Object storage migration**: drop the `objectStorage.ts` sidecar dependency
+1. **Object storage migration**: drop the `objectStorage.ts` sidecar dependency
    and use a GCS service account directly (`GOOGLE_APPLICATION_CREDENTIALS` +
    native `bucket.file().getSignedUrl()`)
-3. **Auth hardening**: rate limiting for `/api/auth/*`
+2. **Auth hardening**: rate limiting for `/api/auth/*`
    (express-rate-limit), email verification, password reset (Resend)
-4. **OAuth providers** via `arctic` (GitHub + Google planned)
-5. **Studio module MVP**: parametric compositions + brand-kit injection +
+3. **OAuth providers** via `arctic` (GitHub + Google planned)
+4. **Studio module MVP**: parametric compositions + brand-kit injection +
    render flow
-6. **Test depth**: add a Postgres testcontainer so `billingService` race
+5. **Test depth**: add a Postgres testcontainer so `billingService` race
    tests and `webhookHandlers.upsertSubscription` can run against a real DB
-7. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
+6. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
    needs a spec before implementation
 
 ## User preferences

@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel older runs for the same branch when a new push comes in.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Test-time env. Real secrets are never needed here — DB is the service
+  # container below, Stripe + auth use dummy values.
+  NODE_ENV: test
+  PORT: "8080"
+  BASE_PATH: /
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/sorrel_test
+  SESSION_SECRET: ci-session-secret
+  ALLOWED_ORIGINS: http://localhost:5173
+  APP_URL: http://localhost:8080
+  STRIPE_SECRET_KEY: sk_test_dummy
+  STRIPE_PUBLISHABLE_KEY: pk_test_dummy
+  STRIPE_WEBHOOK_SECRET: whsec_dummy
+  # Skip the Chromium download during pnpm install — render tests are skipped
+  # in CI for now, so we don't need a browser binary.
+  PUPPETEER_SKIP_DOWNLOAD: "true"
+
+jobs:
+  validate:
+    name: Lint + Typecheck + Test + Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sorrel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify OpenAPI codegen is up to date
+        run: |
+          pnpm --filter @workspace/api-spec run codegen
+          if ! git diff --quiet; then
+            echo "::error::Generated API files are stale. Run 'pnpm --filter @workspace/api-spec run codegen' and commit." >&2
+            git diff --stat
+            exit 1
+          fi
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Apply DB schema
+        run: pnpm --filter @workspace/db run push
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm -r --if-present run build
