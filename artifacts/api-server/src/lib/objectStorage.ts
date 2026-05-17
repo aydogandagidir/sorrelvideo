@@ -9,35 +9,41 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 
-// FIXME: object storage credentials and signed-URL minting still come from a
-// local sidecar at 127.0.0.1:1106 (the legacy Replit object-storage sidecar).
-// Outside that environment the bucket calls below will not work. Replace with a
-// regular GCS service-account JSON (GOOGLE_APPLICATION_CREDENTIALS) and use
-// `bucket.file(name).getSignedUrl(...)` instead — tracked under "Future work"
-// in CLAUDE.md.
-const OBJECT_STORAGE_SIDECAR_URL =
-  process.env.OBJECT_STORAGE_SIDECAR_URL ?? "http://127.0.0.1:1106";
+/**
+ * Initialize the GCS client. Three supported credential modes, checked in
+ * order:
+ *
+ *  1. `GCS_SERVICE_ACCOUNT_KEY` — base64-encoded service-account JSON.
+ *     Best for container deployments that pass secrets via env.
+ *  2. `GOOGLE_APPLICATION_CREDENTIALS` — path to a service-account JSON file.
+ *     The Storage client auto-detects this; nothing to do here.
+ *  3. Application Default Credentials — `gcloud auth application-default
+ *     login` for local dev, or workload identity in GKE/Cloud Run.
+ *
+ * `GCS_PROJECT_ID` is read from env in modes 2/3; in mode 1 it falls back to
+ * the JSON's `project_id` field.
+ */
+function buildStorage(): Storage {
+  const b64 = process.env.GCS_SERVICE_ACCOUNT_KEY;
+  if (b64) {
+    let parsed: { project_id?: string } & Record<string, unknown>;
+    try {
+      parsed = JSON.parse(Buffer.from(b64, "base64").toString("utf-8"));
+    } catch (err) {
+      throw new Error(
+        "GCS_SERVICE_ACCOUNT_KEY is not valid base64-encoded JSON: " +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+    return new Storage({
+      credentials: parsed,
+      projectId: parsed.project_id ?? process.env.GCS_PROJECT_ID,
+    });
+  }
+  return new Storage({ projectId: process.env.GCS_PROJECT_ID });
+}
 
-export const objectStorageClient = new Storage({
-  // External-account credentials configured to talk to the local object-storage
-  // sidecar (legacy from the Replit hosting environment). Replace with a
-  // service-account JSON when migrating to direct GCS auth.
-  credentials: {
-    audience: "object-storage-sidecar",
-    subject_token_type: "access_token",
-    token_url: `${OBJECT_STORAGE_SIDECAR_URL}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${OBJECT_STORAGE_SIDECAR_URL}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
+export const objectStorageClient = buildStorage();
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -57,13 +63,13 @@ export class ObjectStorageService {
         pathsStr
           .split(",")
           .map((path) => path.trim())
-          .filter((path) => path.length > 0)
-      )
+          .filter((path) => path.length > 0),
+      ),
     );
     if (paths.length === 0) {
       throw new Error(
         "PUBLIC_OBJECT_SEARCH_PATHS not set. Create a bucket in 'Object Storage' " +
-          "tool and set PUBLIC_OBJECT_SEARCH_PATHS env var (comma-separated paths)."
+          "tool and set PUBLIC_OBJECT_SEARCH_PATHS env var (comma-separated paths).",
       );
     }
     return paths;
@@ -74,7 +80,7 @@ export class ObjectStorageService {
     if (!dir) {
       throw new Error(
         "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
+          "tool and set PRIVATE_OBJECT_DIR env var.",
       );
     }
     return dir;
@@ -97,7 +103,10 @@ export class ObjectStorageService {
     return null;
   }
 
-  async downloadObject(file: File, cacheTtlSec: number = 3600): Promise<Response> {
+  async downloadObject(
+    file: File,
+    cacheTtlSec: number = 3600,
+  ): Promise<Response> {
     const [metadata] = await file.getMetadata();
     const aclPolicy = await getObjectAclPolicy(file);
     const isPublic = aclPolicy?.visibility === "public";
@@ -106,7 +115,8 @@ export class ObjectStorageService {
     const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
     const headers: Record<string, string> = {
-      "Content-Type": (metadata.contentType as string) || "application/octet-stream",
+      "Content-Type":
+        (metadata.contentType as string) || "application/octet-stream",
       "Cache-Control": `${isPublic ? "public" : "private"}, max-age=${cacheTtlSec}`,
     };
     if (metadata.size) {
@@ -121,7 +131,7 @@ export class ObjectStorageService {
     if (!privateObjectDir) {
       throw new Error(
         "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
+          "tool and set PRIVATE_OBJECT_DIR env var.",
       );
     }
 
@@ -187,7 +197,7 @@ export class ObjectStorageService {
 
   async trySetObjectEntityAclPolicy(
     rawPath: string,
-    aclPolicy: ObjectAclPolicy
+    aclPolicy: ObjectAclPolicy,
   ): Promise<string> {
     const normalizedPath = this.normalizeObjectEntityPath(rawPath);
     if (!normalizedPath.startsWith("/")) {
@@ -237,6 +247,13 @@ function parseObjectPath(path: string): {
   };
 }
 
+const METHOD_TO_ACTION = {
+  GET: "read",
+  HEAD: "read",
+  PUT: "write",
+  DELETE: "delete",
+} as const satisfies Record<string, "read" | "write" | "delete">;
+
 async function signObjectURL({
   bucketName,
   objectName,
@@ -245,33 +262,14 @@ async function signObjectURL({
 }: {
   bucketName: string;
   objectName: string;
-  method: "GET" | "PUT" | "DELETE" | "HEAD";
+  method: keyof typeof METHOD_TO_ACTION;
   ttlSec: number;
 }): Promise<string> {
-  const request = {
-    bucket_name: bucketName,
-    object_name: objectName,
-    method,
-    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-  };
-  const response = await fetch(
-    `${OBJECT_STORAGE_SIDECAR_URL}/object-storage/signed-object-url`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-      signal: AbortSignal.timeout(30_000),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Failed to sign object URL (${response.status}). ` +
-        `Make sure the object-storage sidecar at ${OBJECT_STORAGE_SIDECAR_URL} is reachable.`
-    );
-  }
-
-  const { signed_url: signedURL } = await response.json();
-  return signedURL;
+  const file = objectStorageClient.bucket(bucketName).file(objectName);
+  const [url] = await file.getSignedUrl({
+    action: METHOD_TO_ACTION[method],
+    version: "v4",
+    expires: Date.now() + ttlSec * 1000,
+  });
+  return url;
 }

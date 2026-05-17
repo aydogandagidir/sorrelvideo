@@ -27,17 +27,21 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 
 ## Required env
 
-| Var                      | Required by                            | Purpose                                                                            |
-| ------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | api-server, db push                    | Postgres connection string                                                         |
-| `SESSION_SECRET`         | api-server                             | Session signing (reserved for future use; currently unused but expected to be set) |
-| `PORT`                   | api-server, sorrel, mockup-sandbox     | HTTP listen port (each process needs its own)                                      |
-| `BASE_PATH`              | sorrel, mockup-sandbox                 | Vite base path (use `/` locally)                                                   |
-| `ALLOWED_ORIGINS`        | api-server (production only)           | Comma-separated full origin URLs allowed by CORS                                   |
-| `APP_URL`                | docs/operations                        | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`)  |
-| `STRIPE_SECRET_KEY`      | api-server, scripts                    | Stripe API key                                                                     |
-| `STRIPE_PUBLISHABLE_KEY` | api-server (only if frontend reads it) | Publishable key for client-side checkout                                           |
-| `STRIPE_WEBHOOK_SECRET`  | api-server                             | Verifies signatures on POST `/api/billing/webhook`                                 |
+| Var                                                             | Required by                            | Purpose                                                                                  |
+| --------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                  | api-server, db push                    | Postgres connection string                                                               |
+| `SESSION_SECRET`                                                | api-server                             | Session signing (reserved for future use; currently unused but expected to be set)       |
+| `PORT`                                                          | api-server, sorrel, mockup-sandbox     | HTTP listen port (each process needs its own)                                            |
+| `BASE_PATH`                                                     | sorrel, mockup-sandbox                 | Vite base path (use `/` locally)                                                         |
+| `ALLOWED_ORIGINS`                                               | api-server (production only)           | Comma-separated full origin URLs allowed by CORS                                         |
+| `APP_URL`                                                       | docs/operations                        | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`)        |
+| `STRIPE_SECRET_KEY`                                             | api-server, scripts                    | Stripe API key                                                                           |
+| `STRIPE_PUBLISHABLE_KEY`                                        | api-server (only if frontend reads it) | Publishable key for client-side checkout                                                 |
+| `STRIPE_WEBHOOK_SECRET`                                         | api-server                             | Verifies signatures on POST `/api/billing/webhook`                                       |
+| `GCS_SERVICE_ACCOUNT_KEY` _or_ `GOOGLE_APPLICATION_CREDENTIALS` | api-server (object uploads)            | GCS auth — base64 JSON _or_ path to JSON. Falls back to Application Default Credentials. |
+| `GCS_PROJECT_ID`                                                | api-server                             | GCP project id. Inferred from JSON in `GCS_SERVICE_ACCOUNT_KEY` mode.                    |
+| `PUBLIC_OBJECT_SEARCH_PATHS`                                    | api-server (object uploads)            | Comma-separated bucket paths searched by `GET /api/storage/public-objects/*`             |
+| `PRIVATE_OBJECT_DIR`                                            | api-server (object uploads)            | Private bucket prefix for user uploads (`/<bucket>/<dir>`)                               |
 
 ## Stack
 
@@ -176,12 +180,11 @@ limiting are deliberately deferred — see "Future work" below.
   serialize via `JSON.parse(JSON.stringify(data))`
 - The Stripe webhook route is registered **before** `express.json()` so the
   raw body is preserved for signature verification — do not move it
-- `artifacts/api-server/src/lib/objectStorage.ts` still talks to a local
-  object-storage sidecar at `127.0.0.1:1106` (legacy from the previous hosting
-  environment). Outside that environment GCS calls fail. Replacing this with
-  service-account auth + native `getSignedUrl` is tracked under "Future work"
-  — until then, brand/project file uploads only work where that sidecar is
-  reachable. The endpoint is overridable via `OBJECT_STORAGE_SIDECAR_URL`
+- Object storage talks to GCS directly via `@google-cloud/storage`
+  (`bucket.file(name).getSignedUrl({ version: "v4" })`). Pick an auth mode
+  from `.env.example` — base64 service-account JSON for containers,
+  `GOOGLE_APPLICATION_CREDENTIALS` for local dev, or ADC for workload
+  identity
 
 ## Don't do this
 
@@ -265,17 +268,14 @@ Render / Vercel for the frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **Object storage migration**: drop the `objectStorage.ts` sidecar dependency
-   and use a GCS service account directly (`GOOGLE_APPLICATION_CREDENTIALS` +
-   native `bucket.file().getSignedUrl()`)
-2. **Auth hardening**: rate limiting for `/api/auth/*`
+1. **Auth hardening**: rate limiting for `/api/auth/*`
    (express-rate-limit), email verification, password reset (Resend)
-3. **OAuth providers** via `arctic` (GitHub + Google planned)
-4. **Studio module MVP**: parametric compositions + brand-kit injection +
+2. **OAuth providers** via `arctic` (GitHub + Google planned)
+3. **Studio module MVP**: parametric compositions + brand-kit injection +
    render flow
-5. **Test depth**: add a Postgres testcontainer so `billingService` race
+4. **Test depth**: add a Postgres testcontainer so `billingService` race
    tests and `webhookHandlers.upsertSubscription` can run against a real DB
-6. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
+5. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
    needs a spec before implementation
 
 ## User preferences
