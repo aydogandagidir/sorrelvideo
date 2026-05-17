@@ -14,6 +14,7 @@ import ResetPassword from "./pages/reset-password";
 import EmailVerified from "./pages/email-verified";
 import CheckYourEmail from "./pages/check-your-email";
 import Dashboard from "./pages/dashboard";
+import Studio from "./pages/studio";
 import Templates from "./pages/templates";
 import Projects from "./pages/projects";
 import Brand from "./pages/brand";
@@ -68,6 +69,9 @@ function Router() {
       <Route path="/check-your-email" component={CheckYourEmail} />
       <Route path="/dashboard">
         <ProtectedRoute component={Dashboard} />
+      </Route>
+      <Route path="/studio">
+        <ProtectedRoute component={Studio} />
       </Route>
       <Route path="/templates">
         <ProtectedRoute component={Templates} />

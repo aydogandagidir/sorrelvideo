@@ -139,6 +139,11 @@ export const ProjectStatus = {
   failed: "failed",
 } as const;
 
+/**
+ * Studio placeholder values keyed by `user.*` / `brand.*`. Optional.
+ */
+export type ProjectCompositionVars = { [key: string]: string } | null;
+
 export interface Project {
   id: number;
   name: string;
@@ -156,15 +161,20 @@ export interface Project {
   duration?: number | null;
   /** @nullable */
   renderError?: string | null;
+  /** Studio placeholder values keyed by `user.*` / `brand.*`. Optional. */
+  compositionVars?: ProjectCompositionVars;
   createdAt: string;
   updatedAt: string;
 }
+
+export type ProjectInputCompositionVars = { [key: string]: string };
 
 export interface ProjectInput {
   name: string;
   description?: string;
   module: string;
   templateId?: number;
+  compositionVars?: ProjectInputCompositionVars;
 }
 
 export type ProjectUpdateStatus =
@@ -177,12 +187,15 @@ export const ProjectUpdateStatus = {
   failed: "failed",
 } as const;
 
+export type ProjectUpdateCompositionVars = { [key: string]: string };
+
 export interface ProjectUpdate {
   name?: string;
   description?: string;
   status?: ProjectUpdateStatus;
   thumbnailUrl?: string;
   videoUrl?: string;
+  compositionVars?: ProjectUpdateCompositionVars;
 }
 
 export interface BrandKit {

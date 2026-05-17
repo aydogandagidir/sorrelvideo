@@ -1,10 +1,14 @@
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { createRenderJob, executeRenderJob, type RenderConfig } from "@hyperframes/producer";
+import {
+  createRenderJob,
+  executeRenderJob,
+  type RenderConfig,
+} from "@hyperframes/producer";
 import type { Fps } from "@hyperframes/core";
-import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { db, brandKitTable, projectsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,19 +16,36 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Directory where final rendered mp4 files are stored, keyed by project id. */
 export const RENDERS_DIR = path.resolve(__dirname, "../../renders");
 
+const COMPOSITIONS_DIR = path.resolve(__dirname, "../compositions");
+
 const COMPOSITION_MAP: Record<string, string> = {
   "product-launch": "product-launch.html",
   "brand-promo": "brand-promo.html",
   "social-teaser": "social-teaser.html",
-  studio: "product-launch.html",
+  studio: "studio-default.html",
   ai: "social-teaser.html",
   bulk: "brand-promo.html",
 };
 
 const DEFAULT_COMPOSITION = "product-launch.html";
 
+/** Default values for Studio placeholders when the user/brand leaves them blank. */
+const STUDIO_FALLBACKS = {
+  "brand.companyName": "Your Brand",
+  "brand.initial": "S",
+  "brand.primaryColor": "#6366f1",
+  "brand.secondaryColor": "#1e293b",
+  "brand.accentColor": "#f59e0b",
+  "brand.fontFamily": "'Inter'",
+  "brand.logoUrl": "",
+  "user.headline": "Make something\nthey'll remember.",
+  "user.bodyText":
+    "Sorrel turns a template, your brand kit, and a few sentences into branded video — ready to ship.",
+  "user.ctaText": "Try it free",
+} as const;
+
 /** Resolve the HTML composition filename for a given module slug. */
-function resolveEntryFile(module: string): string {
+export function resolveEntryFile(module: string): string {
   return COMPOSITION_MAP[module] ?? DEFAULT_COMPOSITION;
 }
 
@@ -39,6 +60,123 @@ async function setProjectStatus(
     .where(eq(projectsTable.id, projectId));
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+/**
+ * Apply `{{key}}` substitutions to the composition source.
+ *
+ * - Brand values (companyName, primaryColor, …) are HTML-escaped.
+ * - User text values (headline, bodyText, ctaText) are escaped and `\n`
+ *   is rendered as `<br/>` for the headline / body fields.
+ * - Unknown placeholders are left intact — keeps the HTML inspectable
+ *   when debugging.
+ */
+export function renderCompositionTemplate(
+  source: string,
+  vars: Record<string, string>,
+): string {
+  return source.replace(
+    /{{\s*([a-zA-Z0-9._-]+)\s*}}/g,
+    (match, key: string) => {
+      const value = vars[key];
+      if (value === undefined) return match;
+      const escaped = escapeHtml(value);
+      return key.startsWith("user.")
+        ? escaped.replaceAll("\n", "<br/>")
+        : escaped;
+    },
+  );
+}
+
+interface BrandKitSnapshot {
+  companyName: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  accentColor: string | null;
+  fontFamily: string | null;
+  logoUrl: string | null;
+}
+
+function buildVarMap(
+  brand: BrandKitSnapshot | null,
+  compositionVars: Record<string, string> | null | undefined,
+): Record<string, string> {
+  const map: Record<string, string> = { ...STUDIO_FALLBACKS };
+  if (brand) {
+    if (brand.companyName) {
+      map["brand.companyName"] = brand.companyName;
+      map["brand.initial"] = brand.companyName.charAt(0).toUpperCase() || "S";
+    }
+    if (brand.primaryColor) map["brand.primaryColor"] = brand.primaryColor;
+    if (brand.secondaryColor)
+      map["brand.secondaryColor"] = brand.secondaryColor;
+    if (brand.accentColor) map["brand.accentColor"] = brand.accentColor;
+    if (brand.fontFamily) map["brand.fontFamily"] = brand.fontFamily;
+    if (brand.logoUrl) map["brand.logoUrl"] = brand.logoUrl;
+  }
+  if (compositionVars) {
+    for (const [k, v] of Object.entries(compositionVars)) {
+      if (typeof v === "string" && v.length > 0) map[k] = v;
+    }
+  }
+  return map;
+}
+
+async function loadBrandKit(userId: string): Promise<BrandKitSnapshot | null> {
+  try {
+    const [row] = await db
+      .select()
+      .from(brandKitTable)
+      .where(eq(brandKitTable.userId, userId));
+    if (!row) return null;
+    return {
+      companyName: row.companyName ?? null,
+      primaryColor: row.primaryColor ?? null,
+      secondaryColor: row.secondaryColor ?? null,
+      accentColor: row.accentColor ?? null,
+      fontFamily: row.fontFamily ?? null,
+      logoUrl: row.logoUrl ?? null,
+    };
+  } catch (err) {
+    logger.warn({ err, userId }, "Could not load brand kit");
+    return null;
+  }
+}
+
+/**
+ * Materialize a per-render composition file with Studio variables already
+ * substituted. Returns the directory + filename to feed Hyperframes.
+ */
+async function prepareCompositionFor(project: {
+  id: number;
+  userId: string;
+  module: string;
+  compositionVars: Record<string, string> | null;
+}): Promise<{ dir: string; file: string }> {
+  const baseEntryFile = resolveEntryFile(project.module);
+  const source = fs.readFileSync(
+    path.join(COMPOSITIONS_DIR, baseEntryFile),
+    "utf-8",
+  );
+
+  const brand = await loadBrandKit(project.userId);
+  const vars = buildVarMap(brand, project.compositionVars);
+  const rendered = renderCompositionTemplate(source, vars);
+
+  const dir = path.join(RENDERS_DIR, String(project.id));
+  fs.mkdirSync(dir, { recursive: true });
+  const file = "composition.html";
+  fs.writeFileSync(path.join(dir, file), rendered, "utf-8");
+  return { dir, file };
+}
+
 /**
  * Kick off a Hyperframes render job in the background.
  * Sets project status: draft/failed → rendering → ready/failed.
@@ -48,28 +186,44 @@ export async function startRender(
   module: string,
   _templateId?: number | null,
 ): Promise<void> {
-  const compositionsDir = path.resolve(__dirname, "../compositions");
-  const entryFile = resolveEntryFile(module);
-
   const outputDir = path.join(RENDERS_DIR, String(projectId));
   fs.mkdirSync(outputDir, { recursive: true });
   const outputPath = path.join(outputDir, "output.mp4");
 
-  logger.info({ projectId, entryFile, outputPath }, "Render job starting");
+  logger.info({ projectId, module, outputPath }, "Render job starting");
 
   await setProjectStatus(projectId, "rendering");
 
   try {
+    // Re-read the project to pick up the userId + compositionVars at render time.
+    const [project] = await db
+      .select({
+        id: projectsTable.id,
+        userId: projectsTable.userId,
+        module: projectsTable.module,
+        compositionVars: projectsTable.compositionVars,
+      })
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+
+    if (!project)
+      throw new Error(`Project ${projectId} disappeared mid-render`);
+
+    const { dir, file } = await prepareCompositionFor(project);
+
     const config: RenderConfig = {
       fps: { num: 30, den: 1 } as Fps,
       quality: "draft",
-      entryFile,
+      entryFile: file,
     };
 
     const job = createRenderJob(config);
 
-    await executeRenderJob(job, compositionsDir, outputPath, (j, msg) => {
-      logger.debug({ projectId, percent: Math.round(j.progress * 100), msg }, "Render progress");
+    await executeRenderJob(job, dir, outputPath, (j, msg) => {
+      logger.debug(
+        { projectId, percent: Math.round(j.progress * 100), msg },
+        "Render progress",
+      );
     });
 
     const videoUrl = `/api/projects/${projectId}/video`;

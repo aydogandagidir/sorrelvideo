@@ -263,6 +263,12 @@ export const ListProjectsResponseItem = zod.object({
   videoUrl: zod.string().nullish(),
   duration: zod.number().nullish(),
   renderError: zod.string().nullish(),
+  compositionVars: zod
+    .union([zod.record(zod.string(), zod.string()), zod.null()])
+    .optional()
+    .describe(
+      "Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.",
+    ),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -276,6 +282,7 @@ export const CreateProjectBody = zod.object({
   description: zod.string().optional(),
   module: zod.string(),
   templateId: zod.number().optional(),
+  compositionVars: zod.record(zod.string(), zod.string()).optional(),
 });
 
 /**
@@ -296,6 +303,12 @@ export const GetProjectResponse = zod.object({
   videoUrl: zod.string().nullish(),
   duration: zod.number().nullish(),
   renderError: zod.string().nullish(),
+  compositionVars: zod
+    .union([zod.record(zod.string(), zod.string()), zod.null()])
+    .optional()
+    .describe(
+      "Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.",
+    ),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -313,6 +326,7 @@ export const UpdateProjectBody = zod.object({
   status: zod.enum(["draft", "rendering", "ready", "failed"]).optional(),
   thumbnailUrl: zod.string().optional(),
   videoUrl: zod.string().optional(),
+  compositionVars: zod.record(zod.string(), zod.string()).optional(),
 });
 
 export const UpdateProjectResponse = zod.object({
@@ -326,6 +340,12 @@ export const UpdateProjectResponse = zod.object({
   videoUrl: zod.string().nullish(),
   duration: zod.number().nullish(),
   renderError: zod.string().nullish(),
+  compositionVars: zod
+    .union([zod.record(zod.string(), zod.string()), zod.null()])
+    .optional()
+    .describe(
+      "Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.",
+    ),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -516,6 +536,12 @@ export const GetStatsResponse = zod.object({
         videoUrl: zod.string().nullish(),
         duration: zod.number().nullish(),
         renderError: zod.string().nullish(),
+        compositionVars: zod
+          .union([zod.record(zod.string(), zod.string()), zod.null()])
+          .optional()
+          .describe(
+            "Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.",
+          ),
         createdAt: zod.string(),
         updatedAt: zod.string(),
       }),

@@ -5,7 +5,8 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { ProjectUpdateStatus } from './projectUpdateStatus';
+import type { ProjectUpdateCompositionVars } from "./projectUpdateCompositionVars";
+import type { ProjectUpdateStatus } from "./projectUpdateStatus";
 
 export interface ProjectUpdate {
   name?: string;
@@ -13,4 +14,5 @@ export interface ProjectUpdate {
   status?: ProjectUpdateStatus;
   thumbnailUrl?: string;
   videoUrl?: string;
+  compositionVars?: ProjectUpdateCompositionVars;
 }

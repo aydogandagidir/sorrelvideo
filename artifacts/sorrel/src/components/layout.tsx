@@ -9,6 +9,7 @@ import {
   Video,
   LogOut,
   Settings,
+  Wand2,
   Zap,
 } from "lucide-react";
 import { useBillingInfo } from "@/hooks/useBilling";
@@ -19,6 +20,7 @@ import { useAuth } from "@workspace/auth-web";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/studio", label: "Studio", icon: Wand2 },
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/templates", label: "Templates", icon: Film },
   { href: "/brand", label: "Brand Kit", icon: Palette },
@@ -59,10 +61,13 @@ function UserFooter() {
 
   if (!user) return null;
 
-  const initials = [user.firstName, user.lastName]
-    .filter((name): name is string => Boolean(name))
-    .map((n) => n[0]?.toUpperCase() ?? "")
-    .join("") || user.email?.[0]?.toUpperCase() || "U";
+  const initials =
+    [user.firstName, user.lastName]
+      .filter((name): name is string => Boolean(name))
+      .map((n) => n[0]?.toUpperCase() ?? "")
+      .join("") ||
+    user.email?.[0]?.toUpperCase() ||
+    "U";
 
   const displayName =
     [user.firstName, user.lastName].filter(Boolean).join(" ") ||
@@ -84,7 +89,9 @@ function UserFooter() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{displayName}</p>
           {user.email && (
-            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user.email}
+            </p>
           )}
         </div>
       </div>
@@ -138,7 +145,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Desktop Sidebar */}
       <aside className="hidden border-r bg-sidebar md:flex md:w-64 lg:w-72 flex-col">
         <div className="flex h-16 items-center border-b px-6">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight">
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-bold text-lg tracking-tight"
+          >
             <Video className="h-5 w-5 text-primary" />
             <span>Sorrel</span>
           </Link>
@@ -163,7 +173,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 bg-sidebar p-0 flex flex-col">
+            <SheetContent
+              side="left"
+              className="w-64 bg-sidebar p-0 flex flex-col"
+            >
               <div className="flex h-16 items-center border-b px-6">
                 <div className="flex items-center gap-2 font-bold text-lg">
                   <Video className="h-5 w-5 text-primary" />

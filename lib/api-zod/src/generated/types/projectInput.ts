@@ -5,10 +5,12 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectInputCompositionVars } from "./projectInputCompositionVars";
 
 export interface ProjectInput {
   name: string;
   description?: string;
   module: string;
   templateId?: number;
+  compositionVars?: ProjectInputCompositionVars;
 }

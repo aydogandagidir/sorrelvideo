@@ -857,6 +857,13 @@ components:
           type: ["integer", "null"]
         renderError:
           type: ["string", "null"]
+        compositionVars:
+          description: Studio placeholder values keyed by `user.*` / `brand.*`. Optional.
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: "null"
         createdAt:
           type: string
         updatedAt:
@@ -874,6 +881,10 @@ components:
           type: string
         templateId:
           type: integer
+        compositionVars:
+          type: object
+          additionalProperties:
+            type: string
 
     ProjectUpdate:
       type: object
@@ -889,6 +900,10 @@ components:
           type: string
         videoUrl:
           type: string
+        compositionVars:
+          type: object
+          additionalProperties:
+            type: string
 
     BrandKit:
       type: object

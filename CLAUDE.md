@@ -204,6 +204,15 @@ stored; we only need the identity for sign-in.
 - Output: `artifacts/api-server/renders/<projectId>/output.mp4`
 - Streaming: `GET /api/projects/:id/video` ranges over the file
 - Polling: frontend re-queries project status every 3 seconds
+- **Template substitution**: before each render, `renderService` reads the
+  composition HTML, merges the user's brand kit with the project's
+  `compositionVars` JSON, and writes a per-project
+  `renders/<projectId>/composition.html` that Hyperframes consumes. The
+  substitution helper `renderCompositionTemplate(source, vars)` replaces
+  `{{key}}` placeholders, HTML-escapes the value, and converts `\n` in
+  `user.*` keys to `<br/>`. Unknown placeholders are left intact for
+  debug-ability. `STUDIO_FALLBACKS` covers every required key so a render
+  always produces sensible output even with no brand kit set
 
 ## Known gotchas
 
@@ -309,12 +318,12 @@ Render / Vercel for the frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **Studio module MVP**: parametric compositions + brand-kit injection +
-   render flow
-2. **Test depth**: add a Postgres testcontainer so `billingService` race
+1. **Test depth**: add a Postgres testcontainer so `billingService` race
    tests and `webhookHandlers.upsertSubscription` can run against a real DB
-3. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
+2. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
    needs a spec before implementation
+3. **Studio v2**: timeline / segment editor, custom asset upload, more
+   parametric templates beyond `studio-default.html`
 
 ## User preferences
 
