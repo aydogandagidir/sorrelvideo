@@ -13,34 +13,42 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function getReturnTo(search: string): string {
-  const params = new URLSearchParams(search);
-  const value = params.get("returnTo");
-  if (!value || !value.startsWith("/") || value.startsWith("//"))
-    return "/dashboard";
-  return value;
-}
+const PASSWORD_MIN = 8;
 
-export default function LoginPage() {
+export default function ResetPasswordPage() {
   const [, setLocation] = useLocation();
   const search = useSearch();
-  const returnTo = getReturnTo(search);
-  const { loginWithPassword } = useAuth();
+  const token = new URLSearchParams(search).get("token") ?? "";
 
-  const [email, setEmail] = useState("");
+  const { resetPassword } = useAuth();
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (!token) {
+      setError("This link is missing a reset token.");
+      return;
+    }
+    if (password.length < PASSWORD_MIN) {
+      setError(`Password must be at least ${PASSWORD_MIN} characters.`);
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await loginWithPassword({ email: email.trim(), password });
-      setLocation(returnTo);
+      await resetPassword({ token, password });
+      setLocation("/login?reset=ok");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Reset failed");
     } finally {
       setSubmitting(false);
     }
@@ -57,34 +65,36 @@ export default function LoginPage() {
             <Video className="h-5 w-5" />
             Sorrel
           </Link>
-          <CardTitle>Welcome back</CardTitle>
+          <CardTitle>Choose a new password</CardTitle>
           <CardDescription>
-            Sign in with your email and password.
+            Reset links expire 30 minutes after they were sent.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="password">New password</Label>
               <Input
-                id="email"
-                type="email"
-                autoComplete="email"
+                id="password"
+                type="password"
+                autoComplete="new-password"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                minLength={PASSWORD_MIN}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 disabled={submitting}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="confirm">Confirm new password</Label>
               <Input
-                id="password"
+                id="confirm"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                minLength={PASSWORD_MIN}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
                 disabled={submitting}
               />
             </div>
@@ -97,26 +107,12 @@ export default function LoginPage() {
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in…
+                  Updating…
                 </>
               ) : (
-                "Sign in"
+                "Update password"
               )}
             </Button>
-            <div className="flex items-center justify-between text-sm">
-              <Link
-                href="/forgot-password"
-                className="text-muted-foreground underline-offset-4 hover:underline"
-              >
-                Forgot password?
-              </Link>
-              <Link
-                href="/signup"
-                className="text-primary underline-offset-4 hover:underline"
-              >
-                Create an account
-              </Link>
-            </div>
           </form>
         </CardContent>
       </Card>

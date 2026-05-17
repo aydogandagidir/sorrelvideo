@@ -43,7 +43,7 @@ export default function SignupPage() {
         firstName: firstName.trim() || null,
         lastName: lastName.trim() || null,
       });
-      setLocation("/dashboard");
+      setLocation("/check-your-email");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
@@ -55,12 +55,17 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2 text-center">
-          <Link href="/" className="inline-flex items-center justify-center gap-2 text-lg font-semibold">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center gap-2 text-lg font-semibold"
+          >
             <Video className="h-5 w-5" />
             Sorrel
           </Link>
           <CardTitle>Create your account</CardTitle>
-          <CardDescription>Start rendering branded video in minutes.</CardDescription>
+          <CardDescription>
+            Start rendering branded video in minutes.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -131,7 +136,10 @@ export default function SignupPage() {
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+              <Link
+                href="/login"
+                className="text-primary underline-offset-4 hover:underline"
+              >
                 Sign in
               </Link>
             </p>

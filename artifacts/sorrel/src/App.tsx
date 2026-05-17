@@ -9,6 +9,10 @@ import Home from "./pages/home";
 import Pricing from "./pages/pricing";
 import Login from "./pages/login";
 import Signup from "./pages/signup";
+import ForgotPassword from "./pages/forgot-password";
+import ResetPassword from "./pages/reset-password";
+import EmailVerified from "./pages/email-verified";
+import CheckYourEmail from "./pages/check-your-email";
 import Dashboard from "./pages/dashboard";
 import Templates from "./pages/templates";
 import Projects from "./pages/projects";
@@ -26,13 +30,19 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ component: Component }: { component: ComponentType }) {
+function ProtectedRoute({
+  component: Component,
+}: {
+  component: ComponentType;
+}) {
   const { isAuthenticated, isLoading, login } = useAuth();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+        <div className="animate-pulse text-muted-foreground text-sm">
+          Loading...
+        </div>
       </div>
     );
   }
@@ -52,6 +62,10 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/email-verified" component={EmailVerified} />
+      <Route path="/check-your-email" component={CheckYourEmail} />
       <Route path="/dashboard">
         <ProtectedRoute component={Dashboard} />
       </Route>

@@ -29,6 +29,12 @@ interface AuthState {
   logout: () => Promise<void>;
   /** Re-fetch the current user (useful after auth-state mutations). */
   refresh: () => Promise<void>;
+  /** Request a password-reset email. Always resolves (generic response). */
+  requestPasswordReset: (email: string) => Promise<void>;
+  /** Consume a reset token and set a new password. */
+  resetPassword: (input: { token: string; password: string }) => Promise<void>;
+  /** Re-send the email-verification link for an account. */
+  resendVerification: (email: string) => Promise<void>;
 }
 
 interface AuthEnvelope {
@@ -37,9 +43,9 @@ interface AuthEnvelope {
 
 async function readEnvelope(res: Response): Promise<AuthEnvelope> {
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as
-      | { error?: string }
-      | null;
+    const body = (await res.json().catch(() => null)) as {
+      error?: string;
+    } | null;
     throw new Error(body?.error ?? `HTTP ${res.status}`);
   }
   return (await res.json()) as AuthEnvelope;
@@ -92,21 +98,18 @@ export function useAuth(): AuthState {
     [],
   );
 
-  const signup = useCallback(
-    async (input: SignupInput): Promise<AuthUser> => {
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      const envelope = await readEnvelope(res);
-      if (!envelope.user) throw new Error("Signup succeeded without a user");
-      setUser(envelope.user);
-      return envelope.user;
-    },
-    [],
-  );
+  const signup = useCallback(async (input: SignupInput): Promise<AuthUser> => {
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const envelope = await readEnvelope(res);
+    if (!envelope.user) throw new Error("Signup succeeded without a user");
+    setUser(envelope.user);
+    return envelope.user;
+  }, []);
 
   const logout = useCallback(async (): Promise<void> => {
     try {
@@ -120,6 +123,48 @@ export function useAuth(): AuthState {
     }
   }, []);
 
+  const requestPasswordReset = useCallback(
+    async (email: string): Promise<void> => {
+      // Server always returns 200; we treat HTTP errors as failures regardless.
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    },
+    [],
+  );
+
+  const resetPassword = useCallback(
+    async (input: { token: string; password: string }): Promise<void> => {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+    },
+    [],
+  );
+
+  const resendVerification = useCallback(
+    async (email: string): Promise<void> => {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    },
+    [],
+  );
+
   return {
     user,
     isLoading,
@@ -129,5 +174,8 @@ export function useAuth(): AuthState {
     signup,
     logout,
     refresh,
+    requestPasswordReset,
+    resetPassword,
+    resendVerification,
   };
 }

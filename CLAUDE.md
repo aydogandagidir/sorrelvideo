@@ -42,6 +42,8 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `GCS_PROJECT_ID`                                                | api-server                             | GCP project id. Inferred from JSON in `GCS_SERVICE_ACCOUNT_KEY` mode.                    |
 | `PUBLIC_OBJECT_SEARCH_PATHS`                                    | api-server (object uploads)            | Comma-separated bucket paths searched by `GET /api/storage/public-objects/*`             |
 | `PRIVATE_OBJECT_DIR`                                            | api-server (object uploads)            | Private bucket prefix for user uploads (`/<bucket>/<dir>`)                               |
+| `RESEND_API_KEY`                                                | api-server (auth emails, optional)     | Resend API key. If unset, emails are logged to stdout instead of sent (dev-friendly).    |
+| `EMAIL_FROM`                                                    | api-server (when RESEND_API_KEY set)   | From header for auth emails — e.g. `Sorrel <noreply@sorrel.video>`                       |
 
 ## Stack
 
@@ -137,8 +139,30 @@ Email + password sessions, no third-party identity provider in the loop:
   `logout`, `refresh`, plus the `login()` redirect helper
 
 Sessions live in the `sessions` table (`sid` cookie or `Authorization: Bearer`
-header). 7-day TTL. OAuth, email verification, password reset, and rate
-limiting are deliberately deferred — see "Future work" below.
+header). 7-day TTL.
+
+**Email verification** is best-effort: signup creates the account and an
+unverified row in `email_verifications` (HMAC-SHA256(token, SESSION_SECRET)
+storage, 24-hour TTL). The user gets a `/verify-email?token=...` link by
+email; consuming it sets `users.emailVerifiedAt` and deletes the row.
+Verification is **not** a login gate yet — users keep working while
+unverified, and `/api/auth/resend-verification` can re-send the link.
+
+**Password reset**: `POST /api/auth/forgot-password` always returns 200 to
+avoid email enumeration. If the email matches a user, a token (30-minute
+TTL, single-use, stored as HMAC hash in `password_resets`) is mailed. The
+user posts the token + new password to `/api/auth/reset-password`.
+
+**Rate limiting** (`express-rate-limit`, in-memory): `/api/auth/login` 5/15min
+per IP+email, `/api/auth/signup` 3/hour per IP, `/api/auth/forgot-password`
+3/hour per IP+email, `/api/auth/verify-email` + `/auth/resend-verification`
+10/hour per IP. Swap to a Redis store before scaling horizontally.
+
+**Email transport**: `lib/email.ts` wraps Resend. When `RESEND_API_KEY` is
+unset (typical local dev) it logs the message body instead — the app keeps
+working without an external dependency.
+
+OAuth (GitHub/Google) is the next planned auth feature — see "Future work".
 
 ## Billing
 
@@ -268,14 +292,12 @@ Render / Vercel for the frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **Auth hardening**: rate limiting for `/api/auth/*`
-   (express-rate-limit), email verification, password reset (Resend)
-2. **OAuth providers** via `arctic` (GitHub + Google planned)
-3. **Studio module MVP**: parametric compositions + brand-kit injection +
+1. **OAuth providers** via `arctic` (GitHub + Google planned)
+2. **Studio module MVP**: parametric compositions + brand-kit injection +
    render flow
-4. **Test depth**: add a Postgres testcontainer so `billingService` race
+3. **Test depth**: add a Postgres testcontainer so `billingService` race
    tests and `webhookHandlers.upsertSubscription` can run against a real DB
-5. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
+4. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
    needs a spec before implementation
 
 ## User preferences

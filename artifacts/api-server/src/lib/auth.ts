@@ -74,10 +74,7 @@ export async function deleteSession(sid: string): Promise<void> {
   await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
 }
 
-export async function clearSession(
-  res: Response,
-  sid?: string,
-): Promise<void> {
+export async function clearSession(res: Response, sid?: string): Promise<void> {
   if (sid) await deleteSession(sid);
   res.clearCookie(SESSION_COOKIE, { path: "/" });
 }
@@ -98,4 +95,25 @@ export function setSessionCookie(res: Response, sid: string): void {
     path: "/",
     maxAge: SESSION_TTL,
   });
+}
+
+/**
+ * Issue a URL-safe random token for email verification / password reset.
+ * 32 bytes hex = 256 bits of entropy, well above brute-force range.
+ */
+export function generateToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+/**
+ * HMAC-SHA256 the token with SESSION_SECRET before persisting. We only ever
+ * store the hash, so a DB leak does not let an attacker consume tokens.
+ * The plaintext token lives only in the URL we email to the user.
+ */
+export function hashToken(token: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error("SESSION_SECRET must be set to hash auth tokens");
+  }
+  return crypto.createHmac("sha256", secret).update(token).digest("hex");
 }

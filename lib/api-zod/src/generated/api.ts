@@ -5,26 +5,30 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
-import * as zod from 'zod';
-
+import * as zod from "zod";
 
 /**
  * @summary Get the currently authenticated user
  */
 export const GetCurrentAuthUserHeader = zod.object({
-  "Authorization": zod.string().optional().describe('Opaque session token — `Bearer <sid>`.')
-})
+  Authorization: zod
+    .string()
+    .optional()
+    .describe("Opaque session token — `Bearer <sid>`."),
+});
 
 export const GetCurrentAuthUserResponse = zod.object({
-  "user": zod.union([zod.object({
-  "id": zod.string(),
-  "email": zod.string().email().nullable(),
-  "firstName": zod.string().nullable(),
-  "lastName": zod.string().nullable(),
-  "profileImageUrl": zod.string().nullable()
-}),zod.null()])
-})
-
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string().email().nullable(),
+      firstName: zod.string().nullable(),
+      lastName: zod.string().nullable(),
+      profileImageUrl: zod.string().nullable(),
+    }),
+    zod.null(),
+  ]),
+});
 
 /**
  * @summary Create a new account with email and password
@@ -39,15 +43,19 @@ export const signupWithPasswordBodyFirstNameMax = 100;
 
 export const signupWithPasswordBodyLastNameMax = 100;
 
-
-
 export const SignupWithPasswordBody = zod.object({
-  "email": zod.string().email().min(signupWithPasswordBodyEmailMin).max(signupWithPasswordBodyEmailMax),
-  "password": zod.string().min(signupWithPasswordBodyPasswordMin).max(signupWithPasswordBodyPasswordMax),
-  "firstName": zod.string().max(signupWithPasswordBodyFirstNameMax).nullish(),
-  "lastName": zod.string().max(signupWithPasswordBodyLastNameMax).nullish()
-})
-
+  email: zod
+    .string()
+    .email()
+    .min(signupWithPasswordBodyEmailMin)
+    .max(signupWithPasswordBodyEmailMax),
+  password: zod
+    .string()
+    .min(signupWithPasswordBodyPasswordMin)
+    .max(signupWithPasswordBodyPasswordMax),
+  firstName: zod.string().max(signupWithPasswordBodyFirstNameMax).nullish(),
+  lastName: zod.string().max(signupWithPasswordBodyLastNameMax).nullish(),
+});
 
 /**
  * @summary Authenticate with email and password
@@ -57,328 +65,386 @@ export const loginWithPasswordBodyEmailMax = 254;
 
 export const loginWithPasswordBodyPasswordMax = 256;
 
-
-
 export const LoginWithPasswordBody = zod.object({
-  "email": zod.string().email().min(loginWithPasswordBodyEmailMin).max(loginWithPasswordBodyEmailMax),
-  "password": zod.string().min(1).max(loginWithPasswordBodyPasswordMax)
-})
+  email: zod
+    .string()
+    .email()
+    .min(loginWithPasswordBodyEmailMin)
+    .max(loginWithPasswordBodyEmailMax),
+  password: zod.string().min(1).max(loginWithPasswordBodyPasswordMax),
+});
 
 export const LoginWithPasswordResponse = zod.object({
-  "user": zod.union([zod.object({
-  "id": zod.string(),
-  "email": zod.string().email().nullable(),
-  "firstName": zod.string().nullable(),
-  "lastName": zod.string().nullable(),
-  "profileImageUrl": zod.string().nullable()
-}),zod.null()])
-})
-
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string().email().nullable(),
+      firstName: zod.string().nullable(),
+      lastName: zod.string().nullable(),
+      profileImageUrl: zod.string().nullable(),
+    }),
+    zod.null(),
+  ]),
+});
 
 /**
  * @summary Clear the current session
  */
 export const LogoutSessionHeader = zod.object({
-  "Authorization": zod.string().optional().describe('Opaque session token — `Bearer <sid>`.')
-})
+  Authorization: zod
+    .string()
+    .optional()
+    .describe("Opaque session token — `Bearer <sid>`."),
+});
 
 export const LogoutSessionResponse = zod.object({
-  "success": zod.boolean()
-})
+  success: zod.boolean(),
+});
 
+/**
+ * @summary Request a password reset email
+ */
+export const requestPasswordResetBodyEmailMin = 3;
+export const requestPasswordResetBodyEmailMax = 254;
+
+export const RequestPasswordResetBody = zod.object({
+  email: zod
+    .string()
+    .email()
+    .min(requestPasswordResetBodyEmailMin)
+    .max(requestPasswordResetBodyEmailMax),
+});
+
+export const RequestPasswordResetResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Consume a password-reset token and set a new password
+ */
+export const resetPasswordBodyTokenMin = 8;
+export const resetPasswordBodyTokenMax = 256;
+
+export const resetPasswordBodyPasswordMin = 8;
+export const resetPasswordBodyPasswordMax = 256;
+
+export const ResetPasswordBody = zod.object({
+  token: zod
+    .string()
+    .min(resetPasswordBodyTokenMin)
+    .max(resetPasswordBodyTokenMax),
+  password: zod
+    .string()
+    .min(resetPasswordBodyPasswordMin)
+    .max(resetPasswordBodyPasswordMax),
+});
+
+export const ResetPasswordResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Verify an email address via a token from the verification email
+ */
+export const ConsumeEmailVerificationQueryParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+/**
+ * @summary Resend the email verification link
+ */
+export const resendEmailVerificationBodyEmailMin = 3;
+export const resendEmailVerificationBodyEmailMax = 254;
+
+export const ResendEmailVerificationBody = zod.object({
+  email: zod
+    .string()
+    .email()
+    .min(resendEmailVerificationBodyEmailMin)
+    .max(resendEmailVerificationBodyEmailMax),
+});
+
+export const ResendEmailVerificationResponse = zod.object({
+  success: zod.boolean(),
+});
 
 /**
  * @summary Redirect helper that sends the browser to the frontend login page
  */
 export const BeginBrowserLoginQueryParams = zod.object({
-  "returnTo": zod.coerce.string().optional()
-})
-
+  returnTo: zod.coerce.string().optional(),
+});
 
 /**
  * @summary Clear the session and redirect to the home page
  */
 export const LogoutBrowserSessionHeader = zod.object({
-  "Authorization": zod.string().optional().describe('Opaque session token — `Bearer <sid>`.')
-})
-
+  Authorization: zod
+    .string()
+    .optional()
+    .describe("Opaque session token — `Bearer <sid>`."),
+});
 
 /**
  * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  "status": zod.string()
-})
-
+  status: zod.string(),
+});
 
 /**
  * @summary List video templates
  */
 export const ListTemplatesQueryParams = zod.object({
-  "category": zod.coerce.string().optional(),
-  "module": zod.coerce.string().optional()
-})
+  category: zod.coerce.string().optional(),
+  module: zod.coerce.string().optional(),
+});
 
 export const ListTemplatesResponseItem = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "description": zod.string().nullish(),
-  "category": zod.string(),
-  "module": zod.string(),
-  "thumbnailUrl": zod.string(),
-  "duration": zod.number().describe('Duration in seconds'),
-  "isPremium": zod.boolean(),
-  "tags": zod.array(zod.string()).optional(),
-  "createdAt": zod.string().optional()
-})
-export const ListTemplatesResponse = zod.array(ListTemplatesResponseItem)
-
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  module: zod.string(),
+  thumbnailUrl: zod.string(),
+  duration: zod.number().describe("Duration in seconds"),
+  isPremium: zod.boolean(),
+  tags: zod.array(zod.string()).optional(),
+  createdAt: zod.string().optional(),
+});
+export const ListTemplatesResponse = zod.array(ListTemplatesResponseItem);
 
 /**
  * @summary Create a template
  */
 export const CreateTemplateBody = zod.object({
-  "name": zod.string(),
-  "description": zod.string().optional(),
-  "category": zod.string(),
-  "module": zod.string(),
-  "thumbnailUrl": zod.string(),
-  "duration": zod.number(),
-  "isPremium": zod.boolean().optional(),
-  "tags": zod.array(zod.string()).optional()
-})
-
+  name: zod.string(),
+  description: zod.string().optional(),
+  category: zod.string(),
+  module: zod.string(),
+  thumbnailUrl: zod.string(),
+  duration: zod.number(),
+  isPremium: zod.boolean().optional(),
+  tags: zod.array(zod.string()).optional(),
+});
 
 /**
  * @summary Get a template by ID
  */
 export const GetTemplateParams = zod.object({
-  "id": zod.coerce.number()
-})
+  id: zod.coerce.number(),
+});
 
 export const GetTemplateResponse = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "description": zod.string().nullish(),
-  "category": zod.string(),
-  "module": zod.string(),
-  "thumbnailUrl": zod.string(),
-  "duration": zod.number().describe('Duration in seconds'),
-  "isPremium": zod.boolean(),
-  "tags": zod.array(zod.string()).optional(),
-  "createdAt": zod.string().optional()
-})
-
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  module: zod.string(),
+  thumbnailUrl: zod.string(),
+  duration: zod.number().describe("Duration in seconds"),
+  isPremium: zod.boolean(),
+  tags: zod.array(zod.string()).optional(),
+  createdAt: zod.string().optional(),
+});
 
 /**
  * @summary List video projects
  */
 export const ListProjectsResponseItem = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "description": zod.string().nullish(),
-  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
-  "module": zod.string(),
-  "templateId": zod.number().nullish(),
-  "thumbnailUrl": zod.string().nullish(),
-  "videoUrl": zod.string().nullish(),
-  "duration": zod.number().nullish(),
-  "renderError": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
-})
-export const ListProjectsResponse = zod.array(ListProjectsResponseItem)
-
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["draft", "rendering", "ready", "failed"]),
+  module: zod.string(),
+  templateId: zod.number().nullish(),
+  thumbnailUrl: zod.string().nullish(),
+  videoUrl: zod.string().nullish(),
+  duration: zod.number().nullish(),
+  renderError: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListProjectsResponse = zod.array(ListProjectsResponseItem);
 
 /**
  * @summary Create a new video project
  */
 export const CreateProjectBody = zod.object({
-  "name": zod.string(),
-  "description": zod.string().optional(),
-  "module": zod.string(),
-  "templateId": zod.number().optional()
-})
-
+  name: zod.string(),
+  description: zod.string().optional(),
+  module: zod.string(),
+  templateId: zod.number().optional(),
+});
 
 /**
  * @summary Get a project by ID
  */
 export const GetProjectParams = zod.object({
-  "id": zod.coerce.number()
-})
+  id: zod.coerce.number(),
+});
 
 export const GetProjectResponse = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "description": zod.string().nullish(),
-  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
-  "module": zod.string(),
-  "templateId": zod.number().nullish(),
-  "thumbnailUrl": zod.string().nullish(),
-  "videoUrl": zod.string().nullish(),
-  "duration": zod.number().nullish(),
-  "renderError": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
-})
-
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["draft", "rendering", "ready", "failed"]),
+  module: zod.string(),
+  templateId: zod.number().nullish(),
+  thumbnailUrl: zod.string().nullish(),
+  videoUrl: zod.string().nullish(),
+  duration: zod.number().nullish(),
+  renderError: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
 
 /**
  * @summary Update a project
  */
 export const UpdateProjectParams = zod.object({
-  "id": zod.coerce.number()
-})
+  id: zod.coerce.number(),
+});
 
 export const UpdateProjectBody = zod.object({
-  "name": zod.string().optional(),
-  "description": zod.string().optional(),
-  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']).optional(),
-  "thumbnailUrl": zod.string().optional(),
-  "videoUrl": zod.string().optional()
-})
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  status: zod.enum(["draft", "rendering", "ready", "failed"]).optional(),
+  thumbnailUrl: zod.string().optional(),
+  videoUrl: zod.string().optional(),
+});
 
 export const UpdateProjectResponse = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "description": zod.string().nullish(),
-  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
-  "module": zod.string(),
-  "templateId": zod.number().nullish(),
-  "thumbnailUrl": zod.string().nullish(),
-  "videoUrl": zod.string().nullish(),
-  "duration": zod.number().nullish(),
-  "renderError": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
-})
-
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  status: zod.enum(["draft", "rendering", "ready", "failed"]),
+  module: zod.string(),
+  templateId: zod.number().nullish(),
+  thumbnailUrl: zod.string().nullish(),
+  videoUrl: zod.string().nullish(),
+  duration: zod.number().nullish(),
+  renderError: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
 
 /**
  * @summary Delete a project
  */
 export const DeleteProjectParams = zod.object({
-  "id": zod.coerce.number()
-})
-
+  id: zod.coerce.number(),
+});
 
 /**
  * @summary Start a render job for a project
  */
 export const StartProjectRenderParams = zod.object({
-  "id": zod.coerce.number()
-})
-
+  id: zod.coerce.number(),
+});
 
 /**
  * @summary Stream the rendered video file for a project
  */
 export const GetProjectVideoParams = zod.object({
-  "id": zod.coerce.number()
-})
-
+  id: zod.coerce.number(),
+});
 
 /**
  * @summary Get the current brand kit
  */
 export const GetBrandKitResponse = zod.object({
-  "id": zod.number(),
-  "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string(),
-  "secondaryColor": zod.string(),
-  "accentColor": zod.string().nullish(),
-  "fontFamily": zod.string(),
-  "companyName": zod.string().nullish(),
-  "updatedAt": zod.string()
-})
-
+  id: zod.number(),
+  logoUrl: zod.string().nullish(),
+  primaryColor: zod.string(),
+  secondaryColor: zod.string(),
+  accentColor: zod.string().nullish(),
+  fontFamily: zod.string(),
+  companyName: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
 
 /**
  * @summary Update the brand kit
  */
 export const UpdateBrandKitBody = zod.object({
-  "logoUrl": zod.string().optional(),
-  "primaryColor": zod.string().optional(),
-  "secondaryColor": zod.string().optional(),
-  "accentColor": zod.string().optional(),
-  "fontFamily": zod.string().optional(),
-  "companyName": zod.string().optional()
-})
+  logoUrl: zod.string().optional(),
+  primaryColor: zod.string().optional(),
+  secondaryColor: zod.string().optional(),
+  accentColor: zod.string().optional(),
+  fontFamily: zod.string().optional(),
+  companyName: zod.string().optional(),
+});
 
 export const UpdateBrandKitResponse = zod.object({
-  "id": zod.number(),
-  "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string(),
-  "secondaryColor": zod.string(),
-  "accentColor": zod.string().nullish(),
-  "fontFamily": zod.string(),
-  "companyName": zod.string().nullish(),
-  "updatedAt": zod.string()
-})
-
+  id: zod.number(),
+  logoUrl: zod.string().nullish(),
+  primaryColor: zod.string(),
+  secondaryColor: zod.string(),
+  accentColor: zod.string().nullish(),
+  fontFamily: zod.string(),
+  companyName: zod.string().nullish(),
+  updatedAt: zod.string(),
+});
 
 /**
  * @summary List available platform modules
  */
 export const ListModulesResponseItem = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "slug": zod.string(),
-  "description": zod.string(),
-  "icon": zod.string(),
-  "status": zod.enum(['active', 'coming_soon', 'beta']),
-  "features": zod.array(zod.string()).optional()
-})
-export const ListModulesResponse = zod.array(ListModulesResponseItem)
-
+  id: zod.number(),
+  name: zod.string(),
+  slug: zod.string(),
+  description: zod.string(),
+  icon: zod.string(),
+  status: zod.enum(["active", "coming_soon", "beta"]),
+  features: zod.array(zod.string()).optional(),
+});
+export const ListModulesResponse = zod.array(ListModulesResponseItem);
 
 /**
  * @summary Get current user billing info and plan
  */
 export const GetBillingInfoResponse = zod.object({
-  "plan": zod.enum(['free', 'pro']),
-  "renderCount": zod.number(),
-  "renderLimit": zod.number().nullish(),
-  "renderResetAt": zod.string().nullish(),
-  "stripeCustomerId": zod.string().nullish()
-})
-
+  plan: zod.enum(["free", "pro"]),
+  renderCount: zod.number(),
+  renderLimit: zod.number().nullish(),
+  renderResetAt: zod.string().nullish(),
+  stripeCustomerId: zod.string().nullish(),
+});
 
 /**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
 export const CreateCheckoutSessionBody = zod.object({
-  "priceId": zod.string()
-})
+  priceId: zod.string(),
+});
 
 export const CreateCheckoutSessionResponse = zod.object({
-  "url": zod.string().nullable()
-})
-
+  url: zod.string().nullable(),
+});
 
 /**
  * @summary Create a Stripe Customer Portal session for managing subscriptions
  */
 export const CreatePortalSessionResponse = zod.object({
-  "url": zod.string().nullable()
-})
-
+  url: zod.string().nullable(),
+});
 
 /**
  * @summary List active Stripe prices for Pro plan (public, no auth required)
  */
 export const ListBillingPricesResponse = zod.object({
-  "prices": zod.array(zod.object({
-  "id": zod.string(),
-  "unitAmount": zod.number().nullish(),
-  "currency": zod.string(),
-  "interval": zod.string().nullish(),
-  "productName": zod.string().nullish()
-}))
-})
-
+  prices: zod.array(
+    zod.object({
+      id: zod.string(),
+      unitAmount: zod.number().nullish(),
+      currency: zod.string(),
+      interval: zod.string().nullish(),
+      productName: zod.string().nullish(),
+    }),
+  ),
+});
 
 /**
  * Returns a presigned GCS URL for direct upload. The client sends JSON
@@ -387,70 +453,72 @@ metadata here, then uploads the file directly to the returned URL.
  * @summary Request a presigned URL for file upload
  */
 
-
-
-
-
 export const RequestUploadUrlBody = zod.object({
-  "name": zod.string().min(1).describe('Original file name.'),
-  "size": zod.number().min(1).describe('File size in bytes.'),
-  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. image\/jpeg).')
-})
-
-
-
-
-
+  name: zod.string().min(1).describe("Original file name."),
+  size: zod.number().min(1).describe("File size in bytes."),
+  contentType: zod
+    .string()
+    .min(1)
+    .describe("MIME type of the file (e.g. image\/jpeg)."),
+});
 
 export const RequestUploadUrlResponse = zod.object({
-  "uploadURL": zod.string().url().describe('Presigned GCS URL for PUT upload.'),
-  "objectPath": zod.string().describe('Normalized object path (e.g. \/objects\/uploads\/uuid). Store this in your database.'),
-  "metadata": zod.object({
-  "name": zod.string().min(1).describe('Original file name.'),
-  "size": zod.number().min(1).describe('File size in bytes.'),
-  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. image\/jpeg).')
-}).optional()
-})
-
+  uploadURL: zod.string().url().describe("Presigned GCS URL for PUT upload."),
+  objectPath: zod
+    .string()
+    .describe(
+      "Normalized object path (e.g. \/objects\/uploads\/uuid). Store this in your database.",
+    ),
+  metadata: zod
+    .object({
+      name: zod.string().min(1).describe("Original file name."),
+      size: zod.number().min(1).describe("File size in bytes."),
+      contentType: zod
+        .string()
+        .min(1)
+        .describe("MIME type of the file (e.g. image\/jpeg)."),
+    })
+    .optional(),
+});
 
 /**
  * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
  */
 export const GetPublicObjectParams = zod.object({
-  "filePath": zod.coerce.string()
-})
-
+  filePath: zod.coerce.string(),
+});
 
 /**
  * @summary Serve an object entity from PRIVATE_OBJECT_DIR
  */
 export const GetStorageObjectParams = zod.object({
-  "objectPath": zod.coerce.string()
-})
-
+  objectPath: zod.coerce.string(),
+});
 
 /**
  * @summary Get platform usage statistics
  */
 export const GetStatsResponse = zod.object({
-  "totalProjects": zod.number(),
-  "totalTemplates": zod.number(),
-  "videosRendered": zod.number(),
-  "activeModules": zod.number(),
-  "recentProjects": zod.array(zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "description": zod.string().nullish(),
-  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
-  "module": zod.string(),
-  "templateId": zod.number().nullish(),
-  "thumbnailUrl": zod.string().nullish(),
-  "videoUrl": zod.string().nullish(),
-  "duration": zod.number().nullish(),
-  "renderError": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
-})).optional()
-})
-
-
+  totalProjects: zod.number(),
+  totalTemplates: zod.number(),
+  videosRendered: zod.number(),
+  activeModules: zod.number(),
+  recentProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+        description: zod.string().nullish(),
+        status: zod.enum(["draft", "rendering", "ready", "failed"]),
+        module: zod.string(),
+        templateId: zod.number().nullish(),
+        thumbnailUrl: zod.string().nullish(),
+        videoUrl: zod.string().nullish(),
+        duration: zod.number().nullish(),
+        renderError: zod.string().nullish(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+});

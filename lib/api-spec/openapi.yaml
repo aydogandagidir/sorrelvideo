@@ -34,15 +34,15 @@ paths:
       operationId: getCurrentAuthUser
       summary: Get the currently authenticated user
       parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-        - $ref: '#/components/parameters/SessionCookie'
+        - $ref: "#/components/parameters/AuthorizationSessionHeader"
+        - $ref: "#/components/parameters/SessionCookie"
       responses:
-        '200':
+        "200":
           description: Auth status resolved successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthUserEnvelope'
+                $ref: "#/components/schemas/AuthUserEnvelope"
   /auth/signup:
     post:
       tags: [Auth]
@@ -53,26 +53,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SignupRequest'
+              $ref: "#/components/schemas/SignupRequest"
       responses:
-        '201':
+        "201":
           description: Account created and session established.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthUserEnvelope'
-        '400':
+                $ref: "#/components/schemas/AuthUserEnvelope"
+        "400":
           description: Invalid input (e.g. password too short).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
           description: An account already exists with this email.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
   /auth/login:
     post:
       tags: [Auth]
@@ -83,41 +83,115 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: Authenticated successfully; session cookie set.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthUserEnvelope'
-        '400':
+                $ref: "#/components/schemas/AuthUserEnvelope"
+        "400":
           description: Missing or invalid fields.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
           description: Email or password did not match.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
   /auth/logout:
     post:
       tags: [Auth]
       operationId: logoutSession
       summary: Clear the current session
       parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-        - $ref: '#/components/parameters/SessionCookie'
+        - $ref: "#/components/parameters/AuthorizationSessionHeader"
+        - $ref: "#/components/parameters/SessionCookie"
       responses:
-        '200':
+        "200":
           description: Session cleared.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LogoutSuccess'
+                $ref: "#/components/schemas/LogoutSuccess"
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: requestPasswordReset
+      summary: Request a password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Generic success — sent only if the email is registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccess"
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      summary: Consume a password-reset token and set a new password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password updated; reset token consumed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccess"
+        "400":
+          description: Token is invalid, expired, or already used.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /auth/verify-email:
+    get:
+      tags: [Auth]
+      operationId: consumeEmailVerification
+      summary: Verify an email address via a token from the verification email
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to /email-verified with a status query string.
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      operationId: resendEmailVerification
+      summary: Resend the email verification link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendVerificationRequest"
+      responses:
+        "200":
+          description: Always 200 — generic response to avoid email enumeration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericSuccess"
   /login:
     get:
       tags: [Auth]
@@ -130,7 +204,7 @@ paths:
           schema:
             type: string
       responses:
-        '302':
+        "302":
           description: Redirect to the frontend /login page.
   /logout:
     get:
@@ -138,10 +212,10 @@ paths:
       operationId: logoutBrowserSession
       summary: Clear the session and redirect to the home page
       parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-        - $ref: '#/components/parameters/SessionCookie'
+        - $ref: "#/components/parameters/AuthorizationSessionHeader"
+        - $ref: "#/components/parameters/SessionCookie"
       responses:
-        '302':
+        "302":
           description: Redirect to the home page after clearing the session.
   /healthz:
     get:
@@ -475,7 +549,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/PricesResponse"
 
-
   /storage/uploads/request-url:
     post:
       tags: [Storage]
@@ -489,26 +562,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UploadUrlRequest'
+              $ref: "#/components/schemas/UploadUrlRequest"
       responses:
-        '200':
+        "200":
           description: Presigned upload URL generated.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadUrlResponse'
-        '400':
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
           description: Missing or invalid required fields.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
           description: Failed to generate upload URL.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
   /storage/public-objects/{filePath}:
     get:
       tags: [Storage]
@@ -521,19 +594,19 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Object content streamed with correct Content-Type.
           content:
-            '*/*':
+            "*/*":
               schema:
                 type: string
                 format: binary
-        '404':
+        "404":
           description: File not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
   /storage/objects/{objectPath}:
     get:
       tags: [Storage]
@@ -546,19 +619,19 @@ paths:
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Object content streamed with correct Content-Type.
           content:
-            '*/*':
+            "*/*":
               schema:
                 type: string
                 format: binary
-        '404':
+        "404":
           description: Object not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /stats/overview:
     get:
@@ -611,8 +684,8 @@ components:
       properties:
         user:
           oneOf:
-            - $ref: '#/components/schemas/AuthUser'
-            - type: 'null'
+            - $ref: "#/components/schemas/AuthUser"
+            - type: "null"
     ErrorEnvelope:
       type: object
       required: [error]
@@ -658,6 +731,43 @@ components:
         success:
           type: boolean
           const: true
+    GenericSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 254
+    ResetPasswordRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+          minLength: 8
+          maxLength: 256
+        password:
+          type: string
+          minLength: 8
+          maxLength: 256
+    ResendVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 254
     HealthStatus:
       type: object
       properties:
@@ -923,7 +1033,7 @@ components:
           type: string
           description: Normalized object path (e.g. /objects/uploads/uuid). Store this in your database.
         metadata:
-          $ref: '#/components/schemas/UploadUrlRequest'
+          $ref: "#/components/schemas/UploadUrlRequest"
 
     PlatformStats:
       type: object

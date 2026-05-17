@@ -20,8 +20,10 @@
     "drizzle-orm": "catalog:",
     "@node-rs/argon2": "^2.0.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.5.0",
     "google-auth-library": "^10.6.2",
     "pino": "^9.14.0",
+    "resend": "^6.12.3",
     "pino-http": "^10.5.0",
     "stripe": "^22.1.1",
     "zod": "catalog:"
