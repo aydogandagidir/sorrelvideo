@@ -17,6 +17,7 @@
   "private": true,
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@testcontainers/postgresql": "^10.18.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",

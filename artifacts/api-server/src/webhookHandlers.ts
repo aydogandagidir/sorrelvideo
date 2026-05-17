@@ -51,7 +51,9 @@ export class WebhookHandlers {
   }
 }
 
-async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
+export async function upsertSubscription(
+  sub: Stripe.Subscription,
+): Promise<void> {
   const customerId =
     typeof sub.customer === "string" ? sub.customer : sub.customer.id;
 
@@ -98,7 +100,9 @@ async function upsertSubscription(sub: Stripe.Subscription): Promise<void> {
   );
 }
 
-async function deleteSubscription(sub: Stripe.Subscription): Promise<void> {
+export async function deleteSubscription(
+  sub: Stripe.Subscription,
+): Promise<void> {
   await db
     .delete(stripeSubscriptionsTable)
     .where(eq(stripeSubscriptionsTable.id, sub.id));

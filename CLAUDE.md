@@ -291,21 +291,34 @@ stored; we only need the identity for sign-in.
 
 ## Testing strategy
 
-Vitest workspace runs three projects: **api-server** (node), **sorrel** (jsdom),
-and **auth-web** (jsdom). Run `pnpm test` (CI mode), `pnpm test:watch`
-(dev), or `pnpm test:coverage`.
+Vitest workspace runs four projects: **api-server** (node), **sorrel**
+(jsdom), **auth-web** (jsdom), **ai** (node). Run `pnpm test` (CI mode),
+`pnpm test:watch` (dev), or `pnpm test:coverage`.
 
-Initial coverage is intentionally narrow (smoke level): password hashing,
-`getUserPlan(null)` short-circuit, route 401 paths for `/projects` and
-`/auth`, and `useAuth` hydration + login fetch mock.
+There are two test tiers:
 
-Each testable package owns a `vitest.config.ts`; the workspace root has
-`vitest.workspace.ts`. The api-server project loads `src/test/setup.ts`
-which seeds env defaults (`DATABASE_URL`, `SESSION_SECRET`, Stripe stubs)
-so import-time validations don't trip during unit tests. **Tests must not
-hit the real database**; supertest route tests cover the auth-rejection
-path only. Use `vi.mock` for any DB-touching test until a Postgres
-testcontainer setup is added.
+- **Unit tests** (`*.test.ts`/`*.test.tsx`) — DB-less and fast. Password
+  hashing, schema parsing, route-auth rejection paths, useAuth fetch
+  mocks, render template substitution.
+- **Integration tests** (`*.integration.test.ts`) — only inside
+  `api-server`. Run against a real Postgres instance booted by Vitest's
+  `globalSetup` (`src/test/global-setup.ts`) via
+  `@testcontainers/postgresql`. The container is created once per `pnpm
+test` invocation, the Drizzle schema is applied through
+  `pnpm --filter @workspace/db run push-force`, and the URL is
+  `provide()`-d to workers (read in `src/test/setup.ts`). Each test calls
+  `truncateAll()` in `beforeEach`. Current coverage:
+  `billingService` render + AI race tests and Pro bypass,
+  `getBillingInfo` snapshot, `webhookHandlers.upsertSubscription` +
+  `deleteSubscription`, `applyBillingMigration` idempotency.
+
+**Docker dependency**: integration tests need a reachable container
+runtime. If Docker isn't running locally, `globalSetup` logs a warning
+and the integration suites skip themselves (`describe.runIf`) — unit
+tests still run. CI uses `ubuntu-latest` which has Docker built in, so
+integration tests run there unconditionally. Override with
+`SORREL_SKIP_INTEGRATION_DB=true` to force-skip even when Docker is
+present.
 
 ESLint relaxes `no-explicit-any`, `no-non-null-assertion`, and `no-console`
 inside `**/*.test.{ts,tsx}` and `**/test/**`. Husky's `pre-push` runs the
@@ -354,15 +367,16 @@ Render / Vercel for the frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **Test depth**: add a Postgres testcontainer so `billingService` race
-   tests, `checkAndIncrementAiCount`, and `webhookHandlers.upsertSubscription`
-   can run against a real DB
-2. **Module completion (next)**: Bulk, Analytics, Collab — each needs a
-   spec before implementation. AI MVP landed (Tur 7).
-3. **AI v2**: streaming responses, per-field regen, prompt history,
+1. **Module completion (next)**: Bulk, Analytics, Collab — each needs a
+   spec before implementation. AI MVP landed (Tur 7), integration test
+   depth landed (Tur 8).
+2. **AI v2**: streaming responses, per-field regen, prompt history,
    custom prompt templates
-4. **Studio v2**: timeline / segment editor, custom asset upload, more
+3. **Studio v2**: timeline / segment editor, custom asset upload, more
    parametric templates beyond `studio-default.html`
+4. **Auth integration tests**: signup → user row + session cookie,
+   login → session lookup, OAuth account linking (depends on a Stripe /
+   email mock too — pair with an email transport stub)
 
 ## User preferences
 

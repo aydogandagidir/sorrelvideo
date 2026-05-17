@@ -11,8 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Test-time env. Real secrets are never needed here — DB is the service
-  # container below, Stripe + auth use dummy values.
+  # Test-time env. Real secrets are never needed here — integration tests spin
+  # up their own Postgres testcontainer in globalSetup; the dummy URL below is
+  # only there so pg.Pool's import-time validation passes for unit tests.
   NODE_ENV: test
   PORT: "8080"
   BASE_PATH: /
@@ -31,22 +32,7 @@ jobs:
   validate:
     name: Lint + Typecheck + Test + Build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sorrel_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -82,10 +68,9 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Apply DB schema
-        run: pnpm --filter @workspace/db run push
-
       - name: Test
+        # globalSetup boots a Postgres testcontainer and runs `db push` against
+        # it; no service container needed.
         run: pnpm test
 
       - name: Build
