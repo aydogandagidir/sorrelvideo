@@ -1,0 +1,3 @@
+# Validate typecheck, lint, and tests before pushing. Bypass with --no-verify
+# only for emergencies (CI will catch the same issues).
+pnpm run typecheck && pnpm run lint && pnpm run test

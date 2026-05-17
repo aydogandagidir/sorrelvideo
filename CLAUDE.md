@@ -27,17 +27,17 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 
 ## Required env
 
-| Var | Required by | Purpose |
-|---|---|---|
-| `DATABASE_URL` | api-server, db push | Postgres connection string |
-| `SESSION_SECRET` | api-server | Session signing (reserved for future use; currently unused but expected to be set) |
-| `PORT` | api-server, sorrel, mockup-sandbox | HTTP listen port (each process needs its own) |
-| `BASE_PATH` | sorrel, mockup-sandbox | Vite base path (use `/` locally) |
-| `ALLOWED_ORIGINS` | api-server (production only) | Comma-separated full origin URLs allowed by CORS |
-| `APP_URL` | docs/operations | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`) |
-| `STRIPE_SECRET_KEY` | api-server, scripts | Stripe API key |
-| `STRIPE_PUBLISHABLE_KEY` | api-server (only if frontend reads it) | Publishable key for client-side checkout |
-| `STRIPE_WEBHOOK_SECRET` | api-server | Verifies signatures on POST `/api/billing/webhook` |
+| Var                      | Required by                            | Purpose                                                                            |
+| ------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | api-server, db push                    | Postgres connection string                                                         |
+| `SESSION_SECRET`         | api-server                             | Session signing (reserved for future use; currently unused but expected to be set) |
+| `PORT`                   | api-server, sorrel, mockup-sandbox     | HTTP listen port (each process needs its own)                                      |
+| `BASE_PATH`              | sorrel, mockup-sandbox                 | Vite base path (use `/` locally)                                                   |
+| `ALLOWED_ORIGINS`        | api-server (production only)           | Comma-separated full origin URLs allowed by CORS                                   |
+| `APP_URL`                | docs/operations                        | Public URL used to register the Stripe webhook (`${APP_URL}/api/billing/webhook`)  |
+| `STRIPE_SECRET_KEY`      | api-server, scripts                    | Stripe API key                                                                     |
+| `STRIPE_PUBLISHABLE_KEY` | api-server (only if frontend reads it) | Publishable key for client-side checkout                                           |
+| `STRIPE_WEBHOOK_SECRET`  | api-server                             | Verifies signatures on POST `/api/billing/webhook`                                 |
 
 ## Stack
 
@@ -56,18 +56,18 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 
 ## Monorepo layout
 
-| Package | Role |
-|---|---|
-| `lib/db` | Drizzle schema (single source of truth) + `db` and `pool` exports |
-| `lib/api-spec` | OpenAPI YAML + Orval config (single source of truth for API contracts) |
-| `lib/api-zod` | Generated Zod schemas — **do not edit by hand** |
-| `lib/api-client-react` | Generated React Query hooks — **do not edit by hand** |
-| `lib/auth-web` | Frontend `useAuth` hook (provider-agnostic; talks to `/api/auth/*`) |
-| `lib/object-storage-web` | Google Cloud Storage helper |
-| `artifacts/api-server` | Express server, routes, services, render pipeline, Stripe webhooks |
-| `artifacts/sorrel` | Main React frontend (the Sorrel app) |
-| `artifacts/mockup-sandbox` | Hyperframes development sandbox |
-| `scripts` | Standalone helpers (e.g. `seed-products`) |
+| Package                    | Role                                                                   |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `lib/db`                   | Drizzle schema (single source of truth) + `db` and `pool` exports      |
+| `lib/api-spec`             | OpenAPI YAML + Orval config (single source of truth for API contracts) |
+| `lib/api-zod`              | Generated Zod schemas — **do not edit by hand**                        |
+| `lib/api-client-react`     | Generated React Query hooks — **do not edit by hand**                  |
+| `lib/auth-web`             | Frontend `useAuth` hook (provider-agnostic; talks to `/api/auth/*`)    |
+| `lib/object-storage-web`   | Google Cloud Storage helper                                            |
+| `artifacts/api-server`     | Express server, routes, services, render pipeline, Stripe webhooks     |
+| `artifacts/sorrel`         | Main React frontend (the Sorrel app)                                   |
+| `artifacts/mockup-sandbox` | Hyperframes development sandbox                                        |
+| `scripts`                  | Standalone helpers (e.g. `seed-products`)                              |
 
 ## Architecture decisions
 
@@ -202,14 +202,25 @@ limiting are deliberately deferred — see "Future work" below.
 
 ## Testing strategy
 
-There are currently **no tests** — no Vitest, no Playwright, no unit suites.
-The first round of test work should add Vitest at the workspace root with:
+Vitest workspace runs three projects: **api-server** (node), **sorrel** (jsdom),
+and **auth-web** (jsdom). Run `pnpm test` (CI mode), `pnpm test:watch`
+(dev), or `pnpm test:coverage`.
 
-1. `billingService.checkAndIncrementRenderCount` race tests (against a real
-   Postgres testcontainer — never mock the DB here)
-2. Auth middleware happy path + 401/403/404 coverage on `routes/projects.ts`
-3. `renderService.resolveEntryFile` unit tests
-4. A small smoke test for `useAuth` (jsdom)
+Initial coverage is intentionally narrow (smoke level): password hashing,
+`getUserPlan(null)` short-circuit, route 401 paths for `/projects` and
+`/auth`, and `useAuth` hydration + login fetch mock.
+
+Each testable package owns a `vitest.config.ts`; the workspace root has
+`vitest.workspace.ts`. The api-server project loads `src/test/setup.ts`
+which seeds env defaults (`DATABASE_URL`, `SESSION_SECRET`, Stripe stubs)
+so import-time validations don't trip during unit tests. **Tests must not
+hit the real database**; supertest route tests cover the auth-rejection
+path only. Use `vi.mock` for any DB-touching test until a Postgres
+testcontainer setup is added.
+
+ESLint relaxes `no-explicit-any`, `no-non-null-assertion`, and `no-console`
+inside `**/*.test.{ts,tsx}` and `**/test/**`. Husky's `pre-push` runs the
+full suite, so a broken test blocks `git push`.
 
 Playwright / E2E can wait until there is meaningful UI surface to cover.
 
@@ -223,6 +234,7 @@ Prettier 3 handles formatting; ESLint defers to it via `eslint-config-prettier`
 and HTML compositions are excluded from linting.
 
 Notable rule decisions:
+
 - `@typescript-eslint/no-explicit-any` and `no-non-null-assertion` are
   **errors** — narrow types or use a guarded check (`if (!x) throw …`)
 - `unused-imports/no-unused-imports` is error with auto-fix; underscore-prefixed
@@ -250,19 +262,19 @@ frontend. Whatever the choice:
 
 Tracked here so it does not get rediscovered each time:
 
-1. **Husky + lint-staged** — run ESLint + Prettier on staged files pre-commit,
-   fail PRs on lint errors
-2. **Vitest skeleton + first tests** (billing race, auth paths, render service)
-3. **Email verification + password reset** (`emailVerifiedAt` column already
-   reserved)
-4. **OAuth providers** via `arctic` (~30 LOC per provider)
-5. **Rate limiting** for `/api/auth/*` (express-rate-limit + Redis)
-6. **CI/CD** (GitHub Actions: typecheck + build + lint + push)
-7. **Object storage migration**: drop the `objectStorage.ts` sidecar dependency
+1. **CI/CD** (GitHub Actions: lint + typecheck + test + build on PR / push)
+2. **Object storage migration**: drop the `objectStorage.ts` sidecar dependency
    and use a GCS service account directly (`GOOGLE_APPLICATION_CREDENTIALS` +
    native `bucket.file().getSignedUrl()`)
-8. **Module completion**: Studio, AI, Bulk, Analytics, Collab — each needs a
-   spec before implementation
+3. **Auth hardening**: rate limiting for `/api/auth/*`
+   (express-rate-limit), email verification, password reset (Resend)
+4. **OAuth providers** via `arctic` (GitHub + Google planned)
+5. **Studio module MVP**: parametric compositions + brand-kit injection +
+   render flow
+6. **Test depth**: add a Postgres testcontainer so `billingService` race
+   tests and `webhookHandlers.upsertSubscription` can run against a real DB
+7. **Module completion** (after Studio): AI, Bulk, Analytics, Collab — each
+   needs a spec before implementation
 
 ## User preferences
 

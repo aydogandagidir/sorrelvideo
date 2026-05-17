@@ -60,10 +60,7 @@ export default tseslint.config(
       ],
       // Allow `declare global { namespace Express { ... } }` for Express
       // type augmentation; this is the documented Express + TS pattern.
-      "@typescript-eslint/no-namespace": [
-        "error",
-        { allowDeclarations: true },
-      ],
+      "@typescript-eslint/no-namespace": ["error", { allowDeclarations: true }],
       "prefer-const": "error",
       eqeqeq: ["error", "always", { null: "ignore" }],
     },
@@ -122,6 +119,37 @@ export default tseslint.config(
     ],
     languageOptions: { globals: { ...globals.node, ...globals.es2022 } },
     rules: { "no-console": "off" },
+  },
+  {
+    // Vitest test files: relax a few rules that conflict with test idioms
+    // (mocks, deliberate non-null asserts on seeded fixtures, console.log
+    // during debugging). Vitest config.ts files share the same env.
+    files: [
+      "**/*.test.{ts,tsx,mts}",
+      "**/*.spec.{ts,tsx,mts}",
+      "**/test/**/*.{ts,tsx,mts}",
+      "**/vitest.config.{ts,mts}",
+      "vitest.workspace.{ts,mts}",
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        describe: "readonly",
+        it: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        beforeAll: "readonly",
+        beforeEach: "readonly",
+        afterAll: "readonly",
+        afterEach: "readonly",
+        vi: "readonly",
+      },
+    },
+    rules: {
+      "no-console": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+    },
   },
   prettier,
 );
