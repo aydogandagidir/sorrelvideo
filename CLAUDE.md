@@ -49,6 +49,10 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `AI_PROVIDER`                                                   | api-server (AI suggest)                 | `anthropic` (default) or `openai`. Picks which provider `lib/ai` routes calls to.                |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`                         | api-server (when AI_PROVIDER=anthropic) | API key + optional model override (defaults to `claude-haiku-4-5`).                              |
 | `OPENAI_API_KEY` / `OPENAI_MODEL`                               | api-server (when AI_PROVIDER=openai)    | API key + optional model override (defaults to `gpt-4o-mini`).                                   |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN`                                | api-server / sorrel (optional)          | Sentry error tracking. Init is a no-op when unset, app still runs.                               |
+| `SENTRY_TRACES_SAMPLE_RATE`                                     | api-server / sorrel (optional)          | Sentry trace sampling — defaults to `0.1` (10 %).                                                |
+| `LOGTAIL_SOURCE_TOKEN`                                          | api-server (optional)                   | Better Stack / Logtail log sink. Logs ship to stdout regardless; this just adds a remote target. |
+| `GIT_SHA`                                                       | api-server (optional, set by CI)        | Pinned to `github.event.workflow_run.head_sha`; surfaces as the `release` tag in Sentry events.  |
 
 ## Stack
 
@@ -349,34 +353,68 @@ Notable rule decisions:
 
 ## Deployment
 
-CI runs on GitHub Actions (`.github/workflows/ci.yml`): on every PR and on
-`push` to `main` it installs deps, verifies that OpenAPI codegen is in
-sync, lints, typechecks, applies the Drizzle schema to a Postgres service
-container, runs the Vitest suite, and builds every package. A permanent
-hosting target has not been chosen. Reasonable candidates: Railway / Fly /
-Render / Vercel for the frontend. Whatever the choice:
+**Hosting target: Railway.** Single container running the Node 24
+api-server, which also serves the Vite SPA bundle out of `/app/public`
+via `express.static` + an SPA fallback for client-side routing. The
+Dockerfile builds both packages in one multi-stage image (Chromium
+system dependencies installed; Puppeteer's downloaded binary copied
+across).
 
-- The API server is a single Node 24 process listening on `PORT`
-- The frontend is a static Vite build (`pnpm --filter @workspace/sorrel run build`
-  produces `dist/public/`)
-- The Stripe webhook needs a public HTTPS URL configured in the Stripe Dashboard
-- Postgres can be any managed Postgres (Neon, Supabase, RDS, etc.)
-- Puppeteer needs a Chromium binary in the runtime image
+**CI** (`.github/workflows/ci.yml`): on every PR and push to `main` —
+install deps, verify OpenAPI codegen is in sync, lint, typecheck, run
+Vitest (with Postgres testcontainer for integration tests), build.
+
+**Deploy** (`.github/workflows/deploy.yml`): listens for the CI workflow
+to finish on `main`; if green, runs `railway up --service api --detach`
+using a `RAILWAY_TOKEN` secret. Subsequent pushes auto-ship.
+
+**Observability**:
+
+- **Sentry** (`@sentry/node` + `@sentry/react`) — error tracking;
+  release tag pinned to the deploy commit's `GIT_SHA`. `beforeSend`
+  scrubs password / token fields from request bodies. No-op when
+  `SENTRY_DSN` is unset so local dev stays clean.
+- **Better Stack / Logtail** (`@logtail/pino`) — structured log sink
+  layered on top of Pino. Stdout always carries the logs (Railway
+  scrapes that too); the Logtail target is only attached when
+  `LOGTAIL_SOURCE_TOKEN` is present.
+
+**One-time setup** for every clean environment: see `DEPLOYMENT.md` —
+Stripe products + webhook, Resend domain verify, GCS bucket + service
+account, optional GitHub/Google OAuth apps, Railway env paste, custom
+domain DNS, first manual `pnpm --filter @workspace/db run push` against
+production.
+
+Production schema migrations are **manual** (`railway run pnpm --filter
+@workspace/db run push`). Wiring `db push` into the deploy pipeline is
+deliberately not done — a misclick erasing prod data is the easiest
+disaster to write.
 
 ## Future work
 
 Tracked here so it does not get rediscovered each time:
 
-1. **Module completion (next)**: Bulk, Analytics, Collab — each needs a
-   spec before implementation. AI MVP landed (Tur 7), integration test
-   depth landed (Tur 8).
-2. **AI v2**: streaming responses, per-field regen, prompt history,
+1. **Render queue (Tur 10)**: BullMQ + Redis. The current
+   `setImmediate` fire-and-forget loses jobs on pod restart — fine for
+   soft launch, not for paid users. Pair with `rate-limit-redis` to make
+   the auth limiters multi-instance safe.
+2. **Legal pages**: static Terms / Privacy / cookie banner. Stripe +
+   any EU user makes this mandatory before broad launch.
+3. **End-to-end Playwright smoke test**: signup → Studio → render →
+   mp4 served. Currently the only render-pipeline check is `pnpm run
+build`.
+4. **Module completion**: Bulk, Analytics, Collab — each needs a spec
+   before implementation. Studio MVP (Tur 6) and AI MVP (Tur 7) landed.
+5. **AI v2**: streaming responses, per-field regen, prompt history,
    custom prompt templates
-3. **Studio v2**: timeline / segment editor, custom asset upload, more
+6. **Studio v2**: timeline / segment editor, custom asset upload, more
    parametric templates beyond `studio-default.html`
-4. **Auth integration tests**: signup → user row + session cookie,
-   login → session lookup, OAuth account linking (depends on a Stripe /
-   email mock too — pair with an email transport stub)
+7. **Auth integration tests**: signup → user row + session cookie,
+   login → session lookup, OAuth account linking (depends on an email
+   transport stub).
+8. **Sentry source map upload**: `sentry-cli releases files
+upload-sourcemaps` in the deploy workflow + strip `.map` from the
+   shipped artifact.
 
 ## User preferences
 

@@ -104,8 +104,11 @@ async function buildAll() {
     ],
     sourcemap: "linked",
     plugins: [
-      // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
+      // pino relies on workers to handle logging, instead of externalizing it
+      // we use a plugin to handle it. Production attaches the @logtail/pino
+      // transport when LOGTAIL_SOURCE_TOKEN is set; bundle it so it doesn't
+      // need a node_modules lookup at runtime.
+      esbuildPluginPino({ transports: ["pino-pretty", "@logtail/pino"] }),
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {

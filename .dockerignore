@@ -1,0 +1,44 @@
+# Things we never want inside the build context.
+**/node_modules
+**/.git
+**/.github
+**/.husky
+**/dist
+**/build
+**/out-tsc
+**/.cache
+**/.local
+**/coverage
+**/*.tsbuildinfo
+**/pnpm-debug.log
+
+# Tests / vitest setup don't need to land in production image.
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/*.integration.test.ts
+**/vitest.config.ts
+**/vitest.workspace.ts
+**/src/test/**
+
+# Local secrets / env.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Editor noise.
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Plan + claude artifacts.
+.claude
+CLAUDE.md
+DEPLOYMENT.md
+plan*.md
+
+# Render output volume — comes from Railway volume mount at runtime.
+artifacts/api-server/renders

@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -13,7 +15,9 @@ const app: Express = express();
 // (e.g. "https://app.example.com,https://www.example.com").
 // In development, allow any origin so the Vite dev server can reach the API.
 const allowedOrigins: string[] = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  ? process.env.ALLOWED_ORIGINS.split(",")
+      .map((o) => o.trim())
+      .filter(Boolean)
   : [];
 
 app.use(
@@ -88,5 +92,20 @@ app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
 app.use("/api", router);
+
+// Production: serve the Vite SPA bundle copied into /app/public by the
+// Dockerfile. API routes take precedence (mounted above). Anything that
+// reaches this middleware and isn't an /api/* path falls back to index.html
+// so client-side routing works on hard reloads / share links.
+if (process.env.NODE_ENV === "production") {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const publicDir = path.resolve(here, "../public");
+  app.use(express.static(publicDir, { maxAge: "1h", index: false }));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api")) return next();
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+}
 
 export default app;

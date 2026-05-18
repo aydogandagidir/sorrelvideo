@@ -1,6 +1,15 @@
+// IMPORTANT: Sentry must be initialised before anything that imports Express
+// or pino-http — its SDK patches globals (http, async_hooks). No-op when
+// SENTRY_DSN is unset.
+import { initSentry, Sentry } from "./lib/sentry";
+initSentry();
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
+
+// Wire Sentry's Express error handler — only runs when SDK was initialised.
+Sentry.setupExpressErrorHandler(app);
 
 async function initBilling(): Promise<void> {
   if (!process.env.DATABASE_URL) {
