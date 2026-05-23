@@ -147,9 +147,6 @@ importers:
       "@hyperframes/producer":
         specifier: ^0.6.6
         version: 0.6.6(typescript@5.9.3)
-      "@logtail/pino":
-        specifier: ^0.5.5
-        version: 0.5.8(pino@9.14.0)
       "@node-rs/argon2":
         specifier: ^2.0.2
         version: 2.0.2
@@ -2461,45 +2458,6 @@ packages:
       {
         integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==,
       }
-
-  "@logtail/core@0.5.8":
-    resolution:
-      {
-        integrity: sha512-1LxjI46LCXeVRyENwjO4s0a1CWSIqHjYH6w2YVNhQLc5b7mVN0jhzxvmg9mps54aEuCSuK2SVCNmgvuNTDtAug==,
-      }
-
-  "@logtail/node@0.5.8":
-    resolution:
-      {
-        integrity: sha512-9XMxeToOL1QHVNp7IQlPxbRsu3iYUBtXl/SFCyOQQmtnwzS7z+tbiV39DYkXfwkzig6wjwTfLYDQj673Bqplqg==,
-      }
-
-  "@logtail/pino@0.5.8":
-    resolution:
-      {
-        integrity: sha512-MRRAAn0APedr0v3uP91YnLJT1dJts/PGSRaBkFTyeG3gS28TkWbQc7ZruD17pDKEgOhRNJkj7c2v9uh8AhKFug==,
-      }
-    peerDependencies:
-      pino: ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
-
-  "@logtail/tools@0.5.8":
-    resolution:
-      {
-        integrity: sha512-eAbbHaYSpRoB7Udp301xVUVDeKdgXTP2/s9FOeKX5tPLMM3hgbvuIx50bYJoV/to7bHGYBi36Gdsnj8ElcPXbg==,
-      }
-
-  "@logtail/types@0.5.8":
-    resolution:
-      {
-        integrity: sha512-CJIijD/2vqK8XwPRZJeUkiiBEhKTviHs5p1WI40WvW21kU18QiQ8PupFJ2uhrItxhwtlkXmRXul5+cNtv3cAFQ==,
-      }
-
-  "@msgpack/msgpack@2.8.0":
-    resolution:
-      {
-        integrity: sha512-h9u4u/jiIRKbq25PM+zymTyW6bhTzELvOoUd+AvYriWOAKpLGnIamaET3pnHYoI5iYphAHBI4ayx0MehR+VVPQ==,
-      }
-    engines: { node: ">= 10" }
 
   "@napi-rs/wasm-runtime@0.2.12":
     resolution:
@@ -4976,12 +4934,6 @@ packages:
     resolution:
       {
         integrity: sha512-N1ASjp/nXH3ovBHddRJpli4ozpk6UdDYIX4RJWFa9L1YKnzdhTlVmiGHm4DZnj/jLbqZpes4aeR30EFGQtvhQQ==,
-      }
-
-  "@types/stack-trace@0.0.33":
-    resolution:
-      {
-        integrity: sha512-O7in6531Bbvlb2KEsJ0dq0CHZvc3iWSR5ZYMtvGgnHA56VgriAN/AU2LorfmcvAl2xc9N5fbCTRyMRRl8nd74g==,
       }
 
   "@types/superagent@8.1.9":
@@ -9403,12 +9355,6 @@ packages:
     engines: { node: ">=0.10" }
     hasBin: true
 
-  pino-abstract-transport@1.2.0:
-    resolution:
-      {
-        integrity: sha512-Guhh8EZfPCfH+PMXAb6rKOjGQEoy0xlAIn+irODG5kgfYV+BQ0rGYYWTIel3P5mmyXqkYkPmdIkywsn6QKUR1Q==,
-      }
-
   pino-abstract-transport@2.0.0:
     resolution:
       {
@@ -10136,13 +10082,6 @@ packages:
       }
     engines: { node: ">= 18" }
 
-  serialize-error@8.1.0:
-    resolution:
-      {
-        integrity: sha512-3NnuWfM6vBYoy5gZFvHiYsVbafvI9vZv/+jlIigFn4oP4zjNPK3LhcY0xSCgeb1a5L8jO71Mit9LlNoi2UfDDQ==,
-      }
-    engines: { node: ">=10" }
-
   serve-static@2.2.1:
     resolution:
       {
@@ -10352,12 +10291,6 @@ packages:
         integrity: sha512-wPldCk3asibAjQ/kziWQQt1Wh3PgDFpC0XpwclzKcdT1vql6KeYxf5LIt4nlFkUeR8WuphYMKqUA56X4rjbfgQ==,
       }
     engines: { node: ">=10.16.0" }
-
-  stack-trace@0.0.10:
-    resolution:
-      {
-        integrity: sha512-KGzahc7puUKkzyMt+IqAep+TVNbKP+k2Lmwhub39m1AsTSkaDutx56aDCo+HLDzf/D26BIHTJWNiTG1KAJiQCg==,
-      }
 
   stackback@0.0.2:
     resolution:
@@ -10840,13 +10773,6 @@ packages:
         integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==,
       }
     engines: { node: ">= 0.8.0" }
-
-  type-fest@0.20.2:
-    resolution:
-      {
-        integrity: sha512-Ne+eE4r0/iWnpAxD852z3A+N0Bt5RN//NjJwRd2VFHEmrywxf5vsZlh4R6lixl6B+wz/8d+maTSAkN1FIkI3LQ==,
-      }
-    engines: { node: ">=10" }
 
   type-is@2.0.1:
     resolution:
@@ -12322,36 +12248,6 @@ snapshots:
       "@jridgewell/sourcemap-codec": 1.5.5
 
   "@js-sdsl/ordered-map@4.4.2": {}
-
-  "@logtail/core@0.5.8":
-    dependencies:
-      "@logtail/tools": 0.5.8
-      "@logtail/types": 0.5.8
-      serialize-error: 8.1.0
-
-  "@logtail/node@0.5.8":
-    dependencies:
-      "@logtail/core": 0.5.8
-      "@logtail/types": 0.5.8
-      "@msgpack/msgpack": 2.8.0
-      "@types/stack-trace": 0.0.33
-      minimatch: 9.0.9
-      stack-trace: 0.0.10
-
-  "@logtail/pino@0.5.8(pino@9.14.0)":
-    dependencies:
-      "@logtail/node": 0.5.8
-      "@logtail/types": 0.5.8
-      pino: 9.14.0
-      pino-abstract-transport: 1.2.0
-
-  "@logtail/tools@0.5.8":
-    dependencies:
-      "@logtail/types": 0.5.8
-
-  "@logtail/types@0.5.8": {}
-
-  "@msgpack/msgpack@2.8.0": {}
 
   "@napi-rs/wasm-runtime@0.2.12":
     dependencies:
@@ -14152,8 +14048,6 @@ snapshots:
   "@types/ssh2@1.15.5":
     dependencies:
       "@types/node": 18.19.130
-
-  "@types/stack-trace@0.0.33": {}
 
   "@types/superagent@8.1.9":
     dependencies:
@@ -16998,11 +16892,6 @@ snapshots:
 
   pidtree@0.6.0: {}
 
-  pino-abstract-transport@1.2.0:
-    dependencies:
-      readable-stream: 4.7.0
-      split2: 4.2.0
-
   pino-abstract-transport@2.0.0:
     dependencies:
       split2: 4.2.0
@@ -17535,10 +17424,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  serialize-error@8.1.0:
-    dependencies:
-      type-fest: 0.20.2
-
   serve-static@2.2.1:
     dependencies:
       encodeurl: 2.0.0
@@ -17677,8 +17562,6 @@ snapshots:
     optionalDependencies:
       cpu-features: 0.0.10
       nan: 2.27.0
-
-  stack-trace@0.0.10: {}
 
   stackback@0.0.2: {}
 
@@ -18015,8 +17898,6 @@ snapshots:
   type-check@0.4.0:
     dependencies:
       prelude-ls: 1.2.1
-
-  type-fest@0.20.2: {}
 
   type-is@2.0.1:
     dependencies:
