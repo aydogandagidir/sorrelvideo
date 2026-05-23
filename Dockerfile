@@ -47,6 +47,13 @@ ENV NODE_ENV=production \
 RUN pnpm run typecheck \
     && pnpm --filter @workspace/api-server --filter @workspace/sorrel run build
 
+# The Hyperframes producer loads its core runtime + manifest from
+# <cwd>/core/dist at render time. That folder isn't in git (it's a copy of the
+# installed @hyperframes/core build output), so materialize it here from the
+# package. -L dereferences the pnpm symlink.
+RUN mkdir -p core \
+    && cp -rL artifacts/api-server/node_modules/@hyperframes/core/dist core/dist
+
 # ---------- Stage 4: runtime ----------
 # Slim image with Chromium system deps + production node_modules. Puppeteer's
 # cached Chromium binary travels along with node_modules so the renderer can
@@ -56,10 +63,19 @@ ENV NODE_ENV=production \
     PORT=8080 \
     BASE_PATH=/ \
     PNPM_HOME="/pnpm" \
-    PATH="/pnpm:$PATH"
+    PATH="/pnpm:$PATH" \
+    # Hyperframes (puppeteer-core) needs an explicit Chromium binary. We install
+    # the system chromium package below and point the engine at it via this env
+    # (read in @hyperframes/engine browserManager.ts), instead of relying on
+    # puppeteer's version-stamped cache path.
+    PRODUCER_HEADLESS_SHELL_PATH=/usr/bin/chromium \
+    PUPPETEER_SKIP_DOWNLOAD=true
 
-# Chromium runtime libraries (https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux).
+# Chromium + its runtime libraries
+# (https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux).
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        chromium \
+        ffmpeg \
         ca-certificates \
         fonts-liberation \
         libasound2 \
@@ -95,29 +111,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
 
-# Copy the entire monorepo node_modules layout — workspace symlinks need the
-# full pnpm store layout for `@workspace/*` to resolve. This keeps the bundle
-# small enough to start while leaving heavy native modules in place.
+# Preserve the EXACT monorepo layout so pnpm's relative symlinks keep working.
+# The esbuild bundle externalizes native deps (@node-rs/argon2, puppeteer,
+# @sentry/*, @google-cloud/*); at runtime Node resolves them from
+# artifacts/api-server/node_modules -> ../../node_modules/.pnpm/... . Flattening
+# the bundle to /app/dist broke that chain, so we keep the bundle at its
+# original path: /app/artifacts/api-server/dist.
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build /repo/package.json ./package.json
 COPY --from=build /repo/pnpm-lock.yaml ./pnpm-lock.yaml
 
-# api-server bundle + composition templates (loaded at render time).
-COPY --from=build /repo/artifacts/api-server/dist ./dist
-COPY --from=build /repo/artifacts/api-server/src/compositions ./compositions
-COPY --from=build /repo/artifacts/api-server/package.json ./package.json.app
+# api-server bundle + its node_modules (symlinks into /app/node_modules/.pnpm)
+# + composition templates (read at render time via the src/compositions probe).
+COPY --from=build /repo/artifacts/api-server/dist ./artifacts/api-server/dist
 COPY --from=build /repo/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
+COPY --from=build /repo/artifacts/api-server/package.json ./artifacts/api-server/package.json
+COPY --from=build /repo/artifacts/api-server/src/compositions ./artifacts/api-server/src/compositions
 
-# Frontend bundle — served by api-server's express.static under /public.
-COPY --from=build /repo/artifacts/sorrel/dist/public ./public
+# Frontend bundle — app.ts (in production) serves it via express.static from
+# `<bundle dir>/../public` = /app/artifacts/api-server/public.
+COPY --from=build /repo/artifacts/sorrel/dist/public ./artifacts/api-server/public
 
-# Puppeteer cache: install puts Chromium under /root/.cache/puppeteer when run
-# at the workspace root. Carry it over so the runtime container doesn't need a
-# Chromium download at boot.
-COPY --from=build /root/.cache/puppeteer /root/.cache/puppeteer
+# Hyperframes core runtime (manifest + iife) materialized in the build stage.
+# Producer resolves it at <cwd>/core/dist (cwd is /app).
+COPY --from=build /repo/core ./core
 
 EXPOSE 8080
 
-# Health: Railway will poll /api/healthz (configured in railway.json).
-CMD ["node", "--enable-source-maps", "dist/index.mjs"]
+# Health: Railway polls /api/healthz (configured in railway.json).
+CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
