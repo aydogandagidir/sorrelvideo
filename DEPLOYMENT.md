@@ -27,9 +27,10 @@ are automatic via GitHub Actions.
    it and exposes `DATABASE_URL` automatically inside the project.
 4. In the api service settings, **Variables → Reference**: link
    `DATABASE_URL` from the Postgres service.
-5. Add a **Volume** to the api service mounted at
-   `/app/artifacts/api-server/renders` (5 GB is plenty for soft launch).
-   This persists rendered mp4s across deploys.
+5. Add a **Volume** to the api service mounted at **`/data`** (5 GB is plenty
+   for soft launch) and set env **`RENDERS_DIR=/data/renders`**. This persists
+   rendered mp4s across deploys. (The app otherwise writes them next to the
+   bundle at `/app/renders`, which is ephemeral.)
 
 ## 2. Stripe — products + webhook
 
