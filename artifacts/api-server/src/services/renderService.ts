@@ -23,16 +23,19 @@ function firstExistingDir(candidates: string[], fallback: string): string {
   return candidates.find((p) => p && fs.existsSync(p)) ?? fallback;
 }
 
-/** Directory where final rendered mp4 files are stored, keyed by project id. */
+/**
+ * Directory where final rendered mp4 files are stored, keyed by project id.
+ * Must be DETERMINISTIC — both the writer (startRender) and reader
+ * (renderFileExists / GET :id/video) resolve it once at module load, so a
+ * "first existing dir" probe would be a race (e.g. a stale ../../renders from
+ * an earlier bug could win). The bundle always runs from dist/, so
+ * `__dirname/../renders` is stable: `artifacts/api-server/renders` in dev and
+ * `/app/renders` in the Docker image. Override with RENDERS_DIR (Railway
+ * volume mount).
+ */
 export const RENDERS_DIR = process.env.RENDERS_DIR
   ? path.resolve(process.env.RENDERS_DIR)
-  : firstExistingDir(
-      [
-        path.resolve(__dirname, "../renders"), // bundle: dist/../renders
-        path.resolve(__dirname, "../../renders"), // source: src/services/../../renders
-      ],
-      path.resolve(__dirname, "../renders"),
-    );
+  : path.resolve(__dirname, "../renders");
 
 const COMPOSITIONS_DIR = firstExistingDir(
   [
@@ -253,8 +256,21 @@ export async function startRender(
     });
 
     const videoUrl = `/api/projects/${projectId}/video`;
-    await setProjectStatus(projectId, "ready", { videoUrl, duration: 10 });
-    logger.info({ projectId, videoUrl }, "Render completed");
+    // Real clip length comes from the composition's window.__hf.duration,
+    // surfaced on the job after render. Fall back to undefined (null in DB)
+    // rather than a misleading constant.
+    const renderedDuration =
+      typeof job.duration === "number" && job.duration > 0
+        ? Math.round(job.duration)
+        : undefined;
+    await setProjectStatus(projectId, "ready", {
+      videoUrl,
+      duration: renderedDuration,
+    });
+    logger.info(
+      { projectId, videoUrl, duration: renderedDuration },
+      "Render completed",
+    );
   } catch (err) {
     const renderError = err instanceof Error ? err.message : String(err);
     logger.error({ projectId, err }, "Render failed");

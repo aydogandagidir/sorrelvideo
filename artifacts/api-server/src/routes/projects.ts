@@ -1,3 +1,4 @@
+import fs from "fs";
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, projectsTable, templatesTable, usersTable } from "@workspace/db";
@@ -11,8 +12,15 @@ import {
   UpdateProjectResponse,
   DeleteProjectParams,
 } from "@workspace/api-zod";
-import { startRender, renderFileExists, getRenderFilePath } from "../services/renderService";
-import { checkAndIncrementRenderCount, getUserPlan } from "../services/billingService";
+import {
+  startRender,
+  renderFileExists,
+  getRenderFilePath,
+} from "../services/renderService";
+import {
+  checkAndIncrementRenderCount,
+  getUserPlan,
+} from "../services/billingService";
 
 const router: IRouter = Router();
 
@@ -151,9 +159,7 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  await db
-    .delete(projectsTable)
-    .where(eq(projectsTable.id, params.data.id));
+  await db.delete(projectsTable).where(eq(projectsTable.id, params.data.id));
 
   res.sendStatus(204);
 });
@@ -282,10 +288,37 @@ router.get("/projects/:id/video", async (req, res): Promise<void> => {
     return;
   }
 
+  // Stream with HTTP range support (browser <video> seeking issues range
+  // requests). We avoid res.sendFile here: Express 5's send() rejects absolute
+  // paths containing spaces (this repo lives under ".../Artificial Inteligence/...")
+  // with a spurious NotFoundError.
   const filePath = getRenderFilePath(id);
+  const stat = fs.statSync(filePath);
+  const total = stat.size;
+  const range = req.headers.range;
+
   res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Accept-Ranges", "bytes");
   res.setHeader("Content-Disposition", `inline; filename="project-${id}.mp4"`);
-  res.sendFile(filePath);
+
+  if (range) {
+    const match = /bytes=(\d*)-(\d*)/.exec(range);
+    const start = match && match[1] ? parseInt(match[1], 10) : 0;
+    const end = match && match[2] ? parseInt(match[2], 10) : total - 1;
+    if (start >= total || end >= total) {
+      res.status(416).setHeader("Content-Range", `bytes */${total}`);
+      res.end();
+      return;
+    }
+    res.status(206);
+    res.setHeader("Content-Range", `bytes ${start}-${end}/${total}`);
+    res.setHeader("Content-Length", end - start + 1);
+    fs.createReadStream(filePath, { start, end }).pipe(res);
+    return;
+  }
+
+  res.setHeader("Content-Length", total);
+  fs.createReadStream(filePath).pipe(res);
 });
 
 export default router;

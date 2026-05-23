@@ -3,145 +3,118 @@
   <head>
     <meta charset="UTF-8" />
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        width: 1920px;
-        height: 1080px;
-        overflow: hidden;
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1920px; height: 1080px; overflow: hidden;
         background: #0a0a0a;
         font-family: {{brand.fontFamily}}, "Segoe UI", system-ui, sans-serif;
         color: #fff;
       }
       .scene {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(
-          135deg,
-          {{brand.primaryColor}}cc 0%,
-          #0a0a0a 50%,
-          {{brand.secondaryColor}}99 100%
-        );
-        position: relative;
-        padding: 120px;
+        width: 100%; height: 100%;
+        display: flex; align-items: center; justify-content: flex-start;
+        background: linear-gradient(135deg, {{brand.primaryColor}} 0%, #0a0a0a 55%, {{brand.secondaryColor}} 100%);
+        position: relative; padding: 140px;
       }
       .glow {
-        position: absolute;
-        width: 900px;
-        height: 900px;
-        border-radius: 50%;
-        background: radial-gradient(
-          circle,
-          {{brand.accentColor}}55,
-          transparent 70%
-        );
-        bottom: -200px;
-        left: -200px;
-        filter: blur(20px);
+        position: absolute; width: 1000px; height: 1000px; border-radius: 50%;
+        background: radial-gradient(circle, {{brand.accentColor}}55, transparent 70%);
+        bottom: -260px; right: -200px; filter: blur(30px);
       }
-      .card {
-        position: relative;
-        z-index: 1;
-        max-width: 1400px;
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 24px;
-        margin-bottom: 64px;
-        animation: fadeIn 0.5s ease 0.2s forwards;
-        opacity: 0;
-      }
+      .card { position: relative; z-index: 1; max-width: 1500px; }
+      .brand { display: flex; align-items: center; gap: 28px; margin-bottom: 72px; }
       .brand-logo {
-        width: 96px;
-        height: 96px;
-        border-radius: 24px;
-        background: {{brand.primaryColor}};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 48px;
-        font-weight: 800;
+        width: 104px; height: 104px; border-radius: 26px; background: {{brand.primaryColor}};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 52px; font-weight: 800; color: #fff;
       }
-      .brand-name {
-        font-size: 32px;
-        font-weight: 700;
-        letter-spacing: 1px;
-      }
+      .brand-name { font-size: 34px; font-weight: 700; letter-spacing: 1px; }
       .headline {
-        font-size: 132px;
-        font-weight: 900;
-        line-height: 1;
-        letter-spacing: -2px;
-        background: linear-gradient(
-          135deg,
-          #fff,
-          {{brand.accentColor}}
-        );
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        animation: slideUp 0.7s ease 0.5s forwards;
-        opacity: 0;
+        font-size: 140px; font-weight: 900; line-height: 1.02; letter-spacing: -3px;
+        background: linear-gradient(135deg, #ffffff, {{brand.accentColor}});
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       }
       .body {
-        font-size: 38px;
-        line-height: 1.45;
-        margin-top: 40px;
-        max-width: 1100px;
-        color: rgba(255, 255, 255, 0.78);
-        animation: fadeIn 0.5s ease 0.9s forwards;
-        opacity: 0;
+        font-size: 40px; line-height: 1.45; margin-top: 44px; max-width: 1150px;
+        color: rgba(255, 255, 255, 0.8);
       }
       .cta {
-        display: inline-flex;
-        align-items: center;
-        gap: 16px;
-        margin-top: 80px;
-        padding: 28px 56px;
-        background: {{brand.accentColor}};
-        color: #0a0a0a;
-        border-radius: 999px;
-        font-size: 32px;
-        font-weight: 700;
-        animation: fadeIn 0.5s ease 1.2s forwards;
-        opacity: 0;
+        display: inline-flex; align-items: center; gap: 16px; margin-top: 88px;
+        padding: 30px 60px; background: {{brand.accentColor}}; color: #0a0a0a;
+        border-radius: 999px; font-size: 34px; font-weight: 800;
       }
-      @keyframes fadeIn {
-        to {
-          opacity: 1;
-        }
-      }
-      @keyframes slideUp {
-        from {
-          opacity: 0;
-          transform: translateY(40px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
+      /* Animated elements start hidden; window.__hf.seek(t) reveals them.
+         No CSS @keyframes — Chrome's clock is paused during render. */
+      .anim { opacity: 0; will-change: opacity, transform; }
     </style>
   </head>
   <body>
-    <div class="scene">
+    <div class="scene" data-composition-id="studio" data-duration="5">
       <div class="glow"></div>
       <div class="card">
-        <div class="brand">
+        <div class="brand anim" data-from="0.2" data-to="0.9" data-slide="40">
           <div class="brand-logo">{{brand.initial}}</div>
           <div class="brand-name">{{brand.companyName}}</div>
         </div>
-        <h1 class="headline">{{user.headline}}</h1>
-        <p class="body">{{user.bodyText}}</p>
-        <div class="cta">{{user.ctaText}} →</div>
+        <h1 class="headline anim" data-from="0.5" data-to="1.4" data-slide="48">
+          {{user.headline}}
+        </h1>
+        <p class="body anim" data-from="1.0" data-to="1.9" data-slide="32">
+          {{user.bodyText}}
+        </p>
+        <div class="cta anim" data-from="1.4" data-to="2.2" data-slide="24">
+          {{user.ctaText}} &rarr;
+        </div>
       </div>
     </div>
+
+    <script>
+      (function () {
+        // Hand-rolled Hyperframes contract: window.__hf = { duration, seek }.
+        // The producer injects its own runtime + a __player->__hf bridge, but
+        // that bridge only completes when a timeline registers window.__player.
+        // We never create __player, so the bridge stays dormant and never
+        // overwrites the object installed here.
+        var DURATION = 5; // seconds; must match data-duration and be > 0.
+
+        var items = Array.prototype.slice
+          .call(document.querySelectorAll(".anim"))
+          .map(function (el) {
+            return {
+              el: el,
+              from: parseFloat(el.getAttribute("data-from")) || 0,
+              to: parseFloat(el.getAttribute("data-to")) || DURATION,
+              slide: parseFloat(el.getAttribute("data-slide")) || 0,
+            };
+          });
+
+        function clamp01(x) {
+          return x < 0 ? 0 : x > 1 ? 1 : x;
+        }
+        function easeOut(p) {
+          return 1 - Math.pow(1 - p, 3);
+        }
+
+        function render(t) {
+          for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            var span = it.to - it.from;
+            var raw = span > 0 ? (t - it.from) / span : t >= it.from ? 1 : 0;
+            var p = easeOut(clamp01(raw));
+            it.el.style.opacity = String(p);
+            it.el.style.transform = "translateY(" + (1 - p) * it.slide + "px)";
+          }
+        }
+
+        render(0); // paint t=0 before the readiness probe screenshots it.
+
+        window.__hf = {
+          duration: DURATION,
+          seek: function (t) {
+            render(Math.max(0, Math.min(DURATION, Number(t) || 0)));
+          },
+        };
+      })();
+    </script>
   </body>
 </html>
