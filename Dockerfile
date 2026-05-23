@@ -41,7 +41,11 @@ COPY . .
 ENV NODE_ENV=production \
     BASE_PATH=/ \
     PORT=8080
-RUN pnpm run typecheck && pnpm -r --if-present run build
+# Typecheck everything, but only build what ships: the api-server bundle and
+# the sorrel SPA. mockup-sandbox is a dev-only Hyperframes playground and is
+# not deployed.
+RUN pnpm run typecheck \
+    && pnpm --filter @workspace/api-server --filter @workspace/sorrel run build
 
 # ---------- Stage 4: runtime ----------
 # Slim image with Chromium system deps + production node_modules. Puppeteer's
