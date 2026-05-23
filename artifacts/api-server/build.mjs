@@ -64,6 +64,10 @@ async function buildAll() {
       "@aws-sdk/*",
       "@azure/*",
       "@opentelemetry/*",
+      // Sentry pulls in a large OpenTelemetry graph with dynamic requires that
+      // don't survive bundling. Keep it external; lib/sentry.ts loads it lazily
+      // (only when SENTRY_DSN is set) so dev never needs it resolved.
+      "@sentry/*",
       "@google-cloud/*",
       "@google/*",
       "googleapis",
@@ -104,11 +108,11 @@ async function buildAll() {
     ],
     sourcemap: "linked",
     plugins: [
-      // pino relies on workers to handle logging, instead of externalizing it
-      // we use a plugin to handle it. Production attaches the @logtail/pino
-      // transport when LOGTAIL_SOURCE_TOKEN is set; bundle it so it doesn't
-      // need a node_modules lookup at runtime.
-      esbuildPluginPino({ transports: ["pino-pretty", "@logtail/pino"] }),
+      // pino relies on workers to handle logging; the plugin bundles the
+      // transport worker. We only ship pino-pretty (dev). Production logs as
+      // plain JSON to stdout and is forwarded to Better Stack via a Railway
+      // log drain — no in-process transport, no worker-bundling fragility.
+      esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {

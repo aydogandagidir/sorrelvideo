@@ -53,3 +53,10 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Hyperframes core runtime artifact (copied from @hyperframes/core/dist at
+# setup time; regenerated, not source). See scripts/setup-hyperframes-runtime.
+core/
+
+# Rendered output (mp4 + per-render composition.html), any location.
+**/renders/

@@ -1,34 +1,6 @@
 import pino, { type LoggerOptions } from "pino";
 
 const isProduction = process.env.NODE_ENV === "production";
-const logtailToken = process.env.LOGTAIL_SOURCE_TOKEN;
-
-interface PinoTarget {
-  target: string;
-  options?: Record<string, unknown>;
-  level?: pino.Level;
-}
-
-const targets: PinoTarget[] = [];
-
-// Local dev: pretty-print to stdout. Production: structured stdout (no
-// pino-pretty layer) so the host log shipper (Railway / Better Stack) parses
-// JSON cleanly.
-if (!isProduction) {
-  targets.push({
-    target: "pino-pretty",
-    options: { colorize: true },
-  });
-}
-
-// Better Stack (Logtail) — only when the token is supplied. Falls back to
-// stdout-only otherwise so misconfigured environments still ship logs.
-if (logtailToken) {
-  targets.push({
-    target: "@logtail/pino",
-    options: { sourceToken: logtailToken },
-  });
-}
 
 const options: LoggerOptions = {
   level: process.env.LOG_LEVEL ?? "info",
@@ -39,8 +11,16 @@ const options: LoggerOptions = {
   ],
 };
 
-if (targets.length > 0) {
-  options.transport = { targets };
+// Dev: pretty colorized stdout. Production: structured JSON straight to stdout
+// so the host log shipper parses it cleanly. On Railway, forward those logs to
+// Better Stack / Logtail with a native **log drain** (Project → Settings →
+// Log drains) — no in-process transport needed, which avoids the fragile
+// worker-thread bundling that pino transports require under esbuild.
+if (!isProduction) {
+  options.transport = {
+    target: "pino-pretty",
+    options: { colorize: true },
+  };
 }
 
 export const logger = pino(options);

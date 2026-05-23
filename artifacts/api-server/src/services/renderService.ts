@@ -13,10 +13,36 @@ import { logger } from "../lib/logger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Directory where final rendered mp4 files are stored, keyed by project id. */
-export const RENDERS_DIR = path.resolve(__dirname, "../../renders");
+/**
+ * Pick the first path that exists. esbuild bundles this module to dist/, so
+ * `__dirname` differs between source layout (src/services) and the bundle
+ * (dist/), and again in the Docker image (/app/dist). Probing candidates keeps
+ * dev, prod and the container all working without per-env config.
+ */
+function firstExistingDir(candidates: string[], fallback: string): string {
+  return candidates.find((p) => p && fs.existsSync(p)) ?? fallback;
+}
 
-const COMPOSITIONS_DIR = path.resolve(__dirname, "../compositions");
+/** Directory where final rendered mp4 files are stored, keyed by project id. */
+export const RENDERS_DIR = process.env.RENDERS_DIR
+  ? path.resolve(process.env.RENDERS_DIR)
+  : firstExistingDir(
+      [
+        path.resolve(__dirname, "../renders"), // bundle: dist/../renders
+        path.resolve(__dirname, "../../renders"), // source: src/services/../../renders
+      ],
+      path.resolve(__dirname, "../renders"),
+    );
+
+const COMPOSITIONS_DIR = firstExistingDir(
+  [
+    path.resolve(__dirname, "compositions"), // bundled next to dist (if copied)
+    path.resolve(__dirname, "../compositions"), // prod Docker: /app/compositions
+    path.resolve(__dirname, "../src/compositions"), // dev: dist/../src/compositions
+    path.resolve(__dirname, "../../src/compositions"), // source layout
+  ],
+  path.resolve(__dirname, "../compositions"),
+);
 
 const COMPOSITION_MAP: Record<string, string> = {
   "product-launch": "product-launch.html",

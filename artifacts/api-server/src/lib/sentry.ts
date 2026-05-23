@@ -1,29 +1,28 @@
-import * as Sentry from "@sentry/node";
+import type * as SentryNode from "@sentry/node";
+import type { Express } from "express";
 
-let initialized = false;
+// Loaded lazily so the heavy @sentry/node + @opentelemetry/* dependency graph
+// is only pulled in when SENTRY_DSN is set. Without this, a static import
+// would force those packages to resolve at boot even in local dev (where they
+// may not be hoisted into node_modules), crashing the server.
+let sentry: typeof SentryNode | null = null;
 
 /**
- * Initialise Sentry on the server. No-op when SENTRY_DSN is not set so the
- * app keeps working in local development without an external dependency.
- *
- * Call this BEFORE importing app.ts / spinning up Express — the SDK patches
- * a bunch of globals (http, node:async_hooks) on init.
+ * Initialise Sentry. No-op (and zero import cost) when SENTRY_DSN is unset.
+ * Call before app.listen so the SDK can patch what it needs.
  */
-export function initSentry(): void {
-  if (initialized) return;
+export async function initSentry(): Promise<void> {
   const dsn = process.env.SENTRY_DSN;
   if (!dsn) return;
 
-  Sentry.init({
+  sentry = await import("@sentry/node");
+  sentry.init({
     dsn,
     environment: process.env.NODE_ENV ?? "development",
     release: process.env.GIT_SHA,
     tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"),
     sendDefaultPii: false,
     beforeSend(event) {
-      // Belt-and-braces: scrub request bodies and headers in case a route ever
-      // logs them. Sentry already redacts cookies/auth headers, but body
-      // shape is route-specific.
       if (event.request) {
         delete event.request.cookies;
         if (event.request.data && typeof event.request.data === "object") {
@@ -36,11 +35,18 @@ export function initSentry(): void {
       return event;
     },
   });
-  initialized = true;
+}
+
+/** Wire Sentry's Express error handler. No-op when Sentry wasn't initialised. */
+export function setupSentryErrorHandler(app: Express): void {
+  if (sentry) sentry.setupExpressErrorHandler(app);
+}
+
+/** Manually report an error. No-op when Sentry wasn't initialised. */
+export function captureException(err: unknown): void {
+  if (sentry) sentry.captureException(err);
 }
 
 export function isSentryEnabled(): boolean {
-  return initialized;
+  return sentry !== null;
 }
-
-export { Sentry };

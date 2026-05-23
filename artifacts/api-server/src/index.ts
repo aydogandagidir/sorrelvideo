@@ -1,15 +1,12 @@
-// IMPORTANT: Sentry must be initialised before anything that imports Express
-// or pino-http — its SDK patches globals (http, async_hooks). No-op when
-// SENTRY_DSN is unset.
-import { initSentry, Sentry } from "./lib/sentry";
-initSentry();
-
+import { initSentry, setupSentryErrorHandler } from "./lib/sentry";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
 
-// Wire Sentry's Express error handler — only runs when SDK was initialised.
-Sentry.setupExpressErrorHandler(app);
+// Initialise Sentry (no-op without SENTRY_DSN), then wire its Express error
+// handler. Lazy-loaded so dev boots without the OpenTelemetry dependency graph.
+await initSentry();
+setupSentryErrorHandler(app);
 
 async function initBilling(): Promise<void> {
   if (!process.env.DATABASE_URL) {
