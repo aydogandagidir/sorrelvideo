@@ -1,169 +1,100 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-<meta charset="UTF-8" />
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 1920px; height: 1080px; overflow: hidden;
-    background: #0a0a0a;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    color: #fff;
-  }
-  .scene {
-    width: 100%; height: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    position: relative;
-  }
-  .left {
-    display: flex; flex-direction: column;
-    justify-content: center;
-    padding: 100px 80px;
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    position: relative;
-    overflow: hidden;
-  }
-  .left::before {
-    content: '';
-    position: absolute;
-    width: 500px; height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,107,53,0.15), transparent 70%);
-    bottom: -100px; right: -100px;
-  }
-  .right {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #ff6b35, #f7c59f);
-    position: relative;
-    overflow: hidden;
-  }
-  .right::after {
-    content: '';
-    position: absolute;
-    width: 600px; height: 600px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.1);
-    top: -200px; right: -200px;
-  }
-  .eyebrow {
-    font-size: 16px;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: #ff6b35;
-    animation: fadeIn 0.6s ease 0.2s forwards;
-    opacity: 0;
-  }
-  .title {
-    font-size: 80px;
-    font-weight: 900;
-    line-height: 1.05;
-    margin-top: 20px;
-    animation: slideRight 0.7s ease 0.4s forwards;
-    opacity: 0;
-  }
-  .desc {
-    font-size: 22px;
-    color: rgba(255,255,255,0.55);
-    margin-top: 28px;
-    max-width: 480px;
-    line-height: 1.6;
-    animation: fadeIn 0.6s ease 0.7s forwards;
-    opacity: 0;
-  }
-  .stats {
-    display: flex;
-    gap: 48px;
-    margin-top: 56px;
-    animation: fadeIn 0.6s ease 1s forwards;
-    opacity: 0;
-  }
-  .stat-val {
-    font-size: 48px;
-    font-weight: 900;
-    color: #ff6b35;
-  }
-  .stat-label {
-    font-size: 14px;
-    color: rgba(255,255,255,0.4);
-    margin-top: 4px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-  }
-  .logo-area {
-    text-align: center;
-    z-index: 1;
-    animation: popIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.5s forwards;
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  .logo-circle {
-    width: 240px; height: 240px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.15);
-    border: 3px solid rgba(255,255,255,0.3);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 96px;
-    backdrop-filter: blur(10px);
-    animation: spin 20s linear infinite;
-    margin: 0 auto;
-  }
-  .brand-name {
-    font-size: 40px;
-    font-weight: 800;
-    color: rgba(0,0,0,0.8);
-    margin-top: 32px;
-    letter-spacing: -1px;
-  }
-  .brand-tagline {
-    font-size: 18px;
-    color: rgba(0,0,0,0.5);
-    margin-top: 8px;
-  }
-  @keyframes fadeIn {
-    to { opacity: 1; }
-  }
-  @keyframes slideRight {
-    from { opacity: 0; transform: translateX(-40px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes popIn {
-    to { opacity: 1; transform: scale(1); }
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-</style>
-</head>
-<body>
-<div class="scene">
-  <div class="left">
-    <div class="eyebrow">Brand Identity</div>
-    <h1 class="title">Your Brand.<br/>Amplified.</h1>
-    <p class="desc">Create stunning branded video content in minutes. Consistent, professional, and on-brand every time.</p>
-    <div class="stats">
-      <div>
-        <div class="stat-val">10×</div>
-        <div class="stat-label">Faster</div>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1920px; height: 1080px; overflow: hidden;
+        background: {{brand.secondaryColor}};
+        font-family: {{brand.fontFamily}}, "Segoe UI", system-ui, sans-serif;
+        color: #fff;
+      }
+      .scene {
+        width: 100%; height: 100%; position: relative; padding: 150px;
+        display: flex; flex-direction: column; justify-content: center;
+        background: linear-gradient(115deg, {{brand.secondaryColor}} 0%, #0a0a0a 100%);
+      }
+      .bar { position: absolute; top: 0; left: 0; width: 24px; height: 100%; background: {{brand.accentColor}}; }
+      .brand { display: flex; align-items: center; gap: 32px; margin-bottom: 80px; }
+      .brand-logo {
+        width: 120px; height: 120px; border-radius: 30px; background: {{brand.primaryColor}};
+        display: flex; align-items: center; justify-content: center; font-size: 60px; font-weight: 800;
+      }
+      .brand-name { font-size: 40px; font-weight: 800; letter-spacing: 1px; }
+      .headline {
+        font-size: 128px; font-weight: 900; line-height: 1.04; letter-spacing: -2px; max-width: 1400px;
+        color: #fff;
+      }
+      .accent-line { width: 220px; height: 14px; border-radius: 8px; background: {{brand.accentColor}}; margin: 56px 0; }
+      .body { font-size: 40px; line-height: 1.45; max-width: 1150px; color: rgba(255,255,255,0.82); }
+      .cta {
+        display: inline-flex; margin-top: 72px; padding: 30px 60px; border-radius: 16px;
+        background: {{brand.accentColor}}; color: #0a0a0a; font-size: 34px; font-weight: 800; width: fit-content;
+      }
+      .anim { opacity: 0; will-change: opacity, transform; }
+    </style>
+  </head>
+  <body>
+    <div class="scene" data-composition-id="brand-promo" data-duration="5">
+      <div class="bar"></div>
+      <div class="brand anim" data-from="0.2" data-to="0.9" data-slide="-40">
+        <div class="brand-logo">{{brand.initial}}</div>
+        <div class="brand-name">{{brand.companyName}}</div>
       </div>
-      <div>
-        <div class="stat-val">100%</div>
-        <div class="stat-label">On Brand</div>
-      </div>
-      <div>
-        <div class="stat-val">∞</div>
-        <div class="stat-label">Variations</div>
+      <h1 class="headline anim" data-from="0.5" data-to="1.4" data-slide="44">
+        {{user.headline}}
+      </h1>
+      <div
+        class="accent-line anim"
+        data-from="1.0"
+        data-to="1.6"
+        data-slide="0"
+      ></div>
+      <p class="body anim" data-from="1.2" data-to="2.1" data-slide="30">
+        {{user.bodyText}}
+      </p>
+      <div class="cta anim" data-from="1.7" data-to="2.5" data-slide="22">
+        {{user.ctaText}} &rarr;
       </div>
     </div>
-  </div>
-  <div class="right">
-    <div class="logo-area">
-      <div class="logo-circle">🎬</div>
-      <div class="brand-name">Sorrel</div>
-      <div class="brand-tagline">Video Production Platform</div>
-    </div>
-  </div>
-</div>
-</body>
+    <script>
+      (function () {
+        var DURATION = 5;
+        var items = Array.prototype.slice
+          .call(document.querySelectorAll(".anim"))
+          .map(function (el) {
+            return {
+              el: el,
+              from: parseFloat(el.getAttribute("data-from")) || 0,
+              to: parseFloat(el.getAttribute("data-to")) || DURATION,
+              slide: parseFloat(el.getAttribute("data-slide")) || 0,
+            };
+          });
+        function clamp01(x) {
+          return x < 0 ? 0 : x > 1 ? 1 : x;
+        }
+        function easeOut(p) {
+          return 1 - Math.pow(1 - p, 3);
+        }
+        function render(t) {
+          for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            var span = it.to - it.from;
+            var raw = span > 0 ? (t - it.from) / span : t >= it.from ? 1 : 0;
+            var p = easeOut(clamp01(raw));
+            it.el.style.opacity = String(p);
+            it.el.style.transform = "translateX(" + (1 - p) * it.slide + "px)";
+          }
+        }
+        render(0);
+        window.__hf = {
+          duration: DURATION,
+          seek: function (t) {
+            render(Math.max(0, Math.min(DURATION, Number(t) || 0)));
+          },
+        };
+      })();
+    </script>
+  </body>
 </html>

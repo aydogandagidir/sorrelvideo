@@ -1,151 +1,99 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-<meta charset="UTF-8" />
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 1920px; height: 1080px; overflow: hidden;
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    color: #fff;
-  }
-  .scene {
-    width: 100%; height: 100%;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    position: relative;
-  }
-  .bg-circle {
-    position: absolute;
-    border-radius: 50%;
-    animation: pulse 3s ease-in-out infinite;
-  }
-  .bg-circle.c1 {
-    width: 600px; height: 600px;
-    background: radial-gradient(circle, rgba(120,80,255,0.3), transparent 70%);
-    top: -100px; left: -100px;
-  }
-  .bg-circle.c2 {
-    width: 800px; height: 800px;
-    background: radial-gradient(circle, rgba(255,80,120,0.2), transparent 70%);
-    bottom: -200px; right: -200px;
-    animation-delay: -1.5s;
-  }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 0.7; }
-    50% { transform: scale(1.1); opacity: 1; }
-  }
-  .badge {
-    background: rgba(120,80,255,0.3);
-    border: 1px solid rgba(120,80,255,0.6);
-    border-radius: 100px;
-    padding: 8px 28px;
-    font-size: 18px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #c4b5fd;
-    animation: fadeSlideDown 0.8s ease forwards;
-    opacity: 0;
-    animation-delay: 0.2s;
-  }
-  .headline {
-    font-size: 96px;
-    font-weight: 900;
-    line-height: 1.05;
-    text-align: center;
-    margin-top: 32px;
-    background: linear-gradient(135deg, #fff 40%, #c4b5fd);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: fadeSlideUp 0.8s ease forwards;
-    opacity: 0;
-    animation-delay: 0.5s;
-  }
-  .subline {
-    font-size: 32px;
-    color: rgba(255,255,255,0.6);
-    margin-top: 24px;
-    text-align: center;
-    max-width: 800px;
-    animation: fadeSlideUp 0.8s ease forwards;
-    opacity: 0;
-    animation-delay: 0.8s;
-  }
-  .cta {
-    margin-top: 56px;
-    background: linear-gradient(135deg, #7c50ff, #e040fb);
-    border: none;
-    border-radius: 12px;
-    padding: 20px 56px;
-    font-size: 24px;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: 1px;
-    animation: fadeSlideUp 0.8s ease forwards, shimmer 2s linear 1.5s infinite;
-    opacity: 0;
-    animation-delay: 1.1s;
-    position: relative;
-    overflow: hidden;
-  }
-  .cta::after {
-    content: '';
-    position: absolute;
-    top: 0; left: -100%;
-    width: 100%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    animation: shimmer 2s linear 1.5s infinite;
-  }
-  @keyframes shimmer {
-    0% { left: -100%; }
-    100% { left: 200%; }
-  }
-  @keyframes fadeSlideDown {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fadeSlideUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .particles {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .particle {
-    position: absolute;
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: rgba(196,181,253,0.6);
-    animation: float linear infinite;
-  }
-</style>
-</head>
-<body>
-<div class="scene">
-  <div class="bg-circle c1"></div>
-  <div class="bg-circle c2"></div>
-  <div class="particles" id="particles"></div>
-  <div class="badge">New Launch</div>
-  <h1 class="headline">Product Launch<br/>Teaser</h1>
-  <p class="subline">The next generation of video production is here. Meet Sorrel.</p>
-  <div class="cta">Get Early Access</div>
-</div>
-<script>
-  const container = document.getElementById('particles');
-  for (let i = 0; i < 40; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    p.style.left = Math.random() * 100 + '%';
-    p.style.top = Math.random() * 100 + '%';
-    p.style.animationDuration = (4 + Math.random() * 8) + 's';
-    p.style.animationDelay = -(Math.random() * 12) + 's';
-    p.style.opacity = 0.2 + Math.random() * 0.6;
-    p.style.transform = `scale(${0.5 + Math.random() * 2})`;
-    container.appendChild(p);
-  }
-</script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1920px; height: 1080px; overflow: hidden;
+        background: #07070b;
+        font-family: {{brand.fontFamily}}, "Segoe UI", system-ui, sans-serif;
+        color: #fff;
+      }
+      .scene {
+        width: 100%; height: 100%; position: relative;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        text-align: center; padding: 120px;
+        background:
+          radial-gradient(circle at 50% 18%, {{brand.primaryColor}}66, transparent 55%),
+          linear-gradient(180deg, #07070b 0%, {{brand.secondaryColor}} 140%);
+      }
+      .badge {
+        display: inline-block; padding: 16px 36px; border-radius: 999px;
+        background: {{brand.accentColor}}; color: #07070b;
+        font-size: 28px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
+        margin-bottom: 56px;
+      }
+      .headline {
+        font-size: 150px; font-weight: 900; line-height: 1; letter-spacing: -4px;
+        max-width: 1500px;
+        background: linear-gradient(135deg, #fff, {{brand.accentColor}});
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      }
+      .body { font-size: 42px; line-height: 1.4; margin-top: 48px; max-width: 1200px; color: rgba(255,255,255,0.8); }
+      .cta {
+        margin-top: 80px; padding: 30px 64px; border-radius: 999px;
+        background: {{brand.primaryColor}}; color: #fff; font-size: 36px; font-weight: 800;
+      }
+      .footer { position: absolute; bottom: 90px; font-size: 30px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.65); }
+      .anim { opacity: 0; will-change: opacity, transform; }
+    </style>
+  </head>
+  <body>
+    <div class="scene" data-composition-id="product-launch" data-duration="6">
+      <div class="badge anim" data-from="0.2" data-to="0.9" data-slide="30">
+        New
+      </div>
+      <h1 class="headline anim" data-from="0.5" data-to="1.5" data-slide="50">
+        {{user.headline}}
+      </h1>
+      <p class="body anim" data-from="1.1" data-to="2.1" data-slide="34">
+        {{user.bodyText}}
+      </p>
+      <div class="cta anim" data-from="1.6" data-to="2.5" data-slide="24">
+        {{user.ctaText}}
+      </div>
+      <div class="footer anim" data-from="2.0" data-to="2.8" data-slide="16">
+        {{brand.companyName}}
+      </div>
+    </div>
+    <script>
+      (function () {
+        var DURATION = 6;
+        var items = Array.prototype.slice
+          .call(document.querySelectorAll(".anim"))
+          .map(function (el) {
+            return {
+              el: el,
+              from: parseFloat(el.getAttribute("data-from")) || 0,
+              to: parseFloat(el.getAttribute("data-to")) || DURATION,
+              slide: parseFloat(el.getAttribute("data-slide")) || 0,
+            };
+          });
+        function clamp01(x) {
+          return x < 0 ? 0 : x > 1 ? 1 : x;
+        }
+        function easeOut(p) {
+          return 1 - Math.pow(1 - p, 3);
+        }
+        function render(t) {
+          for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            var span = it.to - it.from;
+            var raw = span > 0 ? (t - it.from) / span : t >= it.from ? 1 : 0;
+            var p = easeOut(clamp01(raw));
+            it.el.style.opacity = String(p);
+            it.el.style.transform = "translateY(" + (1 - p) * it.slide + "px)";
+          }
+        }
+        render(0);
+        window.__hf = {
+          duration: DURATION,
+          seek: function (t) {
+            render(Math.max(0, Math.min(DURATION, Number(t) || 0)));
+          },
+        };
+      })();
+    </script>
+  </body>
 </html>
