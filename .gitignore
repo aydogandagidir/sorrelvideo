@@ -60,3 +60,4 @@ core/
 
 # Rendered output (mp4 + per-render composition.html), any location.
 **/renders/
+.tmp-frames/

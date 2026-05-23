@@ -5,56 +5,54 @@
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
-        width: 1920px; height: 1080px; overflow: hidden;
+        width: 1080px; height: 1920px; overflow: hidden;
         background: {{brand.secondaryColor}};
         font-family: {{brand.fontFamily}}, "Segoe UI", system-ui, sans-serif;
         color: #fff;
       }
       .scene {
-        width: 100%; height: 100%; position: relative; padding: 150px;
+        width: 100%; height: 100%; position: relative; padding: 150px 96px;
         display: flex; flex-direction: column; justify-content: center;
-        background: linear-gradient(115deg, {{brand.secondaryColor}} 0%, #0a0a0a 100%);
+        background: linear-gradient(155deg, {{brand.secondaryColor}} 0%, #08080d 75%);
       }
-      .bar { position: absolute; top: 0; left: 0; width: 24px; height: 100%; background: {{brand.accentColor}}; }
-      .brand { display: flex; align-items: center; gap: 32px; margin-bottom: 80px; }
+      .bar { position: absolute; top: 0; left: 0; right: 0; height: 20px; background: linear-gradient(90deg, {{brand.primaryColor}}, {{brand.accentColor}}); }
+      .brand { display: flex; align-items: center; gap: 28px; margin-bottom: 90px; }
       .brand-logo {
-        width: 120px; height: 120px; border-radius: 30px; background: {{brand.primaryColor}};
-        display: flex; align-items: center; justify-content: center; font-size: 60px; font-weight: 800;
+        width: 120px; height: 120px; border-radius: 30px;
+        background: linear-gradient(135deg, {{brand.primaryColor}}, {{brand.accentColor}});
+        display: flex; align-items: center; justify-content: center; font-size: 62px; font-weight: 800;
       }
-      .brand-name { font-size: 40px; font-weight: 800; letter-spacing: 1px; }
-      .headline {
-        font-size: 128px; font-weight: 900; line-height: 1.04; letter-spacing: -2px; max-width: 1400px;
-        color: #fff;
-      }
-      .accent-line { width: 220px; height: 14px; border-radius: 8px; background: {{brand.accentColor}}; margin: 56px 0; }
-      .body { font-size: 40px; line-height: 1.45; max-width: 1150px; color: rgba(255,255,255,0.82); }
+      .brand-name { font-size: 42px; font-weight: 800; }
+      .headline { font-size: 116px; font-weight: 900; line-height: 1.04; letter-spacing: -2px; max-width: 880px; }
+      .accent-line { width: 200px; height: 16px; border-radius: 8px; background: {{brand.accentColor}}; margin: 60px 0; }
+      .body { font-size: 46px; line-height: 1.45; max-width: 840px; color: rgba(255,255,255,0.82); }
       .cta {
-        display: inline-flex; margin-top: 72px; padding: 30px 60px; border-radius: 16px;
-        background: {{brand.accentColor}}; color: #0a0a0a; font-size: 34px; font-weight: 800; width: fit-content;
+        display: inline-flex; margin-top: 90px; padding: 36px 64px; border-radius: 18px; width: fit-content;
+        background: {{brand.accentColor}}; color: #08080d; font-size: 40px; font-weight: 800;
       }
-      .anim { opacity: 0; will-change: opacity, transform; }
+      .anim { will-change: opacity, transform; }
     </style>
   </head>
   <body>
     <div class="scene" data-composition-id="brand-promo" data-duration="5">
       <div class="bar"></div>
-      <div class="brand anim" data-from="0.2" data-to="0.9" data-slide="-40">
+      <div class="brand anim" data-from="0.15" data-to="0.9" data-slide="-34">
         <div class="brand-logo">{{brand.initial}}</div>
         <div class="brand-name">{{brand.companyName}}</div>
       </div>
-      <h1 class="headline anim" data-from="0.5" data-to="1.4" data-slide="44">
+      <h1 class="headline anim" data-from="0.4" data-to="1.4" data-slide="42">
         {{user.headline}}
       </h1>
       <div
         class="accent-line anim"
-        data-from="1.0"
-        data-to="1.6"
+        data-from="0.9"
+        data-to="1.5"
         data-slide="0"
       ></div>
-      <p class="body anim" data-from="1.2" data-to="2.1" data-slide="30">
+      <p class="body anim" data-from="1.1" data-to="2.0" data-slide="30">
         {{user.bodyText}}
       </p>
-      <div class="cta anim" data-from="1.7" data-to="2.5" data-slide="22">
+      <div class="cta anim" data-from="1.6" data-to="2.4" data-slide="22">
         {{user.ctaText}} &rarr;
       </div>
     </div>
@@ -79,15 +77,14 @@
         }
         function render(t) {
           for (var i = 0; i < items.length; i++) {
-            var it = items[i];
-            var span = it.to - it.from;
+            var it = items[i],
+              span = it.to - it.from;
             var raw = span > 0 ? (t - it.from) / span : t >= it.from ? 1 : 0;
             var p = easeOut(clamp01(raw));
             it.el.style.opacity = String(p);
             it.el.style.transform = "translateX(" + (1 - p) * it.slide + "px)";
           }
         }
-        render(0);
         window.__hf = {
           duration: DURATION,
           seek: function (t) {

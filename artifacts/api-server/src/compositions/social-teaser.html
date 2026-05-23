@@ -5,7 +5,7 @@
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
-        width: 1920px; height: 1080px; overflow: hidden;
+        width: 1080px; height: 1920px; overflow: hidden;
         background: #050507;
         font-family: {{brand.fontFamily}}, "Segoe UI", system-ui, sans-serif;
         color: #fff;
@@ -13,41 +13,38 @@
       .scene {
         width: 100%; height: 100%; position: relative;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        text-align: center; padding: 120px;
+        text-align: center; padding: 120px 80px;
         background:
-          radial-gradient(circle at 30% 30%, {{brand.primaryColor}}55, transparent 45%),
-          radial-gradient(circle at 70% 75%, {{brand.accentColor}}44, transparent 45%),
+          radial-gradient(circle at 25% 22%, {{brand.primaryColor}}55, transparent 42%),
+          radial-gradient(circle at 80% 80%, {{brand.accentColor}}44, transparent 42%),
           #050507;
       }
       .kicker {
-        font-size: 32px; font-weight: 800; letter-spacing: 8px; text-transform: uppercase;
-        color: {{brand.accentColor}}; margin-bottom: 48px;
+        font-size: 34px; font-weight: 800; letter-spacing: 10px; text-transform: uppercase;
+        color: {{brand.accentColor}}; margin-bottom: 56px;
       }
-      .headline {
-        font-size: 172px; font-weight: 900; line-height: 0.98; letter-spacing: -5px; max-width: 1500px;
-        color: #fff;
-      }
-      .body { font-size: 44px; line-height: 1.4; margin-top: 52px; max-width: 1150px; color: rgba(255,255,255,0.85); }
+      .headline { font-size: 156px; font-weight: 900; line-height: 0.98; letter-spacing: -4px; max-width: 920px; }
+      .body { font-size: 48px; line-height: 1.4; margin-top: 60px; max-width: 860px; color: rgba(255,255,255,0.85); }
       .cta {
-        margin-top: 90px; padding: 32px 72px; border-radius: 999px;
-        border: 4px solid {{brand.accentColor}}; color: {{brand.accentColor}};
-        font-size: 38px; font-weight: 800; letter-spacing: 1px;
+        margin-top: 100px; padding: 36px 80px; border-radius: 999px;
+        border: 5px solid {{brand.accentColor}}; color: {{brand.accentColor}};
+        font-size: 42px; font-weight: 800; letter-spacing: 1px;
       }
-      .anim { opacity: 0; will-change: opacity, transform; }
+      .anim { will-change: opacity, transform; }
     </style>
   </head>
   <body>
     <div class="scene" data-composition-id="social-teaser" data-duration="4">
-      <div class="kicker anim" data-from="0.15" data-to="0.7" data-slide="20">
+      <div class="kicker anim" data-from="0.1" data-to="0.7" data-slide="18">
         {{brand.companyName}}
       </div>
-      <h1 class="headline anim" data-from="0.4" data-to="1.2" data-slide="40">
+      <h1 class="headline anim" data-from="0.3" data-to="1.2" data-slide="38">
         {{user.headline}}
       </h1>
-      <p class="body anim" data-from="0.9" data-to="1.6" data-slide="28">
+      <p class="body anim" data-from="0.8" data-to="1.6" data-slide="26">
         {{user.bodyText}}
       </p>
-      <div class="cta anim" data-from="1.3" data-to="2.0" data-slide="20">
+      <div class="cta anim" data-from="1.2" data-to="2.0" data-slide="18">
         {{user.ctaText}}
       </div>
     </div>
@@ -72,20 +69,19 @@
         }
         function render(t) {
           for (var i = 0; i < items.length; i++) {
-            var it = items[i];
-            var span = it.to - it.from;
+            var it = items[i],
+              span = it.to - it.from;
             var raw = span > 0 ? (t - it.from) / span : t >= it.from ? 1 : 0;
             var p = easeOut(clamp01(raw));
             it.el.style.opacity = String(p);
             it.el.style.transform =
               "scale(" +
-              (0.92 + p * 0.08) +
+              (0.94 + p * 0.06) +
               ") translateY(" +
               (1 - p) * it.slide +
               "px)";
           }
         }
-        render(0);
         window.__hf = {
           duration: DURATION,
           seek: function (t) {

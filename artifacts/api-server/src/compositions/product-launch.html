@@ -5,7 +5,7 @@
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
-        width: 1920px; height: 1080px; overflow: hidden;
+        width: 1080px; height: 1920px; overflow: hidden;
         background: #07070b;
         font-family: {{brand.fontFamily}}, "Segoe UI", system-ui, sans-serif;
         color: #fff;
@@ -13,47 +13,48 @@
       .scene {
         width: 100%; height: 100%; position: relative;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        text-align: center; padding: 120px;
+        text-align: center; padding: 130px 90px;
         background:
-          radial-gradient(circle at 50% 18%, {{brand.primaryColor}}66, transparent 55%),
-          linear-gradient(180deg, #07070b 0%, {{brand.secondaryColor}} 140%);
+          radial-gradient(circle at 50% 8%, {{brand.primaryColor}}66, transparent 50%),
+          linear-gradient(180deg, #07070b 30%, {{brand.secondaryColor}} 170%);
       }
       .badge {
-        display: inline-block; padding: 16px 36px; border-radius: 999px;
+        display: inline-block; padding: 18px 42px; border-radius: 999px;
         background: {{brand.accentColor}}; color: #07070b;
-        font-size: 28px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
-        margin-bottom: 56px;
+        font-size: 30px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase;
+        margin-bottom: 70px;
       }
       .headline {
-        font-size: 150px; font-weight: 900; line-height: 1; letter-spacing: -4px;
-        max-width: 1500px;
-        background: linear-gradient(135deg, #fff, {{brand.accentColor}});
+        font-size: 128px; font-weight: 900; line-height: 1.0; letter-spacing: -3px; max-width: 900px;
+        background: linear-gradient(120deg, #fff 35%, {{brand.accentColor}});
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       }
-      .body { font-size: 42px; line-height: 1.4; margin-top: 48px; max-width: 1200px; color: rgba(255,255,255,0.8); }
+      .body { font-size: 46px; line-height: 1.42; margin-top: 56px; max-width: 860px; color: rgba(255,255,255,0.82); }
       .cta {
-        margin-top: 80px; padding: 30px 64px; border-radius: 999px;
-        background: {{brand.primaryColor}}; color: #fff; font-size: 36px; font-weight: 800;
+        margin-top: 100px; padding: 38px 72px; border-radius: 999px;
+        background: linear-gradient(135deg, {{brand.primaryColor}}, {{brand.accentColor}});
+        color: #fff; font-size: 42px; font-weight: 800;
+        box-shadow: 0 24px 70px {{brand.primaryColor}}55;
       }
-      .footer { position: absolute; bottom: 90px; font-size: 30px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.65); }
-      .anim { opacity: 0; will-change: opacity, transform; }
+      .footer { position: absolute; bottom: 110px; font-size: 34px; font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,0.6); }
+      .anim { will-change: opacity, transform; }
     </style>
   </head>
   <body>
     <div class="scene" data-composition-id="product-launch" data-duration="6">
-      <div class="badge anim" data-from="0.2" data-to="0.9" data-slide="30">
+      <div class="badge anim" data-from="0.15" data-to="0.9" data-slide="28">
         New
       </div>
-      <h1 class="headline anim" data-from="0.5" data-to="1.5" data-slide="50">
+      <h1 class="headline anim" data-from="0.4" data-to="1.4" data-slide="44">
         {{user.headline}}
       </h1>
-      <p class="body anim" data-from="1.1" data-to="2.1" data-slide="34">
+      <p class="body anim" data-from="0.9" data-to="1.9" data-slide="32">
         {{user.bodyText}}
       </p>
-      <div class="cta anim" data-from="1.6" data-to="2.5" data-slide="24">
+      <div class="cta anim" data-from="1.4" data-to="2.2" data-slide="24">
         {{user.ctaText}}
       </div>
-      <div class="footer anim" data-from="2.0" data-to="2.8" data-slide="16">
+      <div class="footer anim" data-from="1.9" data-to="2.6" data-slide="14">
         {{brand.companyName}}
       </div>
     </div>
@@ -78,15 +79,14 @@
         }
         function render(t) {
           for (var i = 0; i < items.length; i++) {
-            var it = items[i];
-            var span = it.to - it.from;
+            var it = items[i],
+              span = it.to - it.from;
             var raw = span > 0 ? (t - it.from) / span : t >= it.from ? 1 : 0;
             var p = easeOut(clamp01(raw));
             it.el.style.opacity = String(p);
             it.el.style.transform = "translateY(" + (1 - p) * it.slide + "px)";
           }
         }
-        render(0);
         window.__hf = {
           duration: DURATION,
           seek: function (t) {
