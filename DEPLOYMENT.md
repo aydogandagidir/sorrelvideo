@@ -31,6 +31,11 @@ are automatic via GitHub Actions.
    for soft launch) and set env **`RENDERS_DIR=/data/renders`**. This persists
    rendered mp4s across deploys. (The app otherwise writes them next to the
    bundle at `/app/renders`, which is ephemeral.)
+6. (Recommended for production) **+ New → Database → Redis**. In the api service
+   **Variables → Reference**: link `REDIS_URL` from the Redis service. This moves
+   renders onto a durable BullMQ queue + in-process worker that survives restarts.
+   Without it the app still works — renders run inline and a pod restart
+   mid-render marks that project `failed` (auto-recovered on boot).
 
 ## 2. Stripe — products + webhook
 
@@ -118,6 +123,7 @@ minimum:
   `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR`
 - `SENTRY_DSN`, `VITE_SENTRY_DSN`, `LOGTAIL_SOURCE_TOKEN`
 - `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`)
+- `REDIS_URL` (recommended — durable render queue; omit to render inline)
 
 Trigger a redeploy from the Railway UI. The build takes ~10 minutes the
 first time (Chromium download dominates).
@@ -189,8 +195,10 @@ revert.
   (Sorrel'in case'i için kullanıcı doldursun; Stripe + AB kullanıcı varsa
   yasal şart).
 - Cookie banner (session cookie + Sentry cookies için).
-- Rate limit'i in-memory'den Redis'e taşı (multi-instance scaling için).
-- Render queue → BullMQ + Redis (pod restart sırasında render kaybını
-  önler). Tur 10'da planlanıyor.
+- Rate limit'i in-memory'den Redis'e taşı (`rate-limit-redis`, mevcut
+  `REDIS_URL`'i yeniden kullanır) — multi-instance scaling için.
+- Render queue (BullMQ + Redis) hazır: `REDIS_URL` set edilince dayanıklı kuyruk
+  + worker devreye girer (pod restart'ta render kaybını önler). Set edilmezse
+  render satır içi çalışır.
 - DB backup stratejisi — Railway Postgres Hobby plan günlük snapshot
   veriyor; production'da Pro plan + point-in-time recovery'ye geç.

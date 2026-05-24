@@ -41,6 +41,23 @@ describe("renderCompositionTemplate", () => {
     });
     expect(out).toBe("<p>{{user.unknown}}</p>");
   });
+
+  it("preserves quotes in brand.* values so CSS font-family survives", () => {
+    const out = renderCompositionTemplate(
+      "<style>font-family: {{brand.fontFamily}};</style>",
+      { "brand.fontFamily": "'Inter'" },
+    );
+    expect(out).toBe("<style>font-family: 'Inter';</style>");
+    expect(out).not.toContain("&#39;");
+  });
+
+  it("still markup-escapes brand.* values to prevent style/HTML breakout", () => {
+    const out = renderCompositionTemplate("<p>{{brand.companyName}}</p>", {
+      "brand.companyName": "</style><script>x</script>",
+    });
+    expect(out).not.toContain("<script>");
+    expect(out).toContain("&lt;script&gt;");
+  });
 });
 
 describe("resolveEntryFile", () => {

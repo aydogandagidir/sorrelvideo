@@ -2,6 +2,8 @@ import { initSentry, setupSentryErrorHandler } from "./lib/sentry";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
+import { closeRenderQueue, startRenderWorker } from "./lib/renderQueue";
+import { recoverStuckRenders } from "./lib/recoverStuckRenders";
 
 // Initialise Sentry (no-op without SENTRY_DSN), then wire its Express error
 // handler. Lazy-loaded so dev boots without the OpenTelemetry dependency graph.
@@ -37,7 +39,14 @@ if (Number.isNaN(port) || port <= 0) {
 
 await initBilling();
 
-app.listen(port, (err) => {
+// Boot the render worker before recovery so any jobs already persisted in Redis
+// start draining immediately; recovery then only resets true orphans (rows in
+// "rendering" with no live/pending job). Both are no-ops without REDIS_URL —
+// recovery still resets inline-mode orphans whose background render died.
+await startRenderWorker();
+await recoverStuckRenders();
+
+const server = app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -52,3 +61,14 @@ app.listen(port, (err) => {
     );
   }
 });
+
+// Graceful shutdown: stop accepting connections, then drain the render worker
+// so an in-flight render finishes (or is requeued) before the process exits.
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => {
+    logger.info({ signal }, "Shutting down");
+    server.close(() => {
+      void closeRenderQueue().finally(() => process.exit(0));
+    });
+  });
+}

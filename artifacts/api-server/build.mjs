@@ -68,6 +68,12 @@ async function buildAll() {
       // don't survive bundling. Keep it external; lib/sentry.ts loads it lazily
       // (only when SENTRY_DSN is set) so dev never needs it resolved.
       "@sentry/*",
+      // BullMQ loads Lua command scripts from its own dist/ at runtime; esbuild
+      // would inline the JS but not copy the .lua files, breaking Redis command
+      // registration. Keep it (and ioredis, which resolves dynamically) external
+      // so they resolve from artifacts/api-server/node_modules at runtime.
+      "bullmq",
+      "ioredis",
       "@google-cloud/*",
       "@google/*",
       "googleapis",

@@ -5,6 +5,7 @@ import {
   useAiSuggest,
   useCreateProject,
   useGetBrandKit,
+  useStartProjectRender,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ export default function StudioPage() {
   const [, setLocation] = useLocation();
   const { data: brandKit } = useGetBrandKit();
   const createProject = useCreateProject();
+  const startRender = useStartProjectRender();
   const aiSuggest = useAiSuggest();
 
   const [name, setName] = useState("Untitled Studio Project");
@@ -39,10 +41,15 @@ export default function StudioPage() {
   const [error, setError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<
+    "render_limit" | "premium_template" | "ai_limit"
+  >("ai_limit");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setIsSubmitting(true);
     try {
       const project = await createProject.mutateAsync({
         data: {
@@ -55,9 +62,36 @@ export default function StudioPage() {
           },
         },
       });
+      // Kick off the render, then jump to Projects (which polls it to "ready").
+      // Navigate only after the render call resolves so the card lands in
+      // "rendering", not "draft".
+      await startRender.mutateAsync({ id: project.id });
       setLocation(`/projects?focus=${project.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create project");
+      const anyErr = err as {
+        status?: number;
+        data?: { reason?: string; error?: string };
+        message?: string;
+      };
+      const errorMsg = anyErr.data?.error ?? anyErr.message ?? "";
+      // Render blocked by plan limits — show the upgrade modal in place. The
+      // draft is already saved and waiting on the Projects page.
+      if (anyErr.status === 403 && anyErr.data?.reason === "upgrade_required") {
+        setUpgradeReason(
+          errorMsg.toLowerCase().includes("template")
+            ? "premium_template"
+            : "render_limit",
+        );
+        setShowUpgrade(true);
+        return;
+      }
+      if (anyErr.status === 429) {
+        setError("Slow down a bit — try again in a minute.");
+        return;
+      }
+      setError(errorMsg || "Could not create or render project");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -77,27 +111,19 @@ export default function StudioPage() {
       // Surface upgrade_required as an upgrade modal; everything else as text.
       const anyErr = err as {
         status?: number;
-        response?: {
-          status?: number;
-          data?: { reason?: string; error?: string };
-        };
+        data?: { reason?: string; error?: string };
         message?: string;
       };
-      const status = anyErr.status ?? anyErr.response?.status;
-      const reason = anyErr.response?.data?.reason;
-      if (status === 403 && reason === "upgrade_required") {
+      if (anyErr.status === 403 && anyErr.data?.reason === "upgrade_required") {
+        setUpgradeReason("ai_limit");
         setShowUpgrade(true);
         return;
       }
-      if (status === 429) {
+      if (anyErr.status === 429) {
         setAiError("Slow down a bit — try again in a minute.");
         return;
       }
-      setAiError(
-        anyErr.response?.data?.error ??
-          anyErr.message ??
-          "AI suggestion failed",
-      );
+      setAiError(anyErr.data?.error ?? anyErr.message ?? "AI suggestion failed");
     }
   }
 
@@ -221,12 +247,12 @@ export default function StudioPage() {
                   type="submit"
                   size="lg"
                   className="w-full"
-                  disabled={createProject.isPending}
+                  disabled={isSubmitting}
                 >
-                  {createProject.isPending ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Creating project…
+                      Working…
                     </>
                   ) : (
                     <>
@@ -305,7 +331,7 @@ export default function StudioPage() {
       <UpgradeModal
         open={showUpgrade}
         onOpenChange={setShowUpgrade}
-        reason="ai_limit"
+        reason={upgradeReason}
       />
     </Layout>
   );

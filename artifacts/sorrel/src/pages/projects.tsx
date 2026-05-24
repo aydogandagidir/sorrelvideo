@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useSearch } from "wouter";
+import { cn } from "@/lib/utils";
 import { Layout } from "@/components/layout";
 import {
   useListProjects,
@@ -67,7 +69,13 @@ function useProjectPolling(projectId: number, active: boolean, intervalMs = 3000
   }, [active, projectId, intervalMs, queryClient]);
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({
+  project,
+  focused = false,
+}: {
+  project: Project;
+  focused?: boolean;
+}) {
   const queryClient = useQueryClient();
   const deleteProject = useDeleteProject();
   const renderMutation = useStartProjectRender();
@@ -80,6 +88,20 @@ function ProjectCard({ project }: { project: Project }) {
 
   // Poll while rendering
   useProjectPolling(project.id, isRendering);
+
+  // One-shot scroll + highlight when arriving from Studio with ?focus=<id>.
+  // The didFocus guard keeps the 3s poll-driven re-renders from re-triggering it.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const didFocus = useRef(false);
+  const [highlight, setHighlight] = useState(false);
+  useEffect(() => {
+    if (!focused || didFocus.current) return;
+    didFocus.current = true;
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlight(true);
+    const t = setTimeout(() => setHighlight(false), 2500);
+    return () => clearTimeout(t);
+  }, [focused]);
 
   const handleRender = () => {
     renderMutation.mutate(
@@ -120,7 +142,13 @@ function ProjectCard({ project }: { project: Project }) {
   const videoSrc = project.videoUrl ?? `/api/projects/${project.id}/video`;
 
   return (
-    <Card className="overflow-hidden transition-colors hover:border-primary/30 group">
+    <Card
+      ref={cardRef}
+      className={cn(
+        "overflow-hidden transition-all hover:border-primary/30 group",
+        highlight && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+      )}
+    >
       <CardContent className="p-0 flex items-stretch">
         {/* Thumbnail / status indicator */}
         <div className="w-40 bg-muted shrink-0 flex flex-col items-center justify-center border-r relative overflow-hidden">
@@ -265,6 +293,7 @@ export default function Projects() {
   const queryClient = useQueryClient();
   const { data: projects, isLoading, isError } = useListProjects();
   const createProject = useCreateProject();
+  const focusId = Number(new URLSearchParams(useSearch()).get("focus")) || null;
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -373,7 +402,13 @@ export default function Projects() {
             </Card>
           ))
         ) : projects?.length ? (
-          projects.map((project) => <ProjectCard key={project.id} project={project as Project} />)
+          projects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project as Project}
+              focused={project.id === focusId}
+            />
+          ))
         ) : (
           <div className="text-center py-16 border rounded-xl border-dashed">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
