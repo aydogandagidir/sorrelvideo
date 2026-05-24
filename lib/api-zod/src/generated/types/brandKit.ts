@@ -5,7 +5,7 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { BrandKitBrandVoice } from "./brandKitBrandVoice";
+import type { BrandKitBrandVoice } from './brandKitBrandVoice';
 
 export interface BrandKit {
   id: number;

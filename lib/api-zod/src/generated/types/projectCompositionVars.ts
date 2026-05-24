@@ -9,4 +9,4 @@
 /**
  * Studio placeholder values keyed by `user.*` / `brand.*`. Optional.
  */
-export type ProjectCompositionVars = { [key: string]: string } | null;
+export type ProjectCompositionVars = {[key: string]: string} | null;

@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BrandKitInputBrandVoice =
-  (typeof BrandKitInputBrandVoice)[keyof typeof BrandKitInputBrandVoice];
+export type BrandKitInputBrandVoice = typeof BrandKitInputBrandVoice[keyof typeof BrandKitInputBrandVoice];
+
 
 export const BrandKitInputBrandVoice = {
-  professional: "professional",
-  playful: "playful",
-  bold: "bold",
-  minimal: "minimal",
+  professional: 'professional',
+  playful: 'playful',
+  bold: 'bold',
+  minimal: 'minimal',
 } as const;

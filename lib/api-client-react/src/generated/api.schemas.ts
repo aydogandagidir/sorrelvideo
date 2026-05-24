@@ -27,37 +27,37 @@ export interface ErrorEnvelope {
 
 export interface SignupRequest {
   /**
-   * @minLength 3
-   * @maxLength 254
-   */
+     * @minLength 3
+     * @maxLength 254
+     */
   email: string;
   /**
-   * @minLength 8
-   * @maxLength 256
-   */
+     * @minLength 8
+     * @maxLength 256
+     */
   password: string;
   /**
-   * @maxLength 100
-   * @nullable
-   */
+     * @maxLength 100
+     * @nullable
+     */
   firstName?: string | null;
   /**
-   * @maxLength 100
-   * @nullable
-   */
+     * @maxLength 100
+     * @nullable
+     */
   lastName?: string | null;
 }
 
 export interface LoginRequest {
   /**
-   * @minLength 3
-   * @maxLength 254
-   */
+     * @minLength 3
+     * @maxLength 254
+     */
   email: string;
   /**
-   * @minLength 1
-   * @maxLength 256
-   */
+     * @minLength 1
+     * @maxLength 256
+     */
   password: string;
 }
 
@@ -73,30 +73,30 @@ export type GenericSuccess = typeof GenericSuccessValue;
 
 export interface ForgotPasswordRequest {
   /**
-   * @minLength 3
-   * @maxLength 254
-   */
+     * @minLength 3
+     * @maxLength 254
+     */
   email: string;
 }
 
 export interface ResetPasswordRequest {
   /**
-   * @minLength 8
-   * @maxLength 256
-   */
+     * @minLength 8
+     * @maxLength 256
+     */
   token: string;
   /**
-   * @minLength 8
-   * @maxLength 256
-   */
+     * @minLength 8
+     * @maxLength 256
+     */
   password: string;
 }
 
 export interface ResendVerificationRequest {
   /**
-   * @minLength 3
-   * @maxLength 254
-   */
+     * @minLength 3
+     * @maxLength 254
+     */
   email: string;
 }
 
@@ -130,19 +130,20 @@ export interface TemplateInput {
   tags?: string[];
 }
 
-export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus];
+export type ProjectStatus = typeof ProjectStatus[keyof typeof ProjectStatus];
+
 
 export const ProjectStatus = {
-  draft: "draft",
-  rendering: "rendering",
-  ready: "ready",
-  failed: "failed",
+  draft: 'draft',
+  rendering: 'rendering',
+  ready: 'ready',
+  failed: 'failed',
 } as const;
 
 /**
  * Studio placeholder values keyed by `user.*` / `brand.*`. Optional.
  */
-export type ProjectCompositionVars = { [key: string]: string } | null;
+export type ProjectCompositionVars = {[key: string]: string} | null;
 
 export interface Project {
   id: number;
@@ -167,7 +168,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export type ProjectInputCompositionVars = { [key: string]: string };
+export type ProjectInputCompositionVars = {[key: string]: string};
 
 export interface ProjectInput {
   name: string;
@@ -177,17 +178,17 @@ export interface ProjectInput {
   compositionVars?: ProjectInputCompositionVars;
 }
 
-export type ProjectUpdateStatus =
-  (typeof ProjectUpdateStatus)[keyof typeof ProjectUpdateStatus];
+export type ProjectUpdateStatus = typeof ProjectUpdateStatus[keyof typeof ProjectUpdateStatus];
+
 
 export const ProjectUpdateStatus = {
-  draft: "draft",
-  rendering: "rendering",
-  ready: "ready",
-  failed: "failed",
+  draft: 'draft',
+  rendering: 'rendering',
+  ready: 'ready',
+  failed: 'failed',
 } as const;
 
-export type ProjectUpdateCompositionVars = { [key: string]: string };
+export type ProjectUpdateCompositionVars = {[key: string]: string};
 
 export interface ProjectUpdate {
   name?: string;
@@ -201,15 +202,14 @@ export interface ProjectUpdate {
 /**
  * @nullable
  */
-export type BrandKitBrandVoice =
-  | (typeof BrandKitBrandVoice)[keyof typeof BrandKitBrandVoice]
-  | null;
+export type BrandKitBrandVoice = typeof BrandKitBrandVoice[keyof typeof BrandKitBrandVoice] | null;
+
 
 export const BrandKitBrandVoice = {
-  professional: "professional",
-  playful: "playful",
-  bold: "bold",
-  minimal: "minimal",
+  professional: 'professional',
+  playful: 'playful',
+  bold: 'bold',
+  minimal: 'minimal',
 } as const;
 
 export interface BrandKit {
@@ -230,14 +230,14 @@ export interface BrandKit {
   updatedAt: string;
 }
 
-export type BrandKitInputBrandVoice =
-  (typeof BrandKitInputBrandVoice)[keyof typeof BrandKitInputBrandVoice];
+export type BrandKitInputBrandVoice = typeof BrandKitInputBrandVoice[keyof typeof BrandKitInputBrandVoice];
+
 
 export const BrandKitInputBrandVoice = {
-  professional: "professional",
-  playful: "playful",
-  bold: "bold",
-  minimal: "minimal",
+  professional: 'professional',
+  playful: 'playful',
+  bold: 'bold',
+  minimal: 'minimal',
 } as const;
 
 export interface BrandKitInput {
@@ -252,12 +252,13 @@ export interface BrandKitInput {
   voiceDescription?: string;
 }
 
-export type ModuleStatus = (typeof ModuleStatus)[keyof typeof ModuleStatus];
+export type ModuleStatus = typeof ModuleStatus[keyof typeof ModuleStatus];
+
 
 export const ModuleStatus = {
-  active: "active",
-  coming_soon: "coming_soon",
-  beta: "beta",
+  active: 'active',
+  coming_soon: 'coming_soon',
+  beta: 'beta',
 } as const;
 
 export interface Module {
@@ -270,12 +271,12 @@ export interface Module {
   features?: string[];
 }
 
-export type BillingInfoPlan =
-  (typeof BillingInfoPlan)[keyof typeof BillingInfoPlan];
+export type BillingInfoPlan = typeof BillingInfoPlan[keyof typeof BillingInfoPlan];
+
 
 export const BillingInfoPlan = {
-  free: "free",
-  pro: "pro",
+  free: 'free',
+  pro: 'pro',
 } as const;
 
 export interface BillingInfo {
@@ -296,9 +297,9 @@ export interface BillingInfo {
 
 export interface AiSuggestRequest {
   /**
-   * @minLength 3
-   * @maxLength 500
-   */
+     * @minLength 3
+     * @maxLength 500
+     */
   prompt: string;
 }
 
@@ -339,19 +340,19 @@ export interface PricesResponse {
 
 export interface UploadUrlRequest {
   /**
-   * Original file name.
-   * @minLength 1
-   */
+     * Original file name.
+     * @minLength 1
+     */
   name: string;
   /**
-   * File size in bytes.
-   * @minimum 1
-   */
+     * File size in bytes.
+     * @minimum 1
+     */
   size: number;
   /**
-   * MIME type of the file (e.g. image/jpeg).
-   * @minLength 1
-   */
+     * MIME type of the file (e.g. image/jpeg).
+     * @minLength 1
+     */
   contentType: string;
 }
 
@@ -377,14 +378,15 @@ export interface PlatformStats {
 export type AuthorizationSessionHeaderParameter = string;
 
 export type ConsumeEmailVerificationParams = {
-  token: string;
+token: string;
 };
 
 export type BeginBrowserLoginParams = {
-  returnTo?: string;
+returnTo?: string;
 };
 
 export type ListTemplatesParams = {
-  category?: string;
-  module?: string;
+category?: string;
+module?: string;
 };
+

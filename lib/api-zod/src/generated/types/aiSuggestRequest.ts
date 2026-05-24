@@ -8,8 +8,8 @@
 
 export interface AiSuggestRequest {
   /**
-   * @minLength 3
-   * @maxLength 500
-   */
+     * @minLength 3
+     * @maxLength 500
+     */
   prompt: string;
 }
