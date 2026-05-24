@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Keep GitHub Actions current (also avoids runner/Node deprecations).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]
+
+  # npm / pnpm workspace dependencies. Minor + patch are grouped to cut noise;
+  # majors come as individual PRs for careful review.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]

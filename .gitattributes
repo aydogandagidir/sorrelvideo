@@ -1,0 +1,21 @@
+# Normalize line endings to LF on checkout/commit (kills the CRLF warnings on
+# Windows and keeps diffs clean across platforms).
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.svg   text
+*.woff  binary
+*.woff2 binary
+*.mp4   binary
+*.webm  binary
+*.pdf   binary
+
+# Generated / lockfiles — keep but mark for clearer diffs.
+pnpm-lock.yaml linguist-generated=true
+lib/api-zod/src/generated/**        linguist-generated=true
+lib/api-client-react/src/generated/** linguist-generated=true
