@@ -4,27 +4,26 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 
+// Dev/preview server port. Defaults to 5174 when unset (e.g. during `vite build`,
+// where the server port is irrelevant). An explicitly-set invalid value still errors.
 const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
+const port = rawPort ? Number(rawPort) : 5174;
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
+// Vite base path. Defaults to "/" for local dev. Git Bash (MSYS) rewrites a
+// lone "/" env value into the Git install path (e.g. "C:/Program Files/Git/"),
+// which breaks asset URLs — detect that and reset to "/".
+function resolveBasePath(): string {
+  const raw = process.env.BASE_PATH;
+  if (!raw || raw === "/") return "/";
+  if (/program files|:[\\/]|[\\/]git[\\/]?$/i.test(raw)) return "/";
+  return raw;
 }
+
+const basePath = resolveBasePath();
 
 export default defineConfig({
   base: basePath,

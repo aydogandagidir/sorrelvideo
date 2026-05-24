@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Express } from "express";
@@ -101,10 +102,18 @@ if (process.env.NODE_ENV === "production") {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const publicDir = path.resolve(here, "../public");
   app.use(express.static(publicDir, { maxAge: "1h", index: false }));
+  const indexHtmlPath = path.join(publicDir, "index.html");
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/api")) return next();
-    res.sendFile(path.join(publicDir, "index.html"));
+    // Read + send manually instead of res.sendFile: Express 5's send() rejects
+    // absolute paths containing spaces (the repo can live under ".../Artificial
+    // Inteligence/...") with a spurious NotFoundError — same workaround as the
+    // video stream in routes/projects.ts.
+    fs.readFile(indexHtmlPath, (err, html) => {
+      if (err) return next(err);
+      res.type("html").send(html);
+    });
   });
 }
 

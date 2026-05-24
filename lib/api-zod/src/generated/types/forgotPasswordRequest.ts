@@ -8,8 +8,8 @@
 
 export interface ForgotPasswordRequest {
   /**
-   * @minLength 3
-   * @maxLength 254
-   */
+     * @minLength 3
+     * @maxLength 254
+     */
   email: string;
 }

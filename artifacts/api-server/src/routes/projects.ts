@@ -1,6 +1,6 @@
 import fs from "fs";
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db, projectsTable, templatesTable, usersTable } from "@workspace/db";
 import {
   ListProjectsResponse,
@@ -13,10 +13,10 @@ import {
   DeleteProjectParams,
 } from "@workspace/api-zod";
 import {
-  startRender,
   renderFileExists,
   getRenderFilePath,
 } from "../services/renderService";
+import { enqueueRender } from "../lib/renderQueue";
 import {
   checkAndIncrementRenderCount,
   getUserPlan,
@@ -193,12 +193,8 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
     return;
   }
 
-  if (project.status === "rendering") {
-    res.status(409).json({ error: "Render already in progress" });
-    return;
-  }
-
-  // Check premium template access (pro users only)
+  // Check premium template access (pro users only) — read-only, so a 403 here
+  // costs nothing and stays before the render claim.
   if (project.templateId) {
     const [template] = await db
       .select()
@@ -220,10 +216,29 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
     }
   }
 
-  // Check + increment monthly render count (gated for free plan)
+  // Atomically claim the render. The conditional UPDATE is the concurrency guard:
+  // only one request can flip a project out of a non-rendering state, so two
+  // concurrent calls can't both start a render. 0 rows → already rendering.
+  const [claimed] = await db
+    .update(projectsTable)
+    .set({ status: "rendering", renderError: null })
+    .where(and(eq(projectsTable.id, id), ne(projectsTable.status, "rendering")))
+    .returning();
+
+  if (!claimed) {
+    res.status(409).json({ error: "Render already in progress" });
+    return;
+  }
+
+  // Quota AFTER the claim so the race loser never burns a render. On rejection,
+  // release the claim back to the prior status (a quota block isn't a failure).
   try {
     await checkAndIncrementRenderCount(req.user.id);
   } catch (err) {
+    await db
+      .update(projectsTable)
+      .set({ status: project.status })
+      .where(eq(projectsTable.id, id));
     const e = err as { reason?: string; message?: string };
     if (e.reason === "upgrade_required") {
       res.status(403).json({
@@ -235,23 +250,21 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
     throw err;
   }
 
-  // Set status synchronously so the 202 response always reflects "rendering"
-  await db
-    .update(projectsTable)
-    .set({ status: "rendering", renderError: null })
-    .where(eq(projectsTable.id, id));
+  // Durable enqueue when REDIS_URL is set; inline fire-and-forget otherwise.
+  // If enqueue fails, release the claim so the project isn't stranded in "rendering".
+  try {
+    await enqueueRender(id, project.module, project.templateId);
+  } catch (err) {
+    await db
+      .update(projectsTable)
+      .set({ status: project.status })
+      .where(eq(projectsTable.id, id));
+    req.log.error({ projectId: id, err }, "Failed to enqueue render");
+    res.status(503).json({ error: "Could not start render. Please try again." });
+    return;
+  }
 
-  // Fire-and-forget: startRender picks up from "rendering" and updates to ready/failed
-  startRender(id, project.module, project.templateId).catch((err) => {
-    req.log.error({ projectId: id, err }, "Unhandled render error");
-  });
-
-  const [updated] = await db
-    .select()
-    .from(projectsTable)
-    .where(eq(projectsTable.id, id));
-
-  res.status(202).json(GetProjectResponse.parse(serializeDates(updated)));
+  res.status(202).json(GetProjectResponse.parse(serializeDates(claimed)));
 });
 
 // GET /api/projects/:id/video — stream the rendered mp4 file

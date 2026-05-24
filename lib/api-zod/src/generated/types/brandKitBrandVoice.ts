@@ -9,13 +9,12 @@
 /**
  * @nullable
  */
-export type BrandKitBrandVoice =
-  | (typeof BrandKitBrandVoice)[keyof typeof BrandKitBrandVoice]
-  | null;
+export type BrandKitBrandVoice = typeof BrandKitBrandVoice[keyof typeof BrandKitBrandVoice] | null;
+
 
 export const BrandKitBrandVoice = {
-  professional: "professional",
-  playful: "playful",
-  bold: "bold",
-  minimal: "minimal",
+  professional: 'professional',
+  playful: 'playful',
+  bold: 'bold',
+  minimal: 'minimal',
 } as const;

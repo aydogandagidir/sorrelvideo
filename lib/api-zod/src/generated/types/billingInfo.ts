@@ -5,7 +5,7 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { BillingInfoPlan } from "./billingInfoPlan";
+import type { BillingInfoPlan } from './billingInfoPlan';
 
 export interface BillingInfo {
   plan: BillingInfoPlan;

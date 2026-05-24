@@ -7,5 +7,5 @@
  */
 
 export type ConsumeEmailVerificationParams = {
-  token: string;
+token: string;
 };

@@ -61,3 +61,7 @@ core/
 # Rendered output (mp4 + per-render composition.html), any location.
 **/renders/
 .tmp-frames/
+
+# Production SPA bundle staged for the api-server to serve (copied from
+# artifacts/sorrel/dist/public by the Dockerfile / single-port local serve).
+artifacts/api-server/public/

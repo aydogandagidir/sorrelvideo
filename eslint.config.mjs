@@ -24,6 +24,7 @@ export default tseslint.config(
       "lib/api-client-react/src/generated/**",
       "artifacts/mockup-sandbox/src/.generated/**",
       "artifacts/api-server/renders/**",
+      "artifacts/api-server/public/**",
       "artifacts/api-server/src/compositions/**",
       "eslint.config.mjs",
     ],

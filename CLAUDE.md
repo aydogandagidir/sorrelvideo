@@ -30,6 +30,9 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | Var                                                             | Required by                             | Purpose                                                                                          |
 | --------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `DATABASE_URL`                                                  | api-server, db push                     | Postgres connection string                                                                       |
+| `REDIS_URL`                                                     | api-server (optional)                   | Enables the durable BullMQ render queue + worker. Unset → renders run inline (fire-and-forget).   |
+| `RENDER_CONCURRENCY`                                            | api-server (optional)                   | Render worker concurrency. Defaults to `1` (Chrome + FFmpeg is heavy).                            |
+| `RENDER_JOB_ATTEMPTS`                                           | api-server (optional)                   | Render job retry attempts. Defaults to `1` (render failures are usually deterministic).           |
 | `SESSION_SECRET`                                                | api-server                              | Session signing (reserved for future use; currently unused but expected to be set)               |
 | `PORT`                                                          | api-server, sorrel, mockup-sandbox      | HTTP listen port (each process needs its own)                                                    |
 | `BASE_PATH`                                                     | sorrel, mockup-sandbox                  | Vite base path (use `/` locally)                                                                 |
@@ -90,9 +93,15 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 - **Multi-tenant isolation invariant**: every persisted row is scoped by `userId`.
   Routes return 401 (unauthenticated), 403 (authenticated but not the owner),
   or 404 (row does not exist).
-- **Render is fire-and-forget**: `POST /api/projects/:id/render` flips status to
-  `rendering` and returns 202 immediately. The job runs in the background; the
-  frontend polls every 3 seconds. State machine: `draft|failed → rendering → ready|failed`.
+- **Durable render queue with inline fallback**: `POST /api/projects/:id/render`
+  atomically claims the project (conditional `UPDATE ... WHERE status <> 'rendering'`
+  — the concurrency guard, 409 to the loser), flips status to `rendering`, and
+  returns 202 immediately. When `REDIS_URL` is set the job is enqueued on a BullMQ
+  queue and consumed by an in-process worker that survives restarts; when unset it
+  runs inline (fire-and-forget), so local dev needs no Redis. The frontend polls
+  every 3 seconds. State machine: `draft|failed|ready → rendering → ready|failed`.
+  On boot, `recoverStuckRenders()` resets orphaned `rendering` rows (no live job)
+  back to `failed`.
 - **HTML compositions as templates**: each template is a self-contained HTML
   file in `artifacts/api-server/src/compositions/`. Chrome (Puppeteer + BeginFrame)
   rasterizes it and FFmpeg encodes the frames to MP4.
@@ -238,9 +247,15 @@ stored; we only need the identity for sign-in.
 
 ## Render pipeline
 
-- Endpoint: `POST /api/projects/:id/render` flips status, returns 202
-- Service: `services/renderService.ts` runs the Hyperframes producer in the
-  background
+- Endpoint: `POST /api/projects/:id/render` atomically claims the project
+  (`UPDATE ... WHERE status <> 'rendering' RETURNING` — one winner, else 409),
+  checks quota, enqueues, returns 202
+- Trigger: `enqueueRender` in `lib/renderQueue.ts` — enqueues a BullMQ job when
+  `REDIS_URL` is set, else runs `executeRender` inline (fire-and-forget)
+- Worker + recovery: `startRenderWorker()` (in-process; no-op without Redis)
+  consumes jobs; `recoverStuckRenders()` on boot resets orphaned `rendering` rows
+- Service: `executeRender` in `services/renderService.ts` runs the Hyperframes
+  producer (the work half)
 - Output: `artifacts/api-server/renders/<projectId>/output.mp4`
 - Streaming: `GET /api/projects/:id/video` ranges over the file
 - Polling: frontend re-queries project status every 3 seconds
@@ -264,6 +279,12 @@ stored; we only need the identity for sign-in.
   `@webgpu/types` — these are added to the api-server tsconfig. Do not remove them
 - Puppeteer is in `onlyBuiltDependencies` in `pnpm-workspace.yaml` — required
   for the Hyperframes render pipeline
+- BullMQ rejects purely-numeric custom job ids ("Custom Id cannot be integers").
+  The render queue keys jobs as `render-<projectId>` via `jobIdFor()` in
+  `renderQueue.ts` — keep render job ids non-numeric
+- The render producer reads its core runtime from `<cwd>/core/dist`. The Docker
+  image materializes it; for local dev run the api-server from the repo root (so
+  cwd has `core/dist`) — `cp -rL artifacts/api-server/node_modules/@hyperframes/core/dist core/dist`
 - CORS is permissive in dev (`origin: true`); in production it enforces
   `ALLOWED_ORIGINS` strictly
 - Drizzle returns `Date` objects; before passing rows through Zod parsing,
@@ -394,10 +415,11 @@ disaster to write.
 
 Tracked here so it does not get rediscovered each time:
 
-1. **Render queue (Tur 10)**: BullMQ + Redis. The current
-   `setImmediate` fire-and-forget loses jobs on pod restart — fine for
-   soft launch, not for paid users. Pair with `rate-limit-redis` to make
-   the auth limiters multi-instance safe.
+1. **Multi-instance auth limiters**: the durable render queue (BullMQ + Redis)
+   has landed (see Architecture decisions / Render pipeline). The remaining Redis
+   follow-on is backing the in-memory `express-rate-limit` auth limiters with
+   `rate-limit-redis` (reusing `REDIS_URL`) so they stay correct across more than
+   one instance.
 2. **Legal pages**: static Terms / Privacy / cookie banner. Stripe +
    any EU user makes this mandatory before broad launch.
 3. **End-to-end Playwright smoke test**: signup → Studio → render →

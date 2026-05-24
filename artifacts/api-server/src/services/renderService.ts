@@ -89,21 +89,32 @@ async function setProjectStatus(
     .where(eq(projectsTable.id, projectId));
 }
 
-function escapeHtml(value: string): string {
+/**
+ * Escape only the markup-dangerous characters. Safe for HTML text content and
+ * for values injected into `<style>`/CSS: it prevents `</style>`/`</script>`
+ * breakout and HTML injection while leaving quotes intact, so CSS like
+ * `font-family: 'Inter'` survives instead of becoming `font-family: &#39;Inter&#39;`.
+ */
+function escapeMarkup(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll(">", "&gt;");
+}
+
+/** Full HTML escaping incl. quotes — for user free-text rendered as HTML content. */
+function escapeHtml(value: string): string {
+  return escapeMarkup(value).replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
 /**
  * Apply `{{key}}` substitutions to the composition source.
  *
- * - Brand values (companyName, primaryColor, …) are HTML-escaped.
- * - User text values (headline, bodyText, ctaText) are escaped and `\n`
- *   is rendered as `<br/>` for the headline / body fields.
+ * - `user.*` values (headline, bodyText, ctaText) are free text rendered into
+ *   HTML content: fully escaped (incl. quotes) and `\n` becomes `<br/>`.
+ * - `brand.*` values land in CSS (font-family, colors) or HTML text. They are
+ *   markup-escaped only (`& < >`) so CSS quotes survive — escaping `'` to
+ *   `&#39;` here previously broke `font-family: 'Inter'` at render time.
  * - Unknown placeholders are left intact — keeps the HTML inspectable
  *   when debugging.
  */
@@ -116,10 +127,10 @@ export function renderCompositionTemplate(
     (match, key: string) => {
       const value = vars[key];
       if (value === undefined) return match;
-      const escaped = escapeHtml(value);
-      return key.startsWith("user.")
-        ? escaped.replaceAll("\n", "<br/>")
-        : escaped;
+      if (key.startsWith("user.")) {
+        return escapeHtml(value).replaceAll("\n", "<br/>");
+      }
+      return escapeMarkup(value);
     },
   );
 }
@@ -207,10 +218,11 @@ async function prepareCompositionFor(project: {
 }
 
 /**
- * Kick off a Hyperframes render job in the background.
- * Sets project status: draft/failed → rendering → ready/failed.
+ * Execute a Hyperframes render to completion (the "work" half of the pipeline).
+ * Called either inline (no Redis) or by the BullMQ worker (see renderQueue.ts).
+ * Sets project status: → rendering → ready/failed.
  */
-export async function startRender(
+export async function executeRender(
   projectId: number,
   module: string,
   _templateId?: number | null,
