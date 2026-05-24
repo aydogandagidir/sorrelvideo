@@ -144,7 +144,20 @@ export async function checkAndIncrementRenderCount(
       throw new Error("User not found");
     }
 
-    const plan = await getUserPlan(row.stripe_customer_id);
+    // Plan check on the SAME locked client (not getUserPlan/db) — grabbing a
+    // second pool connection while holding this FOR UPDATE transaction exhausts
+    // the pool and deadlocks under concurrency, which hung the CI integration
+    // tests (the txn never commits, so its row lock blocks the next truncate).
+    const planCheck = row.stripe_customer_id
+      ? await client.query(
+          `SELECT 1 FROM stripe_subscriptions
+            WHERE customer_id = $1 AND status IN ('active', 'trialing')
+            LIMIT 1`,
+          [row.stripe_customer_id],
+        )
+      : null;
+    const plan: "free" | "pro" =
+      planCheck && planCheck.rows.length > 0 ? "pro" : "free";
 
     if (plan === "pro") {
       // Pro users have unlimited renders; do not increment render_count so that
@@ -217,7 +230,20 @@ export async function checkAndIncrementAiCount(userId: string): Promise<void> {
       throw new Error("User not found");
     }
 
-    const plan = await getUserPlan(row.stripe_customer_id);
+    // Plan check on the SAME locked client (not getUserPlan/db) — grabbing a
+    // second pool connection while holding this FOR UPDATE transaction exhausts
+    // the pool and deadlocks under concurrency, which hung the CI integration
+    // tests (the txn never commits, so its row lock blocks the next truncate).
+    const planCheck = row.stripe_customer_id
+      ? await client.query(
+          `SELECT 1 FROM stripe_subscriptions
+            WHERE customer_id = $1 AND status IN ('active', 'trialing')
+            LIMIT 1`,
+          [row.stripe_customer_id],
+        )
+      : null;
+    const plan: "free" | "pro" =
+      planCheck && planCheck.rows.length > 0 ? "pro" : "free";
 
     if (plan === "pro") {
       // Pro: unlimited AI suggests; don't bump the counter.
