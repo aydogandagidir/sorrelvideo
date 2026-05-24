@@ -27,6 +27,9 @@ env:
   # Skip the Chromium download during pnpm install — render tests are skipped
   # in CI for now, so we don't need a browser binary.
   PUPPETEER_SKIP_DOWNLOAD: "true"
+  # Opt the bundled JS actions (checkout / setup-node / pnpm) into Node 24 ahead
+  # of GitHub forcing it (Jun 2026); silences the Node 20 deprecation warning.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   validate:
