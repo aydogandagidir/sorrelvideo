@@ -18,3 +18,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # orval generates the committed API client + Zod code (lib/api-client-react,
+      # lib/api-zod). Auto-bumping it makes those files drift, which fails the
+      # "codegen up to date" CI check — and Dependabot can't run codegen to fix
+      # it. Upgrade orval deliberately instead: bump it, run
+      # `pnpm --filter @workspace/api-spec run codegen`, and commit together.
+      - dependency-name: "orval"
