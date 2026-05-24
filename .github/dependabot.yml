@@ -30,3 +30,9 @@ updates:
       # the component is deliberately migrated.
       - dependency-name: "react-day-picker"
         update-types: ["version-update:semver-major"]
+      # react-resizable-panels v4 drops the `PanelGroup` / `PanelResizeHandle`
+      # named exports the shadcn `resizable.tsx` wrapper relies on, so a major
+      # bump fails typecheck in both sorrel and mockup-sandbox. Allow v2.x
+      # patches but block majors until the component is deliberately migrated.
+      - dependency-name: "react-resizable-panels"
+        update-types: ["version-update:semver-major"]
