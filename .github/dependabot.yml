@@ -25,3 +25,8 @@ updates:
       # it. Upgrade orval deliberately instead: bump it, run
       # `pnpm --filter @workspace/api-spec run codegen`, and commit together.
       - dependency-name: "orval"
+      # react-day-picker v10 is a breaking major that doesn't type-check against
+      # the shadcn calendar component. Allow v9.x patches but block majors until
+      # the component is deliberately migrated.
+      - dependency-name: "react-day-picker"
+        update-types: ["version-update:semver-major"]
