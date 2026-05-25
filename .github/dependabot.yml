@@ -36,3 +36,8 @@ updates:
       # patches but block majors until the component is deliberately migrated.
       - dependency-name: "react-resizable-panels"
         update-types: ["version-update:semver-major"]
+      # lucide-react v1 removes the brand icons (e.g. Github, Google) that
+      # oauth-buttons.tsx imports, so a major bump fails sorrel's typecheck.
+      # Allow v0.x updates but block majors until the icons are migrated.
+      - dependency-name: "lucide-react"
+        update-types: ["version-update:semver-major"]
