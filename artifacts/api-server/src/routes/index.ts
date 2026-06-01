@@ -10,6 +10,7 @@ import billingRouter from "./billing";
 import storageRouter from "./storage";
 import aiRouter from "./ai";
 import compositionsRouter from "./compositions";
+import studioRouter from "./studio";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(billingRouter);
 router.use(storageRouter);
 router.use(aiRouter);
 router.use(compositionsRouter);
+router.use(studioRouter);
 
 export default router;
