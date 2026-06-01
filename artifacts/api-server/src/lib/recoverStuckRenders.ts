@@ -30,8 +30,14 @@ export async function recoverStuckRenders(): Promise<void> {
 
   const queueOn = isQueueEnabled();
 
+  // Lambda renders survive a restart (they run in AWS); the progress poller
+  // reconciles them via getRenderProgress. Never reset a project/job whose
+  // render is live on Lambda, or we'd kill a paid execution.
+  const lambdaProjectIds = await activeLambdaProjectIds();
+
   let reset = 0;
   for (const { id } of stuck) {
+    if (lambdaProjectIds.has(id)) continue;
     if (queueOn && (await hasPendingJob(id))) continue;
     await db
       .update(projectsTable)
@@ -44,7 +50,7 @@ export async function recoverStuckRenders(): Promise<void> {
 
   if (reset > 0) logger.info({ reset }, "Reset stuck renders to failed");
 
-  await recoverStuckRenderJobs(queueOn);
+  await recoverStuckRenderJobs(queueOn, lambdaProjectIds);
 }
 
 /**
@@ -53,7 +59,10 @@ export async function recoverStuckRenders(): Promise<void> {
  * process → mark it `failed`. The `status IN (...)` guard on the UPDATE avoids
  * clobbering a job that finished between the SELECT and the UPDATE.
  */
-async function recoverStuckRenderJobs(queueOn: boolean): Promise<void> {
+async function recoverStuckRenderJobs(
+  queueOn: boolean,
+  lambdaProjectIds: Set<number>,
+): Promise<void> {
   let stuck: { id: string; projectId: number }[];
   try {
     stuck = await db
@@ -69,6 +78,7 @@ async function recoverStuckRenderJobs(queueOn: boolean): Promise<void> {
 
   let reset = 0;
   for (const { id, projectId } of stuck) {
+    if (lambdaProjectIds.has(projectId)) continue;
     if (queueOn && (await hasPendingJob(projectId))) continue;
     await db
       .update(renderJobsTable)
@@ -83,4 +93,23 @@ async function recoverStuckRenderJobs(queueOn: boolean): Promise<void> {
   }
 
   if (reset > 0) logger.info({ reset }, "Reset stuck render jobs to failed");
+}
+
+/** Project ids with a render running on Lambda — the poller owns their lifecycle. */
+async function activeLambdaProjectIds(): Promise<Set<number>> {
+  try {
+    const live = await db
+      .select({ projectId: renderJobsTable.projectId })
+      .from(renderJobsTable)
+      .where(
+        and(
+          eq(renderJobsTable.backend, "lambda"),
+          eq(renderJobsTable.status, "rendering"),
+        ),
+      );
+    return new Set(live.map((r) => r.projectId));
+  } catch (err) {
+    logger.warn({ err }, "Active-lambda-jobs query failed");
+    return new Set();
+  }
 }

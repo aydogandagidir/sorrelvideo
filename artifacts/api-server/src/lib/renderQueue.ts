@@ -2,6 +2,15 @@ import type { Queue, Worker } from "bullmq";
 import type { Redis } from "ioredis";
 import { logger } from "./logger";
 import { executeRender } from "../services/renderService";
+import { selectBackend } from "./renderBackend";
+import {
+  dispatchLambdaRender,
+  LambdaDispatchError,
+} from "./renderBackends/lambdaBackend";
+import { resolveSettings } from "../services/renderSettingsService";
+import { getJobById } from "../services/renderJobsService";
+import { db, projectsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 /**
  * Durable render queue (BullMQ + Redis) with a graceful inline fallback.
@@ -50,7 +59,9 @@ async function getConnection(): Promise<Redis> {
   connection = new IORedis(process.env.REDIS_URL as string, {
     maxRetriesPerRequest: null,
   });
-  connection.on("error", (err) => logger.error({ err }, "Redis connection error"));
+  connection.on("error", (err) =>
+    logger.error({ err }, "Redis connection error"),
+  );
   return connection;
 }
 
@@ -65,16 +76,93 @@ export async function getRenderQueue(): Promise<Queue<RenderJobData>> {
 }
 
 /**
- * Trigger a render. The ONE function routes should call. Enqueues a durable job
- * when Redis is configured; otherwise runs inline (fire-and-forget), preserving
- * the original 202-then-background behavior.
+ * Resolve the userId + gated render settings for a Lambda dispatch. Reads the
+ * ledger row first (its `config` is the exact snapshot the route gated, and it
+ * carries `userId`); if the row is somehow missing, falls back to the project's
+ * own `userId` + `renderSettings` columns. `resolveSettings` coerces either
+ * source into a complete, valid `RenderSettings` (null → defaults).
+ */
+async function loadDispatchContext(
+  projectId: number,
+  renderJobId: string,
+): Promise<{ userId: string; settings: ReturnType<typeof resolveSettings> }> {
+  const job = await getJobById(renderJobId);
+  if (job) {
+    return {
+      userId: job.userId,
+      settings: resolveSettings(job.config ?? null),
+    };
+  }
+  const [project] = await db
+    .select({
+      userId: projectsTable.userId,
+      renderSettings: projectsTable.renderSettings,
+    })
+    .from(projectsTable)
+    .where(eq(projectsTable.id, projectId));
+  if (!project) {
+    throw new Error(`Project ${projectId} not found for Lambda dispatch`);
+  }
+  return {
+    userId: project.userId,
+    settings: resolveSettings(project.renderSettings),
+  };
+}
+
+/**
+ * Trigger a render. The ONE function routes should call.
+ *
+ * Backend selection (M11): `selectBackend(plan)` picks inline | bullmq | lambda.
+ * The `plan` arg is OPTIONAL and defaults to `"free"` so existing 4-arg callers
+ * keep compiling AND keep their behavior — lambda requires a Pro plan, so a
+ * defaulted/free caller can never be routed to lambda, and the inline/bullmq
+ * branch below is byte-identical to before this milestone.
+ *
+ *   - lambda → hand off to the distributed backend (`dispatchLambdaRender`),
+ *     which starts a remote execution; the progress poller drives it to done.
+ *     A dispatch guard rejection (LambdaDispatchError) is RE-THROWN so the route
+ *     releases the project claim and fails the ledger row, exactly like a queue
+ *     enqueue failure.
+ *   - inline | bullmq → the ORIGINAL path, untouched: durable BullMQ job when
+ *     REDIS_URL is set, else inline fire-and-forget.
  */
 export async function enqueueRender(
   projectId: number,
   module: string,
   templateId: number | null,
   renderJobId: string,
+  plan: "free" | "pro" = "free",
 ): Promise<void> {
+  // Lambda is purely additive — only diverts here when explicitly selected.
+  // Everything else falls through to the unchanged inline/bullmq logic so the
+  // shipped behavior (and the smoke test) is preserved exactly.
+  if (selectBackend(plan) === "lambda") {
+    // Prefer the ledger row's gated config snapshot + userId (the route created
+    // it from the re-gated settings); fall back to the project's own columns if
+    // the row can't be read for any reason.
+    const { userId, settings } = await loadDispatchContext(
+      projectId,
+      renderJobId,
+    );
+    try {
+      await dispatchLambdaRender({
+        projectId,
+        userId,
+        module,
+        renderJobId,
+        settings,
+      });
+    } catch (err) {
+      // Surface guard rejections to the caller; the route already knows how to
+      // release the claim + mark the ledger row failed on an enqueue throw.
+      if (err instanceof LambdaDispatchError) throw err;
+      // An unexpected dispatch error is logged and re-thrown for the same reason.
+      logger.error({ projectId, renderJobId, err }, "Lambda dispatch failed");
+      throw err;
+    }
+    return;
+  }
+
   if (isQueueEnabled()) {
     const q = await getRenderQueue();
     const jobId = jobIdFor(projectId);
