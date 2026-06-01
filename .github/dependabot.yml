@@ -41,3 +41,9 @@ updates:
       # Allow v0.x updates but block majors until the icons are migrated.
       - dependency-name: "lucide-react"
         update-types: ["version-update:semver-major"]
+      # ioredis is pinned EXACTLY by bullmq (e.g. bullmq@5.77.6 -> ioredis@5.10.1).
+      # Bumping our direct ioredis ahead of bullmq's pin installs a second copy,
+      # and passing our newer ioredis client to bullmq's Queue/Worker `connection`
+      # fails typecheck (nominal AbstractConnector mismatch). Keep ioredis aligned
+      # with bullmq's pinned version — upgrade both together when bumping bullmq.
+      - dependency-name: "ioredis"

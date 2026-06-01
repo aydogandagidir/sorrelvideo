@@ -20,7 +20,7 @@ function readSecretKey(): string {
 export async function getUncachableStripeClient(): Promise<Stripe> {
   if (!cachedClient) {
     cachedClient = new Stripe(readSecretKey(), {
-      apiVersion: "2026-04-22.dahlia",
+      apiVersion: "2026-05-27.dahlia",
     });
   }
   return cachedClient;
