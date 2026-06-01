@@ -349,6 +349,16 @@ export async function executeRender(
     // webm/mov → output.<ext> (file), png-sequence → frames/ (directory).
     const outputPath = outputPathFor(outputDir, format);
     const config = toEngineConfig(settings, file);
+    // Also pass compositionVars as NATIVE engine variables: Hyperframes injects
+    // them as window.__hfVariables and merges them over a composition's declared
+    // `data-composition-variables` defaults (typed: string|number|color|boolean|
+    // enum). Inert for the current {{key}}-substituted compositions (which don't
+    // declare typed variables), additive for typed / __timelines compositions —
+    // this enables the native typed-variable path (M3) without changing the
+    // verified default render.
+    if (project.compositionVars) {
+      config.variables = project.compositionVars;
+    }
 
     const job = createRenderJob(config);
 
