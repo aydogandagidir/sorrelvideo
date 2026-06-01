@@ -13,7 +13,7 @@ export async function getUncachableStripeClient(): Promise<Stripe> {
   }
 
   cachedClient = new Stripe(secretKey, {
-    apiVersion: "2026-04-22.dahlia",
+    apiVersion: "2026-05-27.dahlia",
   });
   return cachedClient;
 }
