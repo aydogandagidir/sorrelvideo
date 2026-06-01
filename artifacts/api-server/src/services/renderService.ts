@@ -233,6 +233,35 @@ async function loadBrandKit(userId: string): Promise<BrandKitSnapshot | null> {
 }
 
 /**
+ * Build the fully-substituted composition HTML for a project as a STRING,
+ * WITHOUT touching disk. This is the single source of the merge — it loads the
+ * brand kit, merges it with the project's `compositionVars` over
+ * `STUDIO_FALLBACKS` (via `buildVarMap`), reads the composition file for the
+ * project's module, and runs `renderCompositionTemplate`.
+ *
+ * Both the render pipeline (`prepareCompositionFor`, which persists the result)
+ * and the live preview route (GET :id/composition, which serves it inline)
+ * consume this, so a rendered mp4 and a previewed page are guaranteed identical
+ * for the same vars.
+ */
+export async function buildCompositionHtml(project: {
+  id: number;
+  userId: string;
+  module: string;
+  compositionVars: Record<string, string> | null;
+}): Promise<string> {
+  const baseEntryFile = resolveEntryFile(project.module);
+  const source = fs.readFileSync(
+    path.join(COMPOSITIONS_DIR, baseEntryFile),
+    "utf-8",
+  );
+
+  const brand = await loadBrandKit(project.userId);
+  const vars = buildVarMap(brand, project.compositionVars);
+  return renderCompositionTemplate(source, vars);
+}
+
+/**
  * Materialize a per-render composition file with Studio variables already
  * substituted. Returns the directory + filename to feed Hyperframes.
  */
@@ -242,15 +271,7 @@ async function prepareCompositionFor(project: {
   module: string;
   compositionVars: Record<string, string> | null;
 }): Promise<{ dir: string; file: string }> {
-  const baseEntryFile = resolveEntryFile(project.module);
-  const source = fs.readFileSync(
-    path.join(COMPOSITIONS_DIR, baseEntryFile),
-    "utf-8",
-  );
-
-  const brand = await loadBrandKit(project.userId);
-  const vars = buildVarMap(brand, project.compositionVars);
-  const rendered = renderCompositionTemplate(source, vars);
+  const rendered = await buildCompositionHtml(project);
 
   const dir = path.join(RENDERS_DIR, String(project.id));
   fs.mkdirSync(dir, { recursive: true });

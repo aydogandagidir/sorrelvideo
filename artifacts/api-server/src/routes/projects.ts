@@ -23,6 +23,7 @@ import {
 import {
   renderFileExistsAsync,
   getRenderArtifact,
+  buildCompositionHtml,
   RENDERS_DIR,
 } from "../services/renderService";
 import { getThumbnailPath } from "../services/thumbnailService";
@@ -553,6 +554,82 @@ router.get("/projects/:id/video", async (req, res): Promise<void> => {
 
   res.setHeader("Content-Length", total);
   fs.createReadStream(filePath).pipe(res);
+});
+
+// GET /api/projects/:id/composition — serve the fully-substituted composition
+// HTML so the frontend player can preview it WITHOUT a render. Auth + ownership
+// mirror the video route. An optional `?vars=<base64 JSON object>` overrides the
+// project's saved compositionVars (so the Studio editor can preview UNSAVED
+// edits); when absent the saved compositionVars are used as-is.
+router.get("/projects/:id/composition", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid project id" });
+    return;
+  }
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  // Resolve the vars to substitute. Optional `?vars=` is a base64-encoded JSON
+  // OBJECT of overrides, merged OVER the saved compositionVars so previewing
+  // unsaved Studio edits doesn't drop the persisted ones. Malformed (bad
+  // base64, non-JSON, or a non-object) → 400.
+  let mergedVars: Record<string, string> | null = project.compositionVars;
+  const rawVars = req.query.vars;
+  if (typeof rawVars === "string" && rawVars.length > 0) {
+    let overrides: unknown;
+    try {
+      overrides = JSON.parse(Buffer.from(rawVars, "base64").toString("utf-8"));
+    } catch {
+      res.status(400).json({ error: "Invalid vars: not base64-encoded JSON" });
+      return;
+    }
+    if (
+      typeof overrides !== "object" ||
+      overrides === null ||
+      Array.isArray(overrides)
+    ) {
+      res.status(400).json({ error: "Invalid vars: expected a JSON object" });
+      return;
+    }
+    mergedVars = {
+      ...(project.compositionVars ?? {}),
+      ...(overrides as Record<string, string>),
+    };
+  }
+
+  const html = await buildCompositionHtml({
+    id: project.id,
+    userId: project.userId,
+    module: project.module,
+    compositionVars: mergedVars,
+  });
+
+  // Preview must reflect live edits, never a cached copy.
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  // A string body is safe to res.send — the Express-5 spaces-in-path issue only
+  // affects res.sendFile, which we deliberately avoid here.
+  res.send(html);
 });
 
 // GET /api/projects/:id/thumbnail — stream the rendered poster frame (PNG).

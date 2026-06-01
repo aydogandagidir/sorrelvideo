@@ -484,6 +484,48 @@ paths:
         "409":
           description: Project rendered a PNG sequence; not streamable as a file
 
+  /projects/{id}/composition:
+    get:
+      operationId: getProjectComposition
+      tags: [projects]
+      summary: Serve a project's fully-substituted composition HTML for preview
+      description: >-
+        Returns the composition HTML for a project with the brand kit and
+        compositionVars already merged and substituted — the same output the
+        render pipeline feeds Hyperframes — so the frontend player can preview
+        it without a render. The optional `vars` query param is a base64-encoded
+        JSON object whose keys override the project's saved compositionVars
+        (so the Studio editor can preview unsaved edits); when absent the saved
+        compositionVars are used. Served with `Cache-Control: no-store` so the
+        preview always reflects live edits.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        # NOTE: the route also reads an optional `?vars=<base64-json>` override
+        # for live Studio preview. It is intentionally NOT declared as a typed
+        # query param: the player loads this URL via <hyperframes-player src=...>,
+        # never a typed hook, and declaring both a path param and a query param
+        # makes orval emit a colliding `GetProjectCompositionParams` (path zod vs
+        # query type). The Express route validates `vars` manually.
+      responses:
+        "200":
+          description: The substituted composition HTML
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Invalid project id or malformed vars
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Project not found
+
   /projects/{id}/thumbnail:
     get:
       operationId: getProjectThumbnail

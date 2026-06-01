@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
-import { Loader2, Sparkles, Wand2 } from "lucide-react";
+import { Loader2, Pause, Play, Sparkles, Wand2 } from "lucide-react";
 import {
   useAiSuggest,
   useCreateProject,
   useGetBrandKit,
   useStartProjectRender,
+  useUpdateProject,
   useUpdateProjectRenderSettings,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
@@ -19,15 +20,29 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { RenderSettingsForm } from "@/components/render-settings-form";
+import { HfPlayer, type HfPlayerHandle } from "@/components/hf-player";
 import {
   DEFAULT_RENDER_SETTINGS,
   proViolations,
   type RenderSettings,
 } from "@/lib/render-settings";
 import { useBillingInfo } from "@/hooks/useBilling";
+
+/** UTF-8-safe base64 (mirrors the backend's base64-decode → JSON.parse). */
+function encodeVars(vars: Record<string, string>): string {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(vars))));
+}
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 const DEFAULT_HEADLINE = "Make something\nthey'll remember.";
 const DEFAULT_BODY =
@@ -40,6 +55,7 @@ export default function StudioPage() {
   const { data: billing } = useBillingInfo();
   const createProject = useCreateProject();
   const startRender = useStartProjectRender();
+  const updateProject = useUpdateProject();
   const updateRenderSettings = useUpdateProjectRenderSettings();
   const aiSuggest = useAiSuggest();
 
@@ -61,6 +77,128 @@ export default function StudioPage() {
   >("ai_limit");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ── Live preview state ──────────────────────────────────────────────────
+  // The draft project is created lazily (on first Preview or submit) and reused
+  // for the eventual Create & render, so a previewed-then-rendered session does
+  // not leave an orphan draft behind.
+  const [draftId, setDraftId] = useState<number | null>(null);
+  const [previewActive, setPreviewActive] = useState(false);
+  // Snapshot of the vars the preview is currently showing. The text inputs can
+  // drift ahead of this until the user clicks "Update preview".
+  const [previewVars, setPreviewVars] = useState<Record<string, string> | null>(
+    null,
+  );
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewTime, setPreviewTime] = useState(0);
+  const [previewDuration, setPreviewDuration] = useState(0);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const playerRef = useRef<HfPlayerHandle>(null);
+
+  const compositionVars: Record<string, string> = {
+    "user.headline": headline,
+    "user.bodyText": bodyText,
+    "user.ctaText": ctaText,
+  };
+
+  // The live preview reflects whatever vars are currently *shown* (previewVars),
+  // not necessarily the latest edits — so the player only reloads when the user
+  // explicitly refreshes it. The query param carries the vars; the backend
+  // base64-decodes + JSON.parses them and substitutes into the composition.
+  const previewSrc =
+    draftId !== null && previewVars
+      ? `/api/projects/${draftId}/composition?vars=${encodeVars(previewVars)}`
+      : "";
+
+  // True when the editable copy has diverged from what the preview is showing.
+  const previewStale =
+    previewActive &&
+    previewVars !== null &&
+    (previewVars["user.headline"] !== headline ||
+      previewVars["user.bodyText"] !== bodyText ||
+      previewVars["user.ctaText"] !== ctaText);
+
+  /**
+   * Ensure a draft project exists, returning its id. Created once and reused;
+   * the name/vars are re-synced on the final submit so the persisted project
+   * matches the latest copy.
+   */
+  async function ensureDraft(): Promise<number> {
+    if (draftId !== null) return draftId;
+    const project = await createProject.mutateAsync({
+      data: {
+        name: name.trim() || "Untitled Studio Project",
+        module: "studio",
+        compositionVars: compositionVars,
+      },
+    });
+    setDraftId(project.id);
+    return project.id;
+  }
+
+  /**
+   * Open (or refresh) the live preview with the current copy. Ensures a draft
+   * exists, then snapshots the current vars into `previewVars` — which changes
+   * `previewSrc`, and the player reloads off its observed `src` attribute. The
+   * player itself is keyed on `draftId`, so this never remounts mid-session.
+   */
+  async function handlePreview() {
+    setError(null);
+    setPreviewLoading(true);
+    try {
+      await ensureDraft();
+      setPreviewVars(compositionVars);
+      setPreviewActive(true);
+      setPreviewPlaying(false);
+      setPreviewTime(0);
+    } catch (err) {
+      const anyErr = err as {
+        status?: number;
+        data?: { error?: string };
+        message?: string;
+      };
+      if (anyErr.status === 429) {
+        setError("Slow down a bit — try again in a minute.");
+      } else {
+        setError(
+          anyErr.data?.error ?? anyErr.message ?? "Could not start the preview",
+        );
+      }
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  /**
+   * Refresh button: when the copy has changed, re-snapshot (new `src` →
+   * auto-reload); when it hasn't, the `src` is identical so force an imperative
+   * reload to re-fetch the same composition.
+   */
+  function handleRefreshPreview() {
+    if (previewStale) {
+      void handlePreview();
+    } else {
+      setPreviewPlaying(false);
+      setPreviewTime(0);
+      playerRef.current?.reload();
+    }
+  }
+
+  function togglePreviewPlayback() {
+    if (previewPlaying) {
+      playerRef.current?.pause();
+      setPreviewPlaying(false);
+    } else {
+      playerRef.current?.play();
+      setPreviewPlaying(true);
+    }
+  }
+
+  function handleScrub(value: number[]) {
+    const t = value[0] ?? 0;
+    setPreviewTime(t);
+    playerRef.current?.seek(t);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -76,28 +214,31 @@ export default function StudioPage() {
 
     setIsSubmitting(true);
     try {
-      const project = await createProject.mutateAsync({
-        data: {
-          name: name.trim() || "Untitled Studio Project",
-          module: "studio",
-          compositionVars: {
-            "user.headline": headline,
-            "user.bodyText": bodyText,
-            "user.ctaText": ctaText,
+      // Reuse the preview's draft if one exists (avoids orphan drafts); else
+      // create it now. Either way, re-sync the latest name + copy onto the row
+      // so the persisted project matches what the user just edited.
+      const hadDraft = draftId !== null;
+      const projectId = await ensureDraft();
+      if (hadDraft) {
+        await updateProject.mutateAsync({
+          id: projectId,
+          data: {
+            name: name.trim() || "Untitled Studio Project",
+            compositionVars: compositionVars,
           },
-        },
-      });
+        });
+      }
       // Persist the chosen render settings before rendering so the job picks
       // them up. The endpoint re-validates Pro gating server-side.
       await updateRenderSettings.mutateAsync({
-        id: project.id,
+        id: projectId,
         data: renderSettings,
       });
       // Kick off the render, then jump to Projects (which polls it to "ready").
       // Navigate only after the render call resolves so the card lands in
       // "rendering", not "draft".
-      await startRender.mutateAsync({ id: project.id });
-      setLocation(`/projects?focus=${project.id}`);
+      await startRender.mutateAsync({ id: projectId });
+      setLocation(`/projects?focus=${projectId}`);
     } catch (err) {
       const anyErr = err as {
         status?: number;
@@ -319,67 +460,189 @@ export default function StudioPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Brand preview</CardTitle>
-              <CardDescription>
-                Edit on the Brand Kit page — Studio + AI pull live values at
-                render time.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                  Company
-                </p>
-                <p className="text-lg font-semibold">
-                  {brandKit?.companyName ?? "Your Brand"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                  Palette
-                </p>
-                <div className="flex gap-2">
-                  {swatches.map((s) => (
-                    <div
-                      key={s.label}
-                      className="flex flex-col items-center gap-1"
-                    >
-                      <span
-                        className="h-12 w-12 rounded-md border"
-                        style={{ background: s.color }}
-                        title={s.color}
-                        aria-label={`${s.label} swatch`}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Live preview</CardTitle>
+                <CardDescription>
+                  Scrub the composition before you spend a render — this is the
+                  live template, not the final mp4.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {previewActive && previewSrc ? (
+                  <>
+                    <HfPlayer
+                      ref={playerRef}
+                      key={draftId ?? "preview"}
+                      src={previewSrc}
+                      aspect="9:16"
+                      muted
+                      className="mx-auto max-w-[260px]"
+                      onReady={() => {
+                        setPreviewLoading(false);
+                        setPreviewTime(0);
+                      }}
+                      onTimeUpdate={(currentTime, duration) => {
+                        setPreviewTime(currentTime);
+                        if (Number.isFinite(duration) && duration > 0) {
+                          setPreviewDuration(duration);
+                        }
+                      }}
+                      onEnded={() => setPreviewPlaying(false)}
+                      onError={() => {
+                        setPreviewLoading(false);
+                        setPreviewPlaying(false);
+                      }}
+                    />
+                    <div className="space-y-2">
+                      <Slider
+                        value={[previewTime]}
+                        min={0}
+                        max={previewDuration || 0.001}
+                        step={0.01}
+                        onValueChange={handleScrub}
+                        aria-label="Preview position"
+                        disabled={previewDuration <= 0}
                       />
-                      <span className="text-[10px] text-muted-foreground">
-                        {s.label}
+                      <div className="flex items-center justify-between text-xs tabular-nums text-muted-foreground">
+                        <span>{formatTime(previewTime)}</span>
+                        <span>{formatTime(previewDuration)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={togglePreviewPlayback}
+                        disabled={previewDuration <= 0}
+                      >
+                        {previewPlaying ? (
+                          <>
+                            <Pause className="h-4 w-4" />
+                            Pause
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4" />
+                            Play
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleRefreshPreview}
+                        disabled={previewLoading}
+                      >
+                        {previewLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : null}
+                        {previewStale ? "Update preview" : "Reload"}
+                      </Button>
+                    </div>
+                    {previewStale && (
+                      <p className="text-xs text-muted-foreground">
+                        You&apos;ve edited the copy — update the preview to see
+                        the change.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="mx-auto grid aspect-[9/16] max-w-[260px] place-items-center rounded-lg border border-dashed bg-muted/30 text-center text-xs text-muted-foreground">
+                      <span className="px-4">
+                        Preview the live composition with your current copy.
                       </span>
                     </div>
-                  ))}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full"
+                      onClick={handlePreview}
+                      disabled={previewLoading}
+                    >
+                      {previewLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Preparing…
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Preview
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Brand preview</CardTitle>
+                <CardDescription>
+                  Edit on the Brand Kit page — Studio + AI pull live values at
+                  render time.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Company
+                  </p>
+                  <p className="text-lg font-semibold">
+                    {brandKit?.companyName ?? "Your Brand"}
+                  </p>
                 </div>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                  Voice
-                </p>
-                <p className="text-sm capitalize">
-                  {brandKit?.brandVoice ?? "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                  Font
-                </p>
-                <p
-                  className="text-base"
-                  style={{ fontFamily: brandKit?.fontFamily ?? "Inter" }}
-                >
-                  {brandKit?.fontFamily ?? "Inter"} — quick brown fox
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Palette
+                  </p>
+                  <div className="flex gap-2">
+                    {swatches.map((s) => (
+                      <div
+                        key={s.label}
+                        className="flex flex-col items-center gap-1"
+                      >
+                        <span
+                          className="h-12 w-12 rounded-md border"
+                          style={{ background: s.color }}
+                          title={s.color}
+                          aria-label={`${s.label} swatch`}
+                        />
+                        <span className="text-[10px] text-muted-foreground">
+                          {s.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Voice
+                  </p>
+                  <p className="text-sm capitalize">
+                    {brandKit?.brandVoice ?? "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Font
+                  </p>
+                  <p
+                    className="text-base"
+                    style={{ fontFamily: brandKit?.fontFamily ?? "Inter" }}
+                  >
+                    {brandKit?.fontFamily ?? "Inter"} — quick brown fox
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
       <UpgradeModal

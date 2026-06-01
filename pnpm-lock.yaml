@@ -410,6 +410,9 @@ importers:
 
   artifacts/sorrel:
     dependencies:
+      '@hyperframes/player':
+        specifier: ^0.6.64
+        version: 0.6.64
       '@uppy/aws-s3':
         specifier: ^5.1.0
         version: 5.1.0(@uppy/core@5.2.0)
@@ -1726,6 +1729,9 @@ packages:
   '@hyperframes/engine@0.6.6':
     resolution: {integrity: sha512-WJRCJtkNb7Kh72T+6tbdVp61M8TYq/+xMetnNwvo8Z4Sk+QZx2qXyUf/LSL/sbdsHjM3g36WXnhMbT77Ft2MfQ==}
     engines: {node: '>=22'}
+
+  '@hyperframes/player@0.6.64':
+    resolution: {integrity: sha512-vUR9nNetFtOtLP2xFbcxCKzSP5K9sQtTWGvKMOaFZInUjSp8Bh3byitd62KoQks/GJATHGCqOcsbGhycC9zzYA==}
 
   '@hyperframes/producer@0.6.6':
     resolution: {integrity: sha512-luh2YKvqiugUy9AU9IPN2oW2PK2yS/94o5C1xaVDMICZfbQ7Bcj7EwDlxg8M4/Zzp51cCgjqK1GS3a/OzGgO4w==}
@@ -8000,6 +8006,8 @@ snapshots:
       - supports-color
       - typescript
       - utf-8-validate
+
+  '@hyperframes/player@0.6.64': {}
 
   '@hyperframes/producer@0.6.6(typescript@5.9.3)':
     dependencies:

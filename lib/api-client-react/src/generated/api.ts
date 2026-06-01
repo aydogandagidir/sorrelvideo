@@ -1710,6 +1710,84 @@ export function useGetProjectVideo<TData = Awaited<ReturnType<typeof getProjectV
 
 
 
+export const getGetProjectCompositionUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/composition`
+}
+
+/**
+ * Returns the composition HTML for a project with the brand kit and compositionVars already merged and substituted — the same output the render pipeline feeds Hyperframes — so the frontend player can preview it without a render. The optional `vars` query param is a base64-encoded JSON object whose keys override the project's saved compositionVars (so the Studio editor can preview unsaved edits); when absent the saved compositionVars are used. Served with `Cache-Control: no-store` so the preview always reflects live edits.
+ * @summary Serve a project's fully-substituted composition HTML for preview
+ */
+export const getProjectComposition = async (id: number, options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getGetProjectCompositionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectCompositionQueryKey = (id: number,) => {
+    return [
+    `/api/projects/${id}/composition`
+    ] as const;
+    }
+
+
+export const getGetProjectCompositionQueryOptions = <TData = Awaited<ReturnType<typeof getProjectComposition>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectComposition>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectCompositionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectComposition>>> = ({ signal }) => getProjectComposition(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectComposition>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectCompositionQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectComposition>>>
+export type GetProjectCompositionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Serve a project's fully-substituted composition HTML for preview
+ */
+
+export function useGetProjectComposition<TData = Awaited<ReturnType<typeof getProjectComposition>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectComposition>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectCompositionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetProjectThumbnailUrl = (id: number,) => {
 
 

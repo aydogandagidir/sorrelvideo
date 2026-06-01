@@ -430,6 +430,15 @@ export const GetProjectVideoParams = zod.object({
 
 
 /**
+ * Returns the composition HTML for a project with the brand kit and compositionVars already merged and substituted — the same output the render pipeline feeds Hyperframes — so the frontend player can preview it without a render. The optional `vars` query param is a base64-encoded JSON object whose keys override the project's saved compositionVars (so the Studio editor can preview unsaved edits); when absent the saved compositionVars are used. Served with `Cache-Control: no-store` so the preview always reflects live edits.
+ * @summary Serve a project's fully-substituted composition HTML for preview
+ */
+export const GetProjectCompositionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary Stream the rendered poster-frame thumbnail (PNG) for a project
  */
 export const GetProjectThumbnailParams = zod.object({
