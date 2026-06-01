@@ -8,6 +8,14 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     setupFiles: ["./src/test/setup.ts"],
     globalSetup: ["./src/test/global-setup.ts"],
+    // `@hyperframes/core`'s ESM `dist` uses extensionless relative imports that
+    // Node's native ESM loader (which vitest uses) can't resolve. The render
+    // *producer* only imports core types (erased at compile time), so it's
+    // unaffected — but compositionCompilerService imports the runtime value
+    // `lintHyperframeHtml`. Inlining core routes it through Vite's resolver,
+    // which fills in the missing extensions. Keep this if any unit test ever
+    // imports a runtime value from core.
+    server: { deps: { inline: [/@hyperframes\/core/] } },
     // Integration tests share ONE Postgres testcontainer (booted in globalSetup)
     // and each suite truncates the same tables in beforeEach, so they MUST run
     // serially. Otherwise one file's TRUNCATE (AccessExclusiveLock) deadlocks
