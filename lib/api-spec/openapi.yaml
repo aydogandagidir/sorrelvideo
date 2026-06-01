@@ -416,6 +416,33 @@ paths:
         "409":
           description: Render already in progress
 
+  /projects/{id}/render/cancel:
+    post:
+      operationId: cancelProjectRender
+      tags: [projects]
+      summary: Request cancellation of a project's in-flight render
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cancellation requested — the worker finalizes the project to draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+        "409":
+          description: No render in progress
+
   /projects/{id}/video:
     get:
       operationId: getProjectVideo

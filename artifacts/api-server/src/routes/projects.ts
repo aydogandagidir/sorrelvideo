@@ -30,10 +30,16 @@ import {
   resolveSettings,
   assertRenderSettingsAllowed,
 } from "../services/renderSettingsService";
-import { enqueueRender, isQueueEnabled } from "../lib/renderQueue";
+import {
+  enqueueRender,
+  isQueueEnabled,
+  removeQueuedRender,
+} from "../lib/renderQueue";
 import {
   createRenderJob as createRenderJobRow,
   markFailed,
+  requestCancel,
+  getLatestJobForProject,
 } from "../services/renderJobsService";
 import {
   checkAndIncrementRenderCount,
@@ -404,6 +410,54 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
   }
 
   res.status(202).json(GetProjectResponse.parse(serializeDates(claimed)));
+});
+
+// POST /api/projects/:id/render/cancel — request cancellation of an in-flight
+// render. Flags the latest render-job row (owner-scoped) and best-effort drops
+// any still-queued job so it never starts. The running worker observes the flag
+// in its progress callback (M2), throws RenderCancelledError, and finalizes the
+// project back to `draft` + marks the job cancelled — so we don't touch the
+// project status here, just acknowledge with the current row.
+router.post("/projects/:id/render/cancel", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid project id" });
+    return;
+  }
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  // Nothing to cancel unless the latest job is still queued or actively
+  // rendering. ready/failed/cancelled (or no job at all) → 409.
+  const job = await getLatestJobForProject(id);
+  if (!job || (job.status !== "queued" && job.status !== "rendering")) {
+    res.status(409).json({ error: "No render in progress" });
+    return;
+  }
+
+  await requestCancel(job.id, req.user.id);
+  await removeQueuedRender(id);
+
+  res.json(GetProjectResponse.parse(serializeDates(project)));
 });
 
 // GET /api/projects/:id/video — stream the rendered mp4 file

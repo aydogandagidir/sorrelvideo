@@ -383,6 +383,44 @@ export const StartProjectRenderParams = zod.object({
 
 
 /**
+ * @summary Request cancellation of a project's in-flight render
+ */
+export const CancelProjectRenderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CancelProjectRenderResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
+  "module": zod.string(),
+  "templateId": zod.number().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "videoUrl": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
+  "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
  * Streams the rendered video with the Content-Type matching the project's render format (mp4 → video/mp4, webm → video/webm, mov → video/quicktime). Projects rendered as a png-sequence have no single streamable file and return 409.
  * @summary Stream the rendered video file for a project
  */

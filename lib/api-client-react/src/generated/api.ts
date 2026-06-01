@@ -1562,6 +1562,76 @@ export const useStartProjectRender = <TError = ErrorType<void>,
       return useMutation(getStartProjectRenderMutationOptions(options));
     }
 
+export const getCancelProjectRenderUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/render/cancel`
+}
+
+/**
+ * @summary Request cancellation of a project's in-flight render
+ */
+export const cancelProjectRender = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getCancelProjectRenderUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCancelProjectRenderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelProjectRender>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['cancelProjectRender'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelProjectRender>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelProjectRender(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelProjectRenderMutationResult = NonNullable<Awaited<ReturnType<typeof cancelProjectRender>>>
+
+    export type CancelProjectRenderMutationError = ErrorType<void>
+
+    /**
+ * @summary Request cancellation of a project's in-flight render
+ */
+export const useCancelProjectRender = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelProjectRender>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCancelProjectRenderMutationOptions(options));
+    }
+
 export const getGetProjectVideoUrl = (id: number,) => {
 
 

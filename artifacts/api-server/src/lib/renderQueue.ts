@@ -123,6 +123,18 @@ export async function startRenderWorker(): Promise<void> {
 }
 
 /**
+ * Best-effort removal of a project's job from the queue. Called by the cancel
+ * endpoint so a still-queued (not yet active) render never starts; if the job
+ * is already active, the worker observes the cancel flag instead (M2). No-op
+ * in inline mode, and the remove is swallowed (the job may already be gone).
+ */
+export async function removeQueuedRender(projectId: number): Promise<void> {
+  if (!isQueueEnabled()) return;
+  const q = await getRenderQueue();
+  await q.remove(jobIdFor(projectId)).catch(() => undefined);
+}
+
+/**
  * Whether a project still has an unfinished job in the queue (waiting/active/
  * delayed/etc). Used by startup recovery to avoid resetting jobs the worker
  * will resume. Always false in inline mode.
