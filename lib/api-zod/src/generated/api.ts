@@ -237,6 +237,11 @@ export const GetTemplateResponse = zod.object({
 /**
  * @summary List video projects
  */
+export const listProjectsResponseRenderProgressMin = 0;
+export const listProjectsResponseRenderProgressMax = 100;
+
+
+
 export const ListProjectsResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -263,6 +268,8 @@ export const ListProjectsResponseItem = zod.object({
   "ease": zod.string()
 })).optional()
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(listProjectsResponseRenderProgressMin).max(listProjectsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -287,6 +294,11 @@ export const CreateProjectBody = zod.object({
 export const GetProjectParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const getProjectResponseRenderProgressMin = 0;
+export const getProjectResponseRenderProgressMax = 100;
+
+
 
 export const GetProjectResponse = zod.object({
   "id": zod.number(),
@@ -314,6 +326,8 @@ export const GetProjectResponse = zod.object({
   "ease": zod.string()
 })).optional()
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(getProjectResponseRenderProgressMin).max(getProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -334,6 +348,11 @@ export const UpdateProjectBody = zod.object({
   "videoUrl": zod.string().optional(),
   "compositionVars": zod.record(zod.string(), zod.string()).optional()
 })
+
+export const updateProjectResponseRenderProgressMin = 0;
+export const updateProjectResponseRenderProgressMax = 100;
+
+
 
 export const UpdateProjectResponse = zod.object({
   "id": zod.number(),
@@ -361,6 +380,8 @@ export const UpdateProjectResponse = zod.object({
   "ease": zod.string()
 })).optional()
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(updateProjectResponseRenderProgressMin).max(updateProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -389,6 +410,11 @@ export const CancelProjectRenderParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const cancelProjectRenderResponseRenderProgressMin = 0;
+export const cancelProjectRenderResponseRenderProgressMax = 100;
+
+
+
 export const CancelProjectRenderResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -415,6 +441,8 @@ export const CancelProjectRenderResponse = zod.object({
   "ease": zod.string()
 })).optional()
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(cancelProjectRenderResponseRenderProgressMin).max(cancelProjectRenderResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -468,6 +496,11 @@ export const UpdateProjectRenderSettingsBody = zod.object({
 })).optional()
 }).describe('Partial render settings; omitted fields keep their current value.')
 
+export const updateProjectRenderSettingsResponseRenderProgressMin = 0;
+export const updateProjectRenderSettingsResponseRenderProgressMax = 100;
+
+
+
 export const UpdateProjectRenderSettingsResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -494,6 +527,8 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
   "ease": zod.string()
 })).optional()
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(updateProjectRenderSettingsResponseRenderProgressMin).max(updateProjectRenderSettingsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -683,6 +718,11 @@ export const GetStorageObjectParams = zod.object({
 /**
  * @summary Get platform usage statistics
  */
+export const getStatsResponseRecentProjectsItemRenderProgressMin = 0;
+export const getStatsResponseRecentProjectsItemRenderProgressMax = 100;
+
+
+
 export const GetStatsResponse = zod.object({
   "totalProjects": zod.number(),
   "totalTemplates": zod.number(),
@@ -714,6 +754,8 @@ export const GetStatsResponse = zod.object({
   "ease": zod.string()
 })).optional()
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(getStatsResponseRecentProjectsItemRenderProgressMin).max(getStatsResponseRecentProjectsItemRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })).optional()

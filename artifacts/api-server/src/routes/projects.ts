@@ -53,6 +53,34 @@ function serializeDates<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));
 }
 
+/** A project row with the live-progress fields the UI reads (M10). */
+type ProjectRow = typeof projectsTable.$inferSelect;
+type ProjectWithProgress = ProjectRow & {
+  renderProgress: number | null;
+  renderCost: number | null;
+};
+
+/**
+ * Attach the latest render job's live `renderProgress`/`renderCost` to a project,
+ * but ONLY while it is actually rendering — that's the only window the UI needs
+ * live values, and it keeps the list query cheap (no heavy join). Non-rendering
+ * projects get nulls without any DB lookup. Callers pre-filter the rendering
+ * subset so we never N+1 over the whole list.
+ */
+async function withRenderProgress(
+  project: ProjectRow,
+): Promise<ProjectWithProgress> {
+  if (project.status !== "rendering") {
+    return { ...project, renderProgress: null, renderCost: null };
+  }
+  const job = await getLatestJobForProject(project.id);
+  return {
+    ...project,
+    renderProgress: job?.progress ?? null,
+    renderCost: job?.costCents ?? null,
+  };
+}
+
 router.get("/projects", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Unauthorized" });
@@ -64,7 +92,13 @@ router.get("/projects", async (req, res): Promise<void> => {
     .where(eq(projectsTable.userId, req.user.id))
     .orderBy(projectsTable.updatedAt);
 
-  res.json(ListProjectsResponse.parse(serializeDates(projects)));
+  // Attach live progress/cost. withRenderProgress only hits render_jobs for
+  // rendering projects (the rest resolve to nulls synchronously), so this is a
+  // lookup per *rendering* project — typically a handful — not an N+1 over the
+  // whole list. Ordering is preserved (Promise.all keeps index order).
+  const withProgress = await Promise.all(projects.map(withRenderProgress));
+
+  res.json(ListProjectsResponse.parse(serializeDates(withProgress)));
 });
 
 router.post("/projects", async (req, res): Promise<void> => {
@@ -112,7 +146,9 @@ router.get("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetProjectResponse.parse(serializeDates(project)));
+  // Attach live progress/cost (only looked up while rendering, see helper).
+  const withProgress = await withRenderProgress(project);
+  res.json(GetProjectResponse.parse(serializeDates(withProgress)));
 });
 
 router.patch("/projects/:id", async (req, res): Promise<void> => {

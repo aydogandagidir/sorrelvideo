@@ -1092,6 +1092,19 @@ components:
           oneOf:
             - $ref: "#/components/schemas/RenderSettings"
             - type: "null"
+        renderProgress:
+          description: >-
+            Live render progress (0–100) of the latest render job. Populated only
+            while `status` is `rendering`; null otherwise. Additive/optional.
+          type: ["integer", "null"]
+          minimum: 0
+          maximum: 100
+        renderCost:
+          description: >-
+            Estimated render cost in cents from the latest render job. Populated
+            only while `status` is `rendering` (when a metered backend reports it);
+            null otherwise. Additive/optional.
+          type: ["integer", "null"]
         createdAt:
           type: string
         updatedAt:

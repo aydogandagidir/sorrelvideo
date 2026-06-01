@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, Film, Play, Trash2, Clock, Plus, Loader2, Clapperboard, AlertTriangle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -39,6 +40,8 @@ type Project = {
   videoUrl?: string | null;
   duration?: number | null;
   renderError?: string | null;
+  renderProgress?: number | null;
+  renderCost?: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -54,6 +57,11 @@ function StatusBadge({ status }: { status: string }) {
     default:
       return <Badge variant="outline" className="text-muted-foreground">Draft</Badge>;
   }
+}
+
+/** Formats a cost in cents as a short USD label, e.g. 12 → "$0.12". */
+function formatCost(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 /** Polls a single project by id every `intervalMs` while its status is "rendering". */
@@ -192,7 +200,31 @@ function ProjectCard({
                 </span>
               )}
               <span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span>
+              {isRendering && typeof project.renderCost === "number" && (
+                <Badge variant="outline" className="text-xs font-normal" title="Estimated render cost">
+                  {formatCost(project.renderCost)}
+                </Badge>
+              )}
             </div>
+            {/* Live render progress — determinate bar from renderProgress, or an
+                indeterminate pulse while the first progress tick is pending. The
+                3s project poll refreshes the value; no extra request needed. */}
+            {isRendering && (
+              <div className="mt-3 max-w-sm">
+                {typeof project.renderProgress === "number" ? (
+                  <>
+                    <Progress value={project.renderProgress} className="h-2" />
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {project.renderProgress}%
+                    </span>
+                  </>
+                ) : (
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-primary/20">
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
+                  </div>
+                )}
+              </div>
+            )}
             {project.status === "failed" && project.renderError && (
               <div className="mt-2 flex items-start gap-1.5 text-xs text-destructive">
                 <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
