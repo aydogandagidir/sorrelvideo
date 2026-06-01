@@ -1,0 +1,30 @@
+{
+  "name": "@workspace/studio-editor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Repointed @hyperframes/studio build, served same-origin under /editor/ (M9).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@hyperframes/core": "0.6.6",
+    "@hyperframes/player": "0.6.6",
+    "@hyperframes/studio": "0.6.6",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@rollup/plugin-replace": "^6.0.2",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.9.3",
+    "vite": "^6.4.2"
+  }
+}
