@@ -243,13 +243,28 @@ async function loadBrandKit(userId: string): Promise<BrandKitSnapshot | null> {
  * and the live preview route (GET :id/composition, which serves it inline)
  * consume this, so a rendered mp4 and a previewed page are guaranteed identical
  * for the same vars.
+ *
+ * STUDIO OVERRIDE: when `project.compositionHtml` is a non-empty string (the
+ * Studio persisted a fully-authored document via routes/studio.ts), that HTML
+ * is returned VERBATIM — the template+vars merge is skipped, because the saved
+ * document is already final. Null/empty → the legacy merge, so a project that
+ * never went through Studio (and the smoke-test default with compositionHtml
+ * null) renders byte-for-byte as before this branch existed.
  */
 export async function buildCompositionHtml(project: {
   id: number;
   userId: string;
   module: string;
   compositionVars: Record<string, string> | null;
+  compositionHtml?: string | null;
 }): Promise<string> {
+  if (
+    typeof project.compositionHtml === "string" &&
+    project.compositionHtml.length > 0
+  ) {
+    return project.compositionHtml;
+  }
+
   const baseEntryFile = resolveEntryFile(project.module);
   const source = fs.readFileSync(
     path.join(COMPOSITIONS_DIR, baseEntryFile),
@@ -270,6 +285,7 @@ async function prepareCompositionFor(project: {
   userId: string;
   module: string;
   compositionVars: Record<string, string> | null;
+  compositionHtml?: string | null;
 }): Promise<{ dir: string; file: string }> {
   const rendered = await buildCompositionHtml(project);
 
@@ -304,13 +320,16 @@ export async function executeRender(
 
   try {
     // Re-read the project to pick up the userId + compositionVars +
-    // renderSettings at render time.
+    // compositionHtml + renderSettings at render time. compositionHtml, when a
+    // Studio document is saved, takes precedence over the template+vars merge
+    // (see buildCompositionHtml); null keeps the legacy default path.
     const [project] = await db
       .select({
         id: projectsTable.id,
         userId: projectsTable.userId,
         module: projectsTable.module,
         compositionVars: projectsTable.compositionVars,
+        compositionHtml: projectsTable.compositionHtml,
         renderSettings: projectsTable.renderSettings,
       })
       .from(projectsTable)
