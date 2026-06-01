@@ -87,6 +87,7 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `artifacts/sorrel`         | Main React frontend (the Sorrel app)                                   |
 | `artifacts/mockup-sandbox` | Hyperframes development sandbox                                        |
 | `scripts`                  | Standalone helpers (e.g. `seed-products`)                              |
+| `infra`                    | `@workspace/infra` — AWS CDK scaffold for the Lambda render backend (M11, deployed out-of-band; not yet in the workspace install — see Future work) |
 
 ## Architecture decisions
 
@@ -244,6 +245,15 @@ stored; we only need the identity for sign-in.
   Drizzle schema push
 - `users.plan` and `users.stripeSubscriptionId` are reserved schema columns;
   never use them as the source of truth
+- **Render-settings capability matrix**: the Free floor reproduces today's render
+  output — `draft|standard` quality, `24|30` fps, ≤1080p (non-4k), `mp4`, opaque,
+  watermarked, ≤1 transition. Everything else (high quality, 60fps, any `-4k`
+  resolution, webm/mov/png-sequence export, transparent background, watermark removal,
+  >1 transition) is Pro. `assertRenderSettingsAllowed` enforces this, reusing the
+  existing `getUserPlan` + `403 { reason: "upgrade_required" }` pattern (byte-identical
+  to the premium-template / quota rejections, so the same `UpgradeModal` fires). The
+  gate runs at PATCH time AND again at render time (defense in depth — a user who
+  downgrades must not render a previously-saved Pro config).
 
 ## Render pipeline
 
@@ -268,6 +278,39 @@ stored; we only need the identity for sign-in.
   `user.*` keys to `<br/>`. Unknown placeholders are left intact for
   debug-ability. `STUDIO_FALLBACKS` covers every required key so a render
   always produces sensible output even with no brand kit set
+- **Per-project render settings**: the `projects.render_settings` jsonb column
+  (`$type<RenderSettings>`) holds the user-editable render config —
+  `{ fps: 24|30|60, quality: draft|standard|high, format: mp4|webm|mov|png-sequence,
+  resolution: landscape|portrait|square (+ each `-4k` variant), transparent, watermark,
+  transitions? }`. Null → `DEFAULT_RENDER_SETTINGS` (draft / 30fps / mp4 / portrait /
+  opaque / watermarked) so legacy projects render byte-for-byte as before. Edited via the
+  dedicated, Pro-gated `PATCH /api/projects/:id/render-settings` (NOT the generic project
+  PATCH — that would let Pro-only knobs be set un-gated). The settings service lives in
+  `services/renderSettingsService.ts`: `resolveSettings` (coerce a partial/null blob into a
+  complete valid object), `assertRenderSettingsAllowed` (the Free/Pro gate, see Billing),
+  `resolveDimensions` (pixel size per resolution preset), and `toEngineConfig` (the one
+  adapter mapping `RenderSettings` → the engine's `RenderConfig`).
+- **Engine config is derived from settings**: `executeRender` re-reads the project's
+  `renderSettings` at render time and builds the producer `RenderConfig` via
+  `toEngineConfig(resolveSettings(...), entryFile)`. The previously hardcoded
+  `{ fps: {num:30,den:1}, quality: "draft" }` is gone. `enqueueRender` / `executeRender`
+  thread a `renderJobId` through both the inline and BullMQ paths.
+- **`render_jobs` ledger**: a per-attempt audit table (`lib/db/src/schema/render.ts`,
+  row type `RenderJobRow`) distinct from the project's own `status`/`renderError`. One
+  row per render attempt: `id` (uuid — doubles as a queue correlation id, so non-numeric
+  on purpose), `projectId`, `userId`, `backend` (`inline|bullmq|lambda`), `externalId`,
+  `status` (`queued|rendering|ready|failed|cancelled`), `progress`, `costCents`, `format`,
+  `config` (a `RenderSettings` snapshot), `outputPath`, `error`, `cancelRequested`,
+  timestamps. CRUD + lifecycle setters live in `services/renderJobsService.ts`;
+  `recoverStuckRenders()` now reconciles orphaned `render_jobs` rows alongside stuck
+  projects, and `truncateAll()` clears the table.
+- **Hyperframes API (verified against 0.6.6)**: producer `RenderConfig.fps` is an exact
+  rational `{ num, den }` (NOT an enum); `format` ∈ `mp4|webm|mov|png-sequence` (webm/mov/
+  png-sequence carry true alpha); `executeRenderJob(job, dir, out, onProgress?, abortSignal?)`
+  accepts an `AbortSignal` and throws `RenderCancelledError` on cancel (treated as a
+  rollback-to-draft, not a failure). Resolution presets mirror core's `CANVAS_DIMENSIONS`
+  (the 6 named presets above); dimensions are composition-authored, with
+  `RenderConfig.outputResolution` (a `CanvasResolution`) as the override.
 
 ## Known gotchas
 
@@ -285,6 +328,15 @@ stored; we only need the identity for sign-in.
 - The render producer reads its core runtime from `<cwd>/core/dist`. The Docker
   image materializes it; for local dev run the api-server from the repo root (so
   cwd has `core/dist`) — `cp -rL artifacts/api-server/node_modules/@hyperframes/core/dist core/dist`
+- **Windows install**: the root `preinstall` script runs `sh -c '...'`, which fails
+  under PowerShell (`'sh' is not recognized`). Run `pnpm install` from a shell that has
+  `sh` on PATH — Git Bash or WSL
+- `@hyperframes/core`'s ESM `dist` uses extensionless relative imports. esbuild (the
+  prod bundle) and `tsc` (types only) resolve these fine, but Node's native ESM loader
+  (used by vitest) cannot — so any module that imports a **runtime** value from core
+  needs `server.deps.inline: [/@hyperframes\/core/]` in `vitest.config.ts`.
+  `renderSettingsService` sidesteps this today by keeping a local `CANVAS_DIMENSIONS`
+  copy (verified against 0.6.6) instead of importing it
 - CORS is permissive in dev (`origin: true`); in production it enforces
   `ALLOWED_ORIGINS` strictly
 - Drizzle returns `Date` objects; before passing rows through Zod parsing,
@@ -437,6 +489,16 @@ build`.
 8. **Sentry source map upload**: `sentry-cli releases files
 upload-sourcemaps` in the deploy workflow + strip `.map` from the
    shipped artifact.
+9. **Distributed render backend (M11)**: the render-backend abstraction
+   (`inline | bullmq | lambda`, recorded on `render_jobs.backend`) and the
+   `infra/` AWS CDK scaffold (S3 render bucket + Hyperframes Lambda / Step
+   Functions state machine, least-privilege IAM, `deploy-infra.yml`) exist as
+   scaffolding only. Still pending: adding `infra/*` to `pnpm-workspace.yaml` +
+   install, the api-server glue (`renderBackend.ts` / `lambdaBackend.ts` plugging
+   into `renderQueue.ts`), and a deliberate `@hyperframes/*` version alignment
+   (`0.6.6` → `0.6.65`) once the player / studio / `aws-lambda` packages are
+   adopted. The `@hyperframes/aws-lambda` API used by the CDK stack is
+   developer-stated and unverified until then.
 
 ## User preferences
 
