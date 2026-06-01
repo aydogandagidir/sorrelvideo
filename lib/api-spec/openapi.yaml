@@ -442,6 +442,37 @@ paths:
         "404":
           description: Video not available yet
 
+  /projects/{id}/render-settings:
+    patch:
+      operationId: updateProjectRenderSettings
+      tags: [projects]
+      summary: Update a project's render settings (Pro-only capabilities gated)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenderSettingsInput"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden — upgrade_required for Pro-only settings
+        "404":
+          description: Not found
+
   /brand:
     get:
       operationId: getBrandKit
@@ -915,6 +946,11 @@ components:
               additionalProperties:
                 type: string
             - type: "null"
+        renderSettings:
+          description: Per-project render configuration. Null → server defaults.
+          oneOf:
+            - $ref: "#/components/schemas/RenderSettings"
+            - type: "null"
         createdAt:
           type: string
         updatedAt:
@@ -955,6 +991,69 @@ components:
           type: object
           additionalProperties:
             type: string
+
+    RenderTransition:
+      type: object
+      required: [time, shader, duration, ease]
+      properties:
+        time:
+          type: number
+        shader:
+          type: string
+        duration:
+          type: number
+        ease:
+          type: string
+
+    RenderSettings:
+      type: object
+      required: [fps, quality, format, resolution, transparent, watermark]
+      properties:
+        fps:
+          type: integer
+          enum: [24, 30, 60]
+        quality:
+          type: string
+          enum: [draft, standard, high]
+        format:
+          type: string
+          enum: [mp4, webm, mov, png-sequence]
+        resolution:
+          type: string
+          enum: [landscape, portrait, square, landscape-4k, portrait-4k, square-4k]
+        transparent:
+          type: boolean
+        watermark:
+          type: boolean
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RenderTransition"
+
+    RenderSettingsInput:
+      type: object
+      description: Partial render settings; omitted fields keep their current value.
+      properties:
+        fps:
+          type: integer
+          enum: [24, 30, 60]
+        quality:
+          type: string
+          enum: [draft, standard, high]
+        format:
+          type: string
+          enum: [mp4, webm, mov, png-sequence]
+        resolution:
+          type: string
+          enum: [landscape, portrait, square, landscape-4k, portrait-4k, square-4k]
+        transparent:
+          type: boolean
+        watermark:
+          type: boolean
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RenderTransition"
 
     BrandKit:
       type: object

@@ -1,5 +1,5 @@
-import { and, eq } from "drizzle-orm";
-import { db, projectsTable } from "@workspace/db";
+import { and, eq, inArray } from "drizzle-orm";
+import { db, projectsTable, renderJobsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { hasPendingJob, isQueueEnabled } from "./renderQueue";
 
@@ -28,9 +28,8 @@ export async function recoverStuckRenders(): Promise<void> {
     return;
   }
 
-  if (stuck.length === 0) return;
-
   const queueOn = isQueueEnabled();
+
   let reset = 0;
   for (const { id } of stuck) {
     if (queueOn && (await hasPendingJob(id))) continue;
@@ -44,4 +43,44 @@ export async function recoverStuckRenders(): Promise<void> {
   }
 
   if (reset > 0) logger.info({ reset }, "Reset stuck renders to failed");
+
+  await recoverStuckRenderJobs(queueOn);
+}
+
+/**
+ * Mirror the project reconcile for the render_jobs ledger: any job still
+ * `queued` or `rendering` with no live queue entry is an orphan from a crashed
+ * process → mark it `failed`. The `status IN (...)` guard on the UPDATE avoids
+ * clobbering a job that finished between the SELECT and the UPDATE.
+ */
+async function recoverStuckRenderJobs(queueOn: boolean): Promise<void> {
+  let stuck: { id: string; projectId: number }[];
+  try {
+    stuck = await db
+      .select({ id: renderJobsTable.id, projectId: renderJobsTable.projectId })
+      .from(renderJobsTable)
+      .where(inArray(renderJobsTable.status, ["queued", "rendering"]));
+  } catch (err) {
+    logger.warn({ err }, "Stuck render-job recovery query failed");
+    return;
+  }
+
+  if (stuck.length === 0) return;
+
+  let reset = 0;
+  for (const { id, projectId } of stuck) {
+    if (queueOn && (await hasPendingJob(projectId))) continue;
+    await db
+      .update(renderJobsTable)
+      .set({ status: "failed", error: "Render interrupted by a restart" })
+      .where(
+        and(
+          eq(renderJobsTable.id, id),
+          inArray(renderJobsTable.status, ["queued", "rendering"]),
+        ),
+      );
+    reset++;
+  }
+
+  if (reset > 0) logger.info({ reset }, "Reset stuck render jobs to failed");
 }

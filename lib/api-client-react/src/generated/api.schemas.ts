@@ -145,6 +145,63 @@ export const ProjectStatus = {
  */
 export type ProjectCompositionVars = {[key: string]: string} | null;
 
+export type RenderSettingsFps = typeof RenderSettingsFps[keyof typeof RenderSettingsFps];
+
+
+export const RenderSettingsFps = {
+  NUMBER_24: 24,
+  NUMBER_30: 30,
+  NUMBER_60: 60,
+} as const;
+
+export type RenderSettingsQuality = typeof RenderSettingsQuality[keyof typeof RenderSettingsQuality];
+
+
+export const RenderSettingsQuality = {
+  draft: 'draft',
+  standard: 'standard',
+  high: 'high',
+} as const;
+
+export type RenderSettingsFormat = typeof RenderSettingsFormat[keyof typeof RenderSettingsFormat];
+
+
+export const RenderSettingsFormat = {
+  mp4: 'mp4',
+  webm: 'webm',
+  mov: 'mov',
+  'png-sequence': 'png-sequence',
+} as const;
+
+export type RenderSettingsResolution = typeof RenderSettingsResolution[keyof typeof RenderSettingsResolution];
+
+
+export const RenderSettingsResolution = {
+  landscape: 'landscape',
+  portrait: 'portrait',
+  square: 'square',
+  'landscape-4k': 'landscape-4k',
+  'portrait-4k': 'portrait-4k',
+  'square-4k': 'square-4k',
+} as const;
+
+export interface RenderTransition {
+  time: number;
+  shader: string;
+  duration: number;
+  ease: string;
+}
+
+export interface RenderSettings {
+  fps: RenderSettingsFps;
+  quality: RenderSettingsQuality;
+  format: RenderSettingsFormat;
+  resolution: RenderSettingsResolution;
+  transparent: boolean;
+  watermark: boolean;
+  transitions?: RenderTransition[];
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -164,6 +221,8 @@ export interface Project {
   renderError?: string | null;
   /** Studio placeholder values keyed by `user.*` / `brand.*`. Optional. */
   compositionVars?: ProjectCompositionVars;
+  /** Per-project render configuration. Null → server defaults. */
+  renderSettings?: RenderSettings | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -197,6 +256,59 @@ export interface ProjectUpdate {
   thumbnailUrl?: string;
   videoUrl?: string;
   compositionVars?: ProjectUpdateCompositionVars;
+}
+
+export type RenderSettingsInputFps = typeof RenderSettingsInputFps[keyof typeof RenderSettingsInputFps];
+
+
+export const RenderSettingsInputFps = {
+  NUMBER_24: 24,
+  NUMBER_30: 30,
+  NUMBER_60: 60,
+} as const;
+
+export type RenderSettingsInputQuality = typeof RenderSettingsInputQuality[keyof typeof RenderSettingsInputQuality];
+
+
+export const RenderSettingsInputQuality = {
+  draft: 'draft',
+  standard: 'standard',
+  high: 'high',
+} as const;
+
+export type RenderSettingsInputFormat = typeof RenderSettingsInputFormat[keyof typeof RenderSettingsInputFormat];
+
+
+export const RenderSettingsInputFormat = {
+  mp4: 'mp4',
+  webm: 'webm',
+  mov: 'mov',
+  'png-sequence': 'png-sequence',
+} as const;
+
+export type RenderSettingsInputResolution = typeof RenderSettingsInputResolution[keyof typeof RenderSettingsInputResolution];
+
+
+export const RenderSettingsInputResolution = {
+  landscape: 'landscape',
+  portrait: 'portrait',
+  square: 'square',
+  'landscape-4k': 'landscape-4k',
+  'portrait-4k': 'portrait-4k',
+  'square-4k': 'square-4k',
+} as const;
+
+/**
+ * Partial render settings; omitted fields keep their current value.
+ */
+export interface RenderSettingsInput {
+  fps?: RenderSettingsInputFps;
+  quality?: RenderSettingsInputQuality;
+  format?: RenderSettingsInputFormat;
+  resolution?: RenderSettingsInputResolution;
+  transparent?: boolean;
+  watermark?: boolean;
+  transitions?: RenderTransition[];
 }
 
 /**

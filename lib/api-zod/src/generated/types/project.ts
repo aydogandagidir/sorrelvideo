@@ -7,6 +7,7 @@
  */
 import type { ProjectCompositionVars } from './projectCompositionVars';
 import type { ProjectStatus } from './projectStatus';
+import type { RenderSettings } from './renderSettings';
 
 export interface Project {
   id: number;
@@ -27,6 +28,8 @@ export interface Project {
   renderError?: string | null;
   /** Studio placeholder values keyed by `user.*` / `brand.*`. Optional. */
   compositionVars?: ProjectCompositionVars;
+  /** Per-project render configuration. Null → server defaults. */
+  renderSettings?: RenderSettings | null;
   createdAt: string;
   updatedAt: string;
 }

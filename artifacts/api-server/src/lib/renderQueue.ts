@@ -17,6 +17,8 @@ export interface RenderJobData {
   projectId: number;
   module: string;
   templateId: number | null;
+  /** Ledger row id (render_jobs) this enqueue corresponds to. */
+  renderJobId: string;
 }
 
 const QUEUE_NAME = "render";
@@ -71,6 +73,7 @@ export async function enqueueRender(
   projectId: number,
   module: string,
   templateId: number | null,
+  renderJobId: string,
 ): Promise<void> {
   if (isQueueEnabled()) {
     const q = await getRenderQueue();
@@ -80,7 +83,7 @@ export async function enqueueRender(
     await q.remove(jobId).catch(() => undefined);
     await q.add(
       "render",
-      { projectId, module, templateId },
+      { projectId, module, templateId, renderJobId },
       {
         jobId,
         attempts: ATTEMPTS,
@@ -92,7 +95,7 @@ export async function enqueueRender(
   }
 
   // Inline fallback (no Redis): same semantics as the old fire-and-forget.
-  void executeRender(projectId, module, templateId).catch((err) =>
+  void executeRender(projectId, module, templateId, renderJobId).catch((err) =>
     logger.error({ projectId, err }, "Inline render failed"),
   );
 }
@@ -104,7 +107,12 @@ export async function startRenderWorker(): Promise<void> {
   worker = new Worker<RenderJobData>(
     QUEUE_NAME,
     async (job) =>
-      executeRender(job.data.projectId, job.data.module, job.data.templateId),
+      executeRender(
+        job.data.projectId,
+        job.data.module,
+        job.data.templateId,
+        job.data.renderJobId,
+      ),
     { connection: await getConnection(), concurrency: CONCURRENCY },
   );
   worker.on("failed", (job, err) =>

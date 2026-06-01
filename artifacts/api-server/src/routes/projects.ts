@@ -1,7 +1,13 @@
 import fs from "fs";
 import { Router, type IRouter } from "express";
 import { and, eq, ne } from "drizzle-orm";
-import { db, projectsTable, templatesTable, usersTable } from "@workspace/db";
+import {
+  db,
+  projectsTable,
+  templatesTable,
+  usersTable,
+  type RenderSettings,
+} from "@workspace/db";
 import {
   ListProjectsResponse,
   CreateProjectBody,
@@ -11,12 +17,22 @@ import {
   UpdateProjectBody,
   UpdateProjectResponse,
   DeleteProjectParams,
+  UpdateProjectRenderSettingsParams,
+  UpdateProjectRenderSettingsBody,
 } from "@workspace/api-zod";
 import {
   renderFileExists,
   getRenderFilePath,
 } from "../services/renderService";
-import { enqueueRender } from "../lib/renderQueue";
+import {
+  resolveSettings,
+  assertRenderSettingsAllowed,
+} from "../services/renderSettingsService";
+import { enqueueRender, isQueueEnabled } from "../lib/renderQueue";
+import {
+  createRenderJob as createRenderJobRow,
+  markFailed,
+} from "../services/renderJobsService";
 import {
   checkAndIncrementRenderCount,
   getUserPlan,
@@ -164,6 +180,84 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+// PATCH /api/projects/:id/render-settings — update render config (Pro-gated).
+// Dedicated endpoint (NOT the generic PATCH) so Pro-only capabilities can't be
+// set un-gated. The same gate runs again at render time (defense in depth).
+router.patch(
+  "/projects/:id/render-settings",
+  async (req, res): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const rawId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+    const params = UpdateProjectRenderSettingsParams.safeParse({
+      id: parseInt(rawId, 10),
+    });
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const parsed = UpdateProjectRenderSettingsBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const [existing] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, params.data.id));
+
+    if (!existing) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (existing.userId !== req.user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    // Merge the partial over the project's current settings (or defaults), then
+    // gate against the plan before persisting the fully-resolved object.
+    const patch: Partial<RenderSettings> = parsed.data;
+    const merged = resolveSettings({
+      ...(existing.renderSettings ?? {}),
+      ...patch,
+    });
+
+    const [userRow] = await db
+      .select({ stripeCustomerId: usersTable.stripeCustomerId })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id));
+    const plan = await getUserPlan(userRow?.stripeCustomerId ?? null);
+
+    try {
+      assertRenderSettingsAllowed(merged, plan);
+    } catch (err) {
+      const e = err as { reason?: string; message?: string };
+      if (e.reason === "upgrade_required") {
+        res.status(403).json({
+          error: e.message ?? "Upgrade required",
+          reason: "upgrade_required",
+        });
+        return;
+      }
+      throw err;
+    }
+
+    const [project] = await db
+      .update(projectsTable)
+      .set({ renderSettings: merged })
+      .where(eq(projectsTable.id, params.data.id))
+      .returning();
+
+    res.json(GetProjectResponse.parse(serializeDates(project)));
+  },
+);
+
 // POST /api/projects/:id/render — kick off async render
 router.post("/projects/:id/render", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
@@ -250,15 +344,58 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
     throw err;
   }
 
-  // Durable enqueue when REDIS_URL is set; inline fire-and-forget otherwise.
-  // If enqueue fails, release the claim so the project isn't stranded in "rendering".
+  // Re-gate the persisted render settings at render time (defense in depth — a
+  // user who downgraded after saving a Pro config must not render it). On a
+  // gate failure, release the claim back to the prior status (not a render
+  // failure) and 403, byte-identical to the quota / premium-template rejections.
+  const settings = resolveSettings(project.renderSettings);
   try {
-    await enqueueRender(id, project.module, project.templateId);
+    const [userRow] = await db
+      .select({ stripeCustomerId: usersTable.stripeCustomerId })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id));
+    const plan = await getUserPlan(userRow?.stripeCustomerId ?? null);
+    assertRenderSettingsAllowed(settings, plan);
+  } catch (err) {
+    const e = err as { reason?: string; message?: string };
+    if (e.reason === "upgrade_required") {
+      await db
+        .update(projectsTable)
+        .set({ status: project.status })
+        .where(eq(projectsTable.id, id));
+      res.status(403).json({
+        error: e.message ?? "Upgrade required",
+        reason: "upgrade_required",
+      });
+      return;
+    }
+    throw err;
+  }
+
+  // Open a render-job ledger row before enqueueing so the pipeline has an id to
+  // advance through queued → rendering → ready/failed/cancelled.
+  const renderJobId = await createRenderJobRow({
+    projectId: id,
+    userId: req.user.id,
+    backend: isQueueEnabled() ? "bullmq" : "inline",
+    config: settings,
+    format: settings.format,
+  });
+
+  // Durable enqueue when REDIS_URL is set; inline fire-and-forget otherwise.
+  // If enqueue fails, release the claim so the project isn't stranded in
+  // "rendering" and mark the ledger row failed.
+  try {
+    await enqueueRender(id, project.module, project.templateId, renderJobId);
   } catch (err) {
     await db
       .update(projectsTable)
       .set({ status: project.status })
       .where(eq(projectsTable.id, id));
+    await markFailed(
+      renderJobId,
+      err instanceof Error ? err.message : String(err),
+    ).catch(() => undefined);
     req.log.error({ projectId: id, err }, "Failed to enqueue render");
     res.status(503).json({ error: "Could not start render. Please try again." });
     return;

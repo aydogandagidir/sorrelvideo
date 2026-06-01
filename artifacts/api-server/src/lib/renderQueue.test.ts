@@ -50,20 +50,25 @@ describe("isQueueEnabled", () => {
 describe("enqueueRender", () => {
   it("runs inline (and never touches the queue) when REDIS_URL is unset", async () => {
     const { enqueueRender } = await import("./renderQueue");
-    await enqueueRender(7, "studio", null);
-    expect(h.executeRender).toHaveBeenCalledWith(7, "studio", null);
+    await enqueueRender(7, "studio", null, "rj-7");
+    expect(h.executeRender).toHaveBeenCalledWith(7, "studio", null, "rj-7");
     expect(h.queueAdd).not.toHaveBeenCalled();
   });
 
   it("enqueues with jobId=projectId and does not run inline when REDIS_URL is set", async () => {
     process.env.REDIS_URL = "redis://localhost:6379";
     const { enqueueRender } = await import("./renderQueue");
-    await enqueueRender(42, "studio", 3);
+    await enqueueRender(42, "studio", 3, "rj-42");
 
     expect(h.executeRender).not.toHaveBeenCalled();
     expect(h.queueAdd).toHaveBeenCalledTimes(1);
     const [, data, opts] = h.queueAdd.mock.calls[0];
-    expect(data).toEqual({ projectId: 42, module: "studio", templateId: 3 });
+    expect(data).toEqual({
+      projectId: 42,
+      module: "studio",
+      templateId: 3,
+      renderJobId: "rj-42",
+    });
     // Must NOT be a bare number — BullMQ rejects purely-numeric custom job ids.
     expect(opts.jobId).toBe("render-42");
     expect(opts.jobId).not.toMatch(/^\d+$/);

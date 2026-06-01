@@ -44,6 +44,7 @@ import type {
   Project,
   ProjectInput,
   ProjectUpdate,
+  RenderSettingsInput,
   ResendVerificationRequest,
   ResetPasswordRequest,
   SignupRequest,
@@ -1635,6 +1636,78 @@ export function useGetProjectVideo<TData = Awaited<ReturnType<typeof getProjectV
 
 
 
+
+export const getUpdateProjectRenderSettingsUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/render-settings`
+}
+
+/**
+ * @summary Update a project's render settings (Pro-only capabilities gated)
+ */
+export const updateProjectRenderSettings = async (id: number,
+    renderSettingsInput: RenderSettingsInput, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getUpdateProjectRenderSettingsUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      renderSettingsInput,)
+  }
+);}
+
+
+
+
+export const getUpdateProjectRenderSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectRenderSettings>>, TError,{id: number;data: BodyType<RenderSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectRenderSettings>>, TError,{id: number;data: BodyType<RenderSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateProjectRenderSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectRenderSettings>>, {id: number;data: BodyType<RenderSettingsInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateProjectRenderSettings(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectRenderSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectRenderSettings>>>
+    export type UpdateProjectRenderSettingsMutationBody = BodyType<RenderSettingsInput>
+    export type UpdateProjectRenderSettingsMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a project's render settings (Pro-only capabilities gated)
+ */
+export const useUpdateProjectRenderSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectRenderSettings>>, TError,{id: number;data: BodyType<RenderSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectRenderSettings>>,
+        TError,
+        {id: number;data: BodyType<RenderSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateProjectRenderSettingsMutationOptions(options));
+    }
 
 export const getGetBrandKitUrl = () => {
 

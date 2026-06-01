@@ -4,12 +4,19 @@ import { fileURLToPath } from "url";
 import {
   createRenderJob,
   executeRenderJob,
-  type RenderConfig,
+  RenderCancelledError,
 } from "@hyperframes/producer";
-import type { Fps } from "@hyperframes/core";
 import { eq } from "drizzle-orm";
 import { db, brandKitTable, projectsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { resolveSettings, toEngineConfig } from "./renderSettingsService";
+import {
+  markCancelled,
+  markFailed,
+  markProgress,
+  markReady,
+  markRendering,
+} from "./renderJobsService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -226,23 +233,30 @@ export async function executeRender(
   projectId: number,
   module: string,
   _templateId?: number | null,
+  renderJobId?: string,
 ): Promise<void> {
   const outputDir = path.join(RENDERS_DIR, String(projectId));
   fs.mkdirSync(outputDir, { recursive: true });
   const outputPath = path.join(outputDir, "output.mp4");
 
-  logger.info({ projectId, module, outputPath }, "Render job starting");
+  logger.info(
+    { projectId, module, outputPath, renderJobId },
+    "Render job starting",
+  );
 
   await setProjectStatus(projectId, "rendering");
+  if (renderJobId) await markRendering(renderJobId);
 
   try {
-    // Re-read the project to pick up the userId + compositionVars at render time.
+    // Re-read the project to pick up the userId + compositionVars +
+    // renderSettings at render time.
     const [project] = await db
       .select({
         id: projectsTable.id,
         userId: projectsTable.userId,
         module: projectsTable.module,
         compositionVars: projectsTable.compositionVars,
+        renderSettings: projectsTable.renderSettings,
       })
       .from(projectsTable)
       .where(eq(projectsTable.id, projectId));
@@ -252,11 +266,10 @@ export async function executeRender(
 
     const { dir, file } = await prepareCompositionFor(project);
 
-    const config: RenderConfig = {
-      fps: { num: 30, den: 1 } as Fps,
-      quality: "draft",
-      entryFile: file,
-    };
+    // Resolve the per-project settings (null → DEFAULT_RENDER_SETTINGS) and map
+    // them to the engine's RenderConfig. The Free/Pro gate already ran at the
+    // route layer; here we just honor the persisted, validated config.
+    const config = toEngineConfig(resolveSettings(project.renderSettings), file);
 
     const job = createRenderJob(config);
 
@@ -265,6 +278,15 @@ export async function executeRender(
         { projectId, percent: Math.round(j.progress * 100), msg },
         "Render progress",
       );
+      if (renderJobId) {
+        void markProgress(renderJobId, Math.round(j.progress * 100)).catch(
+          (err) =>
+            logger.warn(
+              { renderJobId, err },
+              "Could not persist render progress",
+            ),
+        );
+      }
     });
 
     const videoUrl = `/api/projects/${projectId}/video`;
@@ -279,14 +301,26 @@ export async function executeRender(
       videoUrl,
       duration: renderedDuration,
     });
+    if (renderJobId)
+      await markReady(renderJobId, { duration: renderedDuration, outputPath });
     logger.info(
-      { projectId, videoUrl, duration: renderedDuration },
+      { projectId, videoUrl, duration: renderedDuration, renderJobId },
       "Render completed",
     );
   } catch (err) {
+    // A cancellation is an expected outcome, not a failure: roll the project
+    // back to a draft so it can be re-rendered, and mark the job cancelled
+    // without writing a renderError the UI would surface as a problem.
+    if (err instanceof RenderCancelledError) {
+      logger.info({ projectId, renderJobId }, "Render cancelled");
+      await setProjectStatus(projectId, "draft");
+      if (renderJobId) await markCancelled(renderJobId);
+      return;
+    }
     const renderError = err instanceof Error ? err.message : String(err);
     logger.error({ projectId, err }, "Render failed");
     await setProjectStatus(projectId, "failed", { renderError });
+    if (renderJobId) await markFailed(renderJobId, renderError);
   }
 }
 

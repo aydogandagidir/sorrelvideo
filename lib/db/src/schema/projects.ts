@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import type { RenderSettings } from "./render";
 
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
@@ -25,6 +26,11 @@ export const projectsTable = pgTable("projects", {
   // (e.g. headline, bodyText, ctaText). Studio writes here; the render
   // service merges this with the user's brand kit at render time.
   compositionVars: jsonb("composition_vars").$type<Record<string, string>>(),
+  // Per-project render configuration (fps, quality, format, resolution,
+  // transparency, watermark, transitions). Null → DEFAULT_RENDER_SETTINGS, so
+  // existing rows render exactly as before this column existed. Edited via
+  // PATCH /projects/:id/render-settings; consumed by renderService at render time.
+  renderSettings: jsonb("render_settings").$type<RenderSettings>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

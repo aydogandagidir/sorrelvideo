@@ -249,6 +249,20 @@ export const ListProjectsResponseItem = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -286,6 +300,20 @@ export const GetProjectResponse = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -319,6 +347,20 @@ export const UpdateProjectResponse = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -345,6 +387,59 @@ export const StartProjectRenderParams = zod.object({
  */
 export const GetProjectVideoParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Update a project's render settings (Pro-only capabilities gated)
+ */
+export const UpdateProjectRenderSettingsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateProjectRenderSettingsBody = zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]).optional(),
+  "quality": zod.enum(['draft', 'standard', 'high']).optional(),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']).optional(),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']).optional(),
+  "transparent": zod.boolean().optional(),
+  "watermark": zod.boolean().optional(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}).describe('Partial render settings; omitted fields keep their current value.')
+
+export const UpdateProjectRenderSettingsResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
+  "module": zod.string(),
+  "templateId": zod.number().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "videoUrl": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
+  "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 })
 
 
@@ -549,6 +644,20 @@ export const GetStatsResponse = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })).optional()
