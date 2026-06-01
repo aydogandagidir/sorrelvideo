@@ -255,6 +255,17 @@ function ProjectCard({
               </Tooltip>
             </TooltipProvider>
 
+            {/* Open this project in the embedded @hyperframes/studio editor */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                window.location.href = `/editor/#project/${project.id}`;
+              }}
+            >
+              Studio
+            </Button>
+
             {/* Render button — shown only for draft status */}
             {project.status === "draft" && (
               <Button

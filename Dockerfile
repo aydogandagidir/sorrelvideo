@@ -19,6 +19,7 @@ FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY artifacts/api-server/package.json artifacts/api-server/
 COPY artifacts/sorrel/package.json artifacts/sorrel/
+COPY artifacts/studio-editor/package.json artifacts/studio-editor/
 COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
 COPY lib/db/package.json lib/db/
 COPY lib/api-spec/package.json lib/api-spec/
@@ -41,11 +42,11 @@ COPY . .
 ENV NODE_ENV=production \
     BASE_PATH=/ \
     PORT=8080
-# Typecheck everything, but only build what ships: the api-server bundle and
-# the sorrel SPA. mockup-sandbox is a dev-only Hyperframes playground and is
-# not deployed.
+# Typecheck everything, but only build what ships: the api-server bundle, the
+# sorrel SPA, and the embedded studio-editor (served at /editor/). mockup-sandbox
+# is a dev-only Hyperframes playground and is not deployed.
 RUN pnpm run typecheck \
-    && pnpm --filter @workspace/api-server --filter @workspace/sorrel run build
+    && pnpm --filter @workspace/api-server --filter @workspace/sorrel --filter @workspace/studio-editor run build
 
 # The Hyperframes producer loads its core runtime + manifest from
 # <cwd>/core/dist at render time. That folder isn't in git (it's a copy of the
@@ -132,6 +133,8 @@ COPY --from=build /repo/artifacts/api-server/src/compositions ./artifacts/api-se
 # Frontend bundle — app.ts (in production) serves it via express.static from
 # `<bundle dir>/../public` = /app/artifacts/api-server/public.
 COPY --from=build /repo/artifacts/sorrel/dist/public ./artifacts/api-server/public
+# Embedded @hyperframes/studio editor (M9) → express serves it at /editor/.
+COPY --from=build /repo/artifacts/studio-editor/dist ./artifacts/api-server/public/editor
 
 # Hyperframes core runtime (manifest + iife) materialized in the build stage.
 # Producer resolves it at <cwd>/core/dist (cwd is /app).

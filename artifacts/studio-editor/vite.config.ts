@@ -29,6 +29,14 @@ const studioSrc = path.dirname(nodeRequire.resolve("@hyperframes/studio"));
 
 export default defineConfig({
   base: "/editor/",
+  server: {
+    // Dev only: the editor's own Vite dev server proxies /api → the api-server
+    // so its repointed /api/studio/* calls reach Sorrel. In production the
+    // editor is served by express under /editor/ (same origin — no proxy).
+    proxy: {
+      "/api": { target: "http://localhost:8080", changeOrigin: true },
+    },
+  },
   resolve: {
     alias: {
       // studio's `exports` map doesn't expose the css; alias the real file so
