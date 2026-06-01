@@ -1,0 +1,23 @@
+{
+  "app": "tsx bin/app.ts",
+  "watch": {
+    "include": ["bin/**", "lib/**"],
+    "exclude": ["node_modules", "cdk.out", "**/*.d.ts"]
+  },
+  "context": {
+    "//": "App-level context. Override the stage at deploy time with `cdk deploy -c stage=prod`. Region comes from AWS_REGION (see bin/app.ts) — Hyperframes Lambda rendering is single-region in v1.",
+    "stage": "dev",
+
+    "//hyperframes": "Defaults mirrored from .env.example so synth has sensible values without env. The api-server runtime reads the deployed equivalents at request time. NOTE: chromeSource is the short \"sparticuz\" token the @hyperframes/aws-lambda construct expects (verified against its 0.6.65 types) — NOT the npm package name \"@sparticuz/chromium\". concurrency maps to the construct's reservedConcurrency prop.",
+    "renderBucketPrefix": "sorrel-render",
+    "chromeSource": "sparticuz",
+    "concurrency": 8,
+
+    "//cdk-feature-flags": "Recommended modern CDK defaults. Trimmed to the ones that affect this stack; `cdk init` emits a longer list, but these are the load-bearing ones for S3 + IAM least privilege.",
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
+    "@aws-cdk/core:newStyleStackSynthesis": true,
+    "@aws-cdk/core:stackRelativeExports": true
+  }
+}
