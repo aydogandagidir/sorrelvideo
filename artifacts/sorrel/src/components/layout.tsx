@@ -11,6 +11,9 @@ import {
   Settings,
   Wand2,
   Zap,
+  Layers,
+  BarChart3,
+  Users,
 } from "lucide-react";
 import { useBillingInfo } from "@/hooks/useBilling";
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,9 @@ const NAV_ITEMS = [
   { href: "/templates", label: "Templates", icon: Film },
   { href: "/brand", label: "Brand Kit", icon: Palette },
   { href: "/modules", label: "Modules", icon: Blocks },
+  { href: "/bulk", label: "Bulk", icon: Layers },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/collab", label: "Collab", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

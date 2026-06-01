@@ -6,6 +6,7 @@ import {
   useCreateProject,
   useGetBrandKit,
   useStartProjectRender,
+  useUpdateProjectRenderSettings,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { RenderSettingsForm } from "@/components/render-settings-form";
+import {
+  DEFAULT_RENDER_SETTINGS,
+  proViolations,
+  type RenderSettings,
+} from "@/lib/render-settings";
+import { useBillingInfo } from "@/hooks/useBilling";
 
 const DEFAULT_HEADLINE = "Make something\nthey'll remember.";
 const DEFAULT_BODY =
@@ -29,26 +37,43 @@ const DEFAULT_CTA = "Try it free";
 export default function StudioPage() {
   const [, setLocation] = useLocation();
   const { data: brandKit } = useGetBrandKit();
+  const { data: billing } = useBillingInfo();
   const createProject = useCreateProject();
   const startRender = useStartProjectRender();
+  const updateRenderSettings = useUpdateProjectRenderSettings();
   const aiSuggest = useAiSuggest();
+
+  const plan = billing?.plan ?? "free";
 
   const [name, setName] = useState("Untitled Studio Project");
   const [aiPrompt, setAiPrompt] = useState("");
   const [headline, setHeadline] = useState(DEFAULT_HEADLINE);
   const [bodyText, setBodyText] = useState(DEFAULT_BODY);
   const [ctaText, setCtaText] = useState(DEFAULT_CTA);
+  const [renderSettings, setRenderSettings] = useState<RenderSettings>(
+    DEFAULT_RENDER_SETTINGS,
+  );
   const [error, setError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<
-    "render_limit" | "premium_template" | "ai_limit"
+    "render_limit" | "premium_template" | "ai_limit" | "render_quality"
   >("ai_limit");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    // Eager client-side gate: a Free user who picked a Pro-only render setting
+    // is nudged to upgrade before we create a draft. The server PATCH below is
+    // still authoritative (handles the 403 path too).
+    if (plan !== "pro" && proViolations(renderSettings).length > 0) {
+      setUpgradeReason("render_quality");
+      setShowUpgrade(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const project = await createProject.mutateAsync({
@@ -62,6 +87,12 @@ export default function StudioPage() {
           },
         },
       });
+      // Persist the chosen render settings before rendering so the job picks
+      // them up. The endpoint re-validates Pro gating server-side.
+      await updateRenderSettings.mutateAsync({
+        id: project.id,
+        data: renderSettings,
+      });
       // Kick off the render, then jump to Projects (which polls it to "ready").
       // Navigate only after the render call resolves so the card lands in
       // "rendering", not "draft".
@@ -74,13 +105,16 @@ export default function StudioPage() {
         message?: string;
       };
       const errorMsg = anyErr.data?.error ?? anyErr.message ?? "";
-      // Render blocked by plan limits — show the upgrade modal in place. The
-      // draft is already saved and waiting on the Projects page.
+      // Render or render-settings blocked by plan limits — show the upgrade
+      // modal in place. Any draft is already saved and waiting on Projects.
       if (anyErr.status === 403 && anyErr.data?.reason === "upgrade_required") {
+        const lower = errorMsg.toLowerCase();
         setUpgradeReason(
-          errorMsg.toLowerCase().includes("template")
+          lower.includes("template")
             ? "premium_template"
-            : "render_limit",
+            : lower.includes("pro plan")
+              ? "render_quality"
+              : "render_limit",
         );
         setShowUpgrade(true);
         return;
@@ -238,6 +272,26 @@ export default function StudioPage() {
                     maxLength={48}
                   />
                 </div>
+
+                <div className="space-y-4 border-t pt-5">
+                  <div>
+                    <h2 className="text-sm font-semibold">Render settings</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Output format, quality, and transitions for this render.
+                    </p>
+                  </div>
+                  <RenderSettingsForm
+                    value={renderSettings}
+                    onChange={setRenderSettings}
+                    plan={plan}
+                    disabled={isSubmitting}
+                    onUpgrade={() => {
+                      setUpgradeReason("render_quality");
+                      setShowUpgrade(true);
+                    }}
+                  />
+                </div>
+
                 {error && (
                   <p className="text-sm text-destructive" role="alert">
                     {error}
