@@ -36,6 +36,7 @@ import {
   isQueueEnabled,
   removeQueuedRender,
 } from "../lib/renderQueue";
+import { selectBackend } from "../lib/renderBackend";
 import {
   createRenderJob as createRenderJobRow,
   markFailed,
@@ -44,6 +45,7 @@ import {
 } from "../services/renderJobsService";
 import {
   checkAndIncrementRenderCount,
+  checkAndIncrementDistributedRenderCount,
   getUserPlan,
 } from "../services/billingService";
 
@@ -394,13 +396,19 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
   // gate failure, release the claim back to the prior status (not a render
   // failure) and 403, byte-identical to the quota / premium-template rejections.
   const settings = resolveSettings(project.renderSettings);
+  const [planRow] = await db
+    .select({ stripeCustomerId: usersTable.stripeCustomerId })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.id));
+  const plan = await getUserPlan(planRow?.stripeCustomerId ?? null);
   try {
-    const [userRow] = await db
-      .select({ stripeCustomerId: usersTable.stripeCustomerId })
-      .from(usersTable)
-      .where(eq(usersTable.id, req.user.id));
-    const plan = await getUserPlan(userRow?.stripeCustomerId ?? null);
     assertRenderSettingsAllowed(settings, plan);
+    // Distributed (Lambda) renders carry a separate monthly cap — even for Pro,
+    // since they cost real money. Only enforced when this render actually routes
+    // to Lambda (RENDER_BACKEND=lambda + AWS env + Pro); inline/bullmq unaffected.
+    if (selectBackend(plan) === "lambda") {
+      await checkAndIncrementDistributedRenderCount(req.user.id);
+    }
   } catch (err) {
     const e = err as { reason?: string; message?: string };
     if (e.reason === "upgrade_required") {
@@ -431,7 +439,7 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
   // If enqueue fails, release the claim so the project isn't stranded in
   // "rendering" and mark the ledger row failed.
   try {
-    await enqueueRender(id, project.module, project.templateId, renderJobId);
+    await enqueueRender(id, project.module, project.templateId, renderJobId, plan);
   } catch (err) {
     await db
       .update(projectsTable)
