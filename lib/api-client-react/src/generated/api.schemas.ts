@@ -311,6 +311,30 @@ export interface RenderSettingsInput {
   transitions?: RenderTransition[];
 }
 
+export type LintMessageSeverity = typeof LintMessageSeverity[keyof typeof LintMessageSeverity];
+
+
+export const LintMessageSeverity = {
+  error: 'error',
+  warning: 'warning',
+  info: 'info',
+} as const;
+
+export interface LintMessage {
+  severity: LintMessageSeverity;
+  message: string;
+  line?: number;
+  rule?: string;
+}
+
+export interface LintRequest {
+  source: string;
+}
+
+export interface LintResponse {
+  messages: LintMessage[];
+}
+
 /**
  * @nullable
  */

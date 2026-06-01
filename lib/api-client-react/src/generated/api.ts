@@ -34,6 +34,8 @@ import type {
   ForgotPasswordRequest,
   GenericSuccess,
   HealthStatus,
+  LintRequest,
+  LintResponse,
   ListTemplatesParams,
   LoginRequest,
   LogoutSuccess,
@@ -2604,4 +2606,75 @@ export function useGetStats<TData = Awaited<ReturnType<typeof getStats>>, TError
 
 
 
+
+export const getLintCompositionUrl = () => {
+
+
+
+
+  return `/api/compositions/lint`
+}
+
+/**
+ * @summary Lint composition HTML and report findings (non-blocking)
+ */
+export const lintComposition = async (lintRequest: LintRequest, options?: RequestInit): Promise<LintResponse> => {
+
+  return customFetch<LintResponse>(getLintCompositionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lintRequest,)
+  }
+);}
+
+
+
+
+export const getLintCompositionMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lintComposition>>, TError,{data: BodyType<LintRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof lintComposition>>, TError,{data: BodyType<LintRequest>}, TContext> => {
+
+const mutationKey = ['lintComposition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof lintComposition>>, {data: BodyType<LintRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  lintComposition(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LintCompositionMutationResult = NonNullable<Awaited<ReturnType<typeof lintComposition>>>
+    export type LintCompositionMutationBody = BodyType<LintRequest>
+    export type LintCompositionMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Lint composition HTML and report findings (non-blocking)
+ */
+export const useLintComposition = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lintComposition>>, TError,{data: BodyType<LintRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof lintComposition>>,
+        TError,
+        {data: BodyType<LintRequest>},
+        TContext
+      > => {
+      return useMutation(getLintCompositionMutationOptions(options));
+    }
 

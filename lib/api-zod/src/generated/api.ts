@@ -664,3 +664,20 @@ export const GetStatsResponse = zod.object({
 })
 
 
+/**
+ * @summary Lint composition HTML and report findings (non-blocking)
+ */
+export const LintCompositionBody = zod.object({
+  "source": zod.string()
+})
+
+export const LintCompositionResponse = zod.object({
+  "messages": zod.array(zod.object({
+  "severity": zod.enum(['error', 'warning', 'info']),
+  "message": zod.string(),
+  "line": zod.number().optional(),
+  "rule": zod.string().optional()
+}))
+})
+
+

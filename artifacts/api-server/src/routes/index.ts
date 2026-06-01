@@ -9,6 +9,7 @@ import statsRouter from "./stats";
 import billingRouter from "./billing";
 import storageRouter from "./storage";
 import aiRouter from "./ai";
+import compositionsRouter from "./compositions";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(statsRouter);
 router.use(billingRouter);
 router.use(storageRouter);
 router.use(aiRouter);
+router.use(compositionsRouter);
 
 export default router;

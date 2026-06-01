@@ -733,6 +733,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/PlatformStats"
 
+  /compositions/lint:
+    post:
+      operationId: lintComposition
+      tags: [compositions]
+      summary: Lint composition HTML and report findings (non-blocking)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LintRequest"
+      responses:
+        "200":
+          description: Lint findings (empty array means nothing to report).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LintResponse"
+        "400":
+          description: Request failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   parameters:
     AuthorizationSessionHeader:
@@ -1054,6 +1085,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RenderTransition"
+
+    LintMessage:
+      type: object
+      required: [severity, message]
+      properties:
+        severity:
+          type: string
+          enum: [error, warning, info]
+        message:
+          type: string
+        line:
+          type: integer
+        rule:
+          type: string
+
+    LintRequest:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+
+    LintResponse:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/LintMessage"
 
     BrandKit:
       type: object
