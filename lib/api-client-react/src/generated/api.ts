@@ -1571,6 +1571,7 @@ export const getGetProjectVideoUrl = (id: number,) => {
 }
 
 /**
+ * Streams the rendered video with the Content-Type matching the project's render format (mp4 → video/mp4, webm → video/webm, mov → video/quicktime). Projects rendered as a png-sequence have no single streamable file and return 409.
  * @summary Stream the rendered video file for a project
  */
 export const getProjectVideo = async (id: number, options?: RequestInit): Promise<Blob> => {
@@ -1627,6 +1628,83 @@ export function useGetProjectVideo<TData = Awaited<ReturnType<typeof getProjectV
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetProjectVideoQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetProjectThumbnailUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/thumbnail`
+}
+
+/**
+ * @summary Stream the rendered poster-frame thumbnail (PNG) for a project
+ */
+export const getProjectThumbnail = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetProjectThumbnailUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectThumbnailQueryKey = (id: number,) => {
+    return [
+    `/api/projects/${id}/thumbnail`
+    ] as const;
+    }
+
+
+export const getGetProjectThumbnailQueryOptions = <TData = Awaited<ReturnType<typeof getProjectThumbnail>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectThumbnailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectThumbnail>>> = ({ signal }) => getProjectThumbnail(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectThumbnail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectThumbnailQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectThumbnail>>>
+export type GetProjectThumbnailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Stream the rendered poster-frame thumbnail (PNG) for a project
+ */
+
+export function useGetProjectThumbnail<TData = Awaited<ReturnType<typeof getProjectThumbnail>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectThumbnailQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

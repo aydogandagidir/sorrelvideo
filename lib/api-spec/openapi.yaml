@@ -421,6 +421,11 @@ paths:
       operationId: getProjectVideo
       tags: [projects]
       summary: Stream the rendered video file for a project
+      description: >-
+        Streams the rendered video with the Content-Type matching the
+        project's render format (mp4 → video/mp4, webm → video/webm,
+        mov → video/quicktime). Projects rendered as a png-sequence have no
+        single streamable file and return 409.
       parameters:
         - name: id
           in: path
@@ -429,9 +434,17 @@ paths:
             type: integer
       responses:
         "200":
-          description: MP4 video stream
+          description: Rendered video stream (format-dependent Content-Type)
           content:
             video/mp4:
+              schema:
+                type: string
+                format: binary
+            video/webm:
+              schema:
+                type: string
+                format: binary
+            video/quicktime:
               schema:
                 type: string
                 format: binary
@@ -441,6 +454,34 @@ paths:
           description: Forbidden
         "404":
           description: Video not available yet
+        "409":
+          description: Project rendered a PNG sequence; not streamable as a file
+
+  /projects/{id}/thumbnail:
+    get:
+      operationId: getProjectThumbnail
+      tags: [projects]
+      summary: Stream the rendered poster-frame thumbnail (PNG) for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PNG thumbnail image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Thumbnail not available
 
   /projects/{id}/render-settings:
     patch:

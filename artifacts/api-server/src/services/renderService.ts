@@ -7,16 +7,23 @@ import {
   RenderCancelledError,
 } from "@hyperframes/producer";
 import { eq } from "drizzle-orm";
-import { db, brandKitTable, projectsTable } from "@workspace/db";
+import {
+  db,
+  brandKitTable,
+  projectsTable,
+  type RenderFormat,
+} from "@workspace/db";
 import { logger } from "../lib/logger";
 import { resolveSettings, toEngineConfig } from "./renderSettingsService";
 import {
+  getLatestJobForProject,
   markCancelled,
   markFailed,
   markProgress,
   markReady,
   markRendering,
 } from "./renderJobsService";
+import { generateThumbnail } from "./thumbnailService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -85,10 +92,38 @@ export function resolveEntryFile(module: string): string {
   return COMPOSITION_MAP[module] ?? DEFAULT_COMPOSITION;
 }
 
+/** Output filename per video container format (no leading directory). */
+const OUTPUT_FILENAME: Record<Exclude<RenderFormat, "png-sequence">, string> = {
+  mp4: "output.mp4",
+  webm: "output.webm",
+  mov: "output.mov",
+};
+
+/**
+ * Resolve the artifact path the producer should write to, given the render
+ * directory and the chosen format.
+ *
+ * - Video formats (mp4/webm/mov) → a FILE: `<dir>/output.<ext>`. `mp4` stays
+ *   `<dir>/output.mp4` exactly as before this function existed, so a
+ *   default-settings render (format → mp4) is byte-for-byte unchanged.
+ * - `png-sequence` → a DIRECTORY the producer fills with `frame_*.png`:
+ *   `<dir>/frames`. The producer treats `outputPath` as a directory for this
+ *   format (and creates it if absent).
+ */
+export function outputPathFor(dir: string, format: RenderFormat): string {
+  if (format === "png-sequence") return path.join(dir, "frames");
+  return path.join(dir, OUTPUT_FILENAME[format]);
+}
+
 async function setProjectStatus(
   projectId: number,
   status: string,
-  extra?: { videoUrl?: string; duration?: number; renderError?: string },
+  extra?: {
+    videoUrl?: string;
+    duration?: number;
+    renderError?: string;
+    thumbnailUrl?: string;
+  },
 ) {
   await db
     .update(projectsTable)
@@ -237,10 +272,9 @@ export async function executeRender(
 ): Promise<void> {
   const outputDir = path.join(RENDERS_DIR, String(projectId));
   fs.mkdirSync(outputDir, { recursive: true });
-  const outputPath = path.join(outputDir, "output.mp4");
 
   logger.info(
-    { projectId, module, outputPath, renderJobId },
+    { projectId, module, outputDir, renderJobId },
     "Render job starting",
   );
 
@@ -269,7 +303,12 @@ export async function executeRender(
     // Resolve the per-project settings (null → DEFAULT_RENDER_SETTINGS) and map
     // them to the engine's RenderConfig. The Free/Pro gate already ran at the
     // route layer; here we just honor the persisted, validated config.
-    const config = toEngineConfig(resolveSettings(project.renderSettings), file);
+    const settings = resolveSettings(project.renderSettings);
+    const format = settings.format;
+    // Format drives the artifact path: mp4 → output.mp4 (unchanged default),
+    // webm/mov → output.<ext> (file), png-sequence → frames/ (directory).
+    const outputPath = outputPathFor(outputDir, format);
+    const config = toEngineConfig(settings, file);
 
     const job = createRenderJob(config);
 
@@ -297,14 +336,31 @@ export async function executeRender(
       typeof job.duration === "number" && job.duration > 0
         ? Math.round(job.duration)
         : undefined;
+
+    // Best-effort poster frame. A thumbnail failure must NEVER fail the render,
+    // so swallow everything here and only set thumbnailUrl when one was written.
+    let thumbnailUrl: string | undefined;
+    try {
+      const thumb = await generateThumbnail(projectId, dir, outputPath, format);
+      if (thumb) thumbnailUrl = `/api/projects/${projectId}/thumbnail`;
+    } catch (thumbErr) {
+      logger.warn(
+        { projectId, err: thumbErr },
+        "Thumbnail generation threw; continuing without one",
+      );
+    }
+
     await setProjectStatus(projectId, "ready", {
       videoUrl,
       duration: renderedDuration,
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
     });
+    // Persist the real artifact path on the ledger row. The format was stamped
+    // at job creation (createRenderJob), so the row now carries both.
     if (renderJobId)
       await markReady(renderJobId, { duration: renderedDuration, outputPath });
     logger.info(
-      { projectId, videoUrl, duration: renderedDuration, renderJobId },
+      { projectId, videoUrl, format, duration: renderedDuration, renderJobId },
       "Render completed",
     );
   } catch (err) {
@@ -324,13 +380,65 @@ export async function executeRender(
   }
 }
 
-/** Check if a rendered video file exists for the given project. */
-export function renderFileExists(projectId: number): boolean {
-  const outputPath = path.join(RENDERS_DIR, String(projectId), "output.mp4");
-  return fs.existsSync(outputPath);
+/**
+ * The default (legacy) mp4 path for a project. Used as the back-compat fallback
+ * when there's no ready render-job row to read an exact `outputPath` from.
+ */
+function defaultMp4Path(projectId: number): string {
+  return path.join(RENDERS_DIR, String(projectId), "output.mp4");
 }
 
-/** Full filesystem path to the rendered mp4. */
+/**
+ * Check if a rendered video file exists for the given project. SYNC fallback
+ * kept for back-compat: it only knows the legacy `output.mp4` location. New
+ * callers that may serve webm/mov/png-sequence should use the async variant,
+ * which resolves the real artifact path from the latest ready render job.
+ */
+export function renderFileExists(projectId: number): boolean {
+  return fs.existsSync(defaultMp4Path(projectId));
+}
+
+/** Full filesystem path to the rendered mp4 (SYNC, legacy `output.mp4`). */
 export function getRenderFilePath(projectId: number): string {
-  return path.join(RENDERS_DIR, String(projectId), "output.mp4");
+  return defaultMp4Path(projectId);
+}
+
+/**
+ * The rendered artifact for a project, resolved format-aware. Prefers the
+ * latest READY render-job row's persisted `outputPath` + `format`; falls back
+ * to the legacy `output.mp4` (format `"mp4"`) when no such row exists, so old
+ * projects rendered before the ledger carried an `outputPath` still resolve.
+ *
+ * `format` lets the route pick the right `Content-Type` and detect the
+ * `png-sequence` case (a directory, not a streamable file).
+ */
+export async function getRenderArtifact(
+  projectId: number,
+): Promise<{ path: string; format: RenderFormat }> {
+  const job = await getLatestJobForProject(projectId);
+  if (job && job.status === "ready" && job.outputPath) {
+    const format = resolveSettings(job.config ?? null).format;
+    return { path: job.outputPath, format };
+  }
+  return { path: defaultMp4Path(projectId), format: "mp4" };
+}
+
+/**
+ * Async, format-aware existence check used by the video route. A `png-sequence`
+ * render's `outputPath` is a DIRECTORY; for every other format it's a file.
+ * Falls back to the legacy `output.mp4` probe when there's no ready job.
+ */
+export async function renderFileExistsAsync(
+  projectId: number,
+): Promise<boolean> {
+  const { path: artifactPath } = await getRenderArtifact(projectId);
+  return fs.existsSync(artifactPath);
+}
+
+/** Async, format-aware artifact path (see `getRenderArtifact`). Back-compat async twin of `getRenderFilePath`. */
+export async function getRenderFilePathAsync(
+  projectId: number,
+): Promise<string> {
+  const { path: artifactPath } = await getRenderArtifact(projectId);
+  return artifactPath;
 }

@@ -21,9 +21,11 @@ import {
   UpdateProjectRenderSettingsBody,
 } from "@workspace/api-zod";
 import {
-  renderFileExists,
-  getRenderFilePath,
+  renderFileExistsAsync,
+  getRenderArtifact,
+  RENDERS_DIR,
 } from "../services/renderService";
+import { getThumbnailPath } from "../services/thumbnailService";
 import {
   resolveSettings,
   assertRenderSettingsAllowed,
@@ -433,23 +435,51 @@ router.get("/projects/:id/video", async (req, res): Promise<void> => {
     return;
   }
 
-  if (project.status !== "ready" || !renderFileExists(id)) {
+  if (project.status !== "ready" || !(await renderFileExistsAsync(id))) {
     res.status(404).json({ error: "Video not available yet" });
     return;
   }
+
+  // Resolve the real artifact path + container format from the latest ready
+  // render job (falls back to legacy output.mp4 / mp4 for old projects).
+  const { path: filePath, format } = await getRenderArtifact(id);
+
+  // png-sequence renders an OUTPUT DIRECTORY of frames, not a streamable file.
+  // Download-as-zip is deferred (M-later); surface a clear 409 for now.
+  if (format === "png-sequence") {
+    res.status(409).json({
+      error:
+        "This project rendered a PNG sequence; download-as-zip is not available yet.",
+    });
+    return;
+  }
+
+  // Per-format MIME + extension for the Content-Type / Content-Disposition.
+  const VIDEO_MIME: Record<"mp4" | "webm" | "mov", string> = {
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+  };
+  const EXT: Record<"mp4" | "webm" | "mov", string> = {
+    mp4: "mp4",
+    webm: "webm",
+    mov: "mov",
+  };
 
   // Stream with HTTP range support (browser <video> seeking issues range
   // requests). We avoid res.sendFile here: Express 5's send() rejects absolute
   // paths containing spaces (this repo lives under ".../Artificial Inteligence/...")
   // with a spurious NotFoundError.
-  const filePath = getRenderFilePath(id);
   const stat = fs.statSync(filePath);
   const total = stat.size;
   const range = req.headers.range;
 
-  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Content-Type", VIDEO_MIME[format]);
   res.setHeader("Accept-Ranges", "bytes");
-  res.setHeader("Content-Disposition", `inline; filename="project-${id}.mp4"`);
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="project-${id}.${EXT[format]}"`,
+  );
 
   if (range) {
     const match = /bytes=(\d*)-(\d*)/.exec(range);
@@ -469,6 +499,53 @@ router.get("/projects/:id/video", async (req, res): Promise<void> => {
 
   res.setHeader("Content-Length", total);
   fs.createReadStream(filePath).pipe(res);
+});
+
+// GET /api/projects/:id/thumbnail — stream the rendered poster frame (PNG).
+// Auth + ownership mirror the video route. Generated best-effort after render
+// (see thumbnailService); 404 when no thumbnail exists yet.
+router.get("/projects/:id/thumbnail", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid project id" });
+    return;
+  }
+
+  const [project] = await db
+    .select({ userId: projectsTable.userId })
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  if (project.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  // Same Express-5 + spaces-in-path constraint as the video route: stream the
+  // file manually rather than res.sendFile.
+  const thumbPath = getThumbnailPath(RENDERS_DIR, id);
+  if (!fs.existsSync(thumbPath)) {
+    res.status(404).json({ error: "Thumbnail not available" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "image/png");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="project-${id}.png"`,
+  );
+  fs.createReadStream(thumbPath).pipe(res);
 });
 
 export default router;

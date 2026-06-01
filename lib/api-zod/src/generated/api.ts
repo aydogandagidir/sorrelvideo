@@ -383,9 +383,18 @@ export const StartProjectRenderParams = zod.object({
 
 
 /**
+ * Streams the rendered video with the Content-Type matching the project's render format (mp4 → video/mp4, webm → video/webm, mov → video/quicktime). Projects rendered as a png-sequence have no single streamable file and return 409.
  * @summary Stream the rendered video file for a project
  */
 export const GetProjectVideoParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Stream the rendered poster-frame thumbnail (PNG) for a project
+ */
+export const GetProjectThumbnailParams = zod.object({
   "id": zod.coerce.number()
 })
 
