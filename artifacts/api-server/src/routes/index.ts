@@ -11,6 +11,7 @@ import storageRouter from "./storage";
 import aiRouter from "./ai";
 import compositionsRouter from "./compositions";
 import studioRouter from "./studio";
+import websiteToVideoRouter from "./websiteToVideo";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(storageRouter);
 router.use(aiRouter);
 router.use(compositionsRouter);
 router.use(studioRouter);
+router.use(websiteToVideoRouter);
 
 export default router;

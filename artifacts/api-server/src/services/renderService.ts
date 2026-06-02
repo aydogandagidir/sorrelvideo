@@ -69,6 +69,9 @@ const COMPOSITION_MAP: Record<string, string> = {
   studio: "studio-default.html",
   ai: "social-teaser.html",
   bulk: "brand-promo.html",
+  // website→video: the captured screenshot is injected via compositionVars
+  // (capture.image data URI + capture.height/title/url) by websiteToVideoService.
+  "website-showcase": "website-showcase.html",
   // Vendored Hyperframes registry blocks (Apache-2.0): each platform template's
   // `module` is its slug, resolving to the same-named <slug>.html composition.
   ...REGISTRY_COMPOSITION_MAP,

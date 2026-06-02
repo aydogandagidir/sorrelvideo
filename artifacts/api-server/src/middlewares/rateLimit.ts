@@ -63,3 +63,11 @@ export const aiSuggestLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   max: 20,
 });
+
+// Authenticated website→video capture. Each call launches headless Chrome to
+// screenshot an arbitrary URL — expensive — so cap a single client to a handful
+// per window (defence-in-depth alongside the SSRF guard).
+export const websiteCaptureLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+});

@@ -53,7 +53,8 @@ import type {
   Template,
   TemplateInput,
   UploadUrlRequest,
-  UploadUrlResponse
+  UploadUrlResponse,
+  WebsiteToVideoRequest
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -2972,5 +2973,76 @@ export const useLintComposition = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getLintCompositionMutationOptions(options));
+    }
+
+export const getWebsiteToVideoUrl = () => {
+
+
+
+
+  return `/api/website-to-video`
+}
+
+/**
+ * @summary Capture a website and create a branded showcase video project
+ */
+export const websiteToVideo = async (websiteToVideoRequest: WebsiteToVideoRequest, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getWebsiteToVideoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      websiteToVideoRequest,)
+  }
+);}
+
+
+
+
+export const getWebsiteToVideoMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof websiteToVideo>>, TError,{data: BodyType<WebsiteToVideoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof websiteToVideo>>, TError,{data: BodyType<WebsiteToVideoRequest>}, TContext> => {
+
+const mutationKey = ['websiteToVideo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof websiteToVideo>>, {data: BodyType<WebsiteToVideoRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  websiteToVideo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type WebsiteToVideoMutationResult = NonNullable<Awaited<ReturnType<typeof websiteToVideo>>>
+    export type WebsiteToVideoMutationBody = BodyType<WebsiteToVideoRequest>
+    export type WebsiteToVideoMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Capture a website and create a branded showcase video project
+ */
+export const useWebsiteToVideo = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof websiteToVideo>>, TError,{data: BodyType<WebsiteToVideoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof websiteToVideo>>,
+        TError,
+        {data: BodyType<WebsiteToVideoRequest>},
+        TContext
+      > => {
+      return useMutation(getWebsiteToVideoMutationOptions(options));
     }
 

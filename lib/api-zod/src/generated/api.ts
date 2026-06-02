@@ -787,3 +787,15 @@ export const LintCompositionResponse = zod.object({
 })
 
 
+/**
+ * @summary Capture a website and create a branded showcase video project
+ */
+export const websiteToVideoBodyUrlMax = 2048;
+
+
+
+export const WebsiteToVideoBody = zod.object({
+  "url": zod.string().max(websiteToVideoBodyUrlMax).describe('The public website URL to capture (http\/https only).')
+})
+
+

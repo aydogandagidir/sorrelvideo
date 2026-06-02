@@ -37,6 +37,7 @@ const MAX_CAPTURE_HEIGHT = 6000;
 export async function captureWebsite(
   rawUrl: string,
   outDir: string,
+  opts?: { maxHeight?: number },
 ): Promise<WebsiteCapture> {
   // SSRF guard first — throws SsrfError before any network/browser work.
   const url = await assertSafeUrl(rawUrl);
@@ -103,7 +104,7 @@ export async function captureWebsite(
       .catch(() => VIEWPORT.height);
     const captureHeight = Math.max(
       VIEWPORT.height,
-      Math.min(fullHeight, MAX_CAPTURE_HEIGHT),
+      Math.min(fullHeight, opts?.maxHeight ?? MAX_CAPTURE_HEIGHT),
     );
 
     const buf = await page.screenshot({
