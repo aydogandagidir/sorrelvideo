@@ -1,0 +1,497 @@
+/**
+ * RenderSettingsForm — a controlled editor for a project's RenderSettings.
+ *
+ * `value` / `onChange` make it fully controlled; the parent owns the state.
+ * `plan` drives Pro-gating: for Free users, Pro-only options still render and
+ * are tagged with a "Pro" badge, but selecting one calls `onUpgrade()` and is
+ * NOT applied to state (the control snaps back) — we keep them clickable rather
+ * than HTML-`disabled` precisely so the click can surface the upgrade nudge.
+ * Self-contained (no data fetching) so Studio and a future Bulk screen can both
+ * mount it. The whole form can be hard-`disabled` via the `disabled` prop while
+ * the parent is submitting.
+ *
+ * The gating mirrors the server (see lib/render-settings.ts → proViolations,
+ * which tracks assertRenderSettingsAllowed). This is an eager UX gate only; the
+ * PATCH endpoint remains authoritative.
+ */
+import { Plus, Trash2, Sparkles } from "lucide-react";
+import {
+  type RenderSettings,
+  type RenderTransition,
+} from "@workspace/api-client-react";
+import {
+  QUALITY_OPTIONS,
+  FPS_OPTIONS,
+  FORMAT_OPTIONS,
+  RESOLUTION_OPTIONS,
+  TRANSITION_SHADERS,
+  EASE_OPTIONS,
+  FREE_MAX_TRANSITIONS,
+  defaultTransition,
+  formatSupportsAlpha,
+  shaderLabel,
+  isProOnly,
+  type RenderQuality,
+  type RenderFps,
+  type RenderFormat,
+  type RenderResolution,
+} from "@/lib/render-settings";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+export interface RenderSettingsFormProps {
+  value: RenderSettings;
+  onChange: (next: RenderSettings) => void;
+  plan: "free" | "pro";
+  /** Invoked when a Free user touches a Pro-only control. */
+  onUpgrade?: () => void;
+  /** Disable the whole form (e.g. while the parent is submitting). */
+  disabled?: boolean;
+}
+
+const ProBadge = () => (
+  <Badge variant="outline" className="ml-1.5 px-1.5 py-0 text-[10px]">
+    Pro
+  </Badge>
+);
+
+export function RenderSettingsForm({
+  value,
+  onChange,
+  plan,
+  onUpgrade,
+  disabled = false,
+}: RenderSettingsFormProps) {
+  const isFree = plan === "free";
+  const patch = (partial: Partial<RenderSettings>) =>
+    onChange({ ...value, ...partial });
+
+  const transitions = value.transitions ?? [];
+  const alphaSupported = formatSupportsAlpha(value.format);
+
+  // A Free user clicking a locked option: nudge to upgrade rather than mutate.
+  const gate = (locked: boolean): boolean => {
+    if (locked && isFree) {
+      onUpgrade?.();
+      return true;
+    }
+    return false;
+  };
+
+  function setQuality(next: RenderQuality) {
+    if (gate(isProOnly("quality", next))) return;
+    patch({ quality: next });
+  }
+  function setFps(next: RenderFps) {
+    if (gate(isProOnly("fps", next))) return;
+    patch({ fps: next });
+  }
+  function setFormat(next: RenderFormat) {
+    if (gate(isProOnly("format", next))) return;
+    // Dropping to a non-alpha format can't keep transparency on.
+    patch({
+      format: next,
+      transparent: formatSupportsAlpha(next) ? value.transparent : false,
+    });
+  }
+  function setResolution(next: RenderResolution) {
+    if (gate(isProOnly("resolution", next))) return;
+    patch({ resolution: next });
+  }
+  function setTransparent(next: boolean) {
+    if (gate(isProOnly("transparent", next))) return;
+    patch({ transparent: next });
+  }
+  function setWatermark(nextWatermark: boolean) {
+    // watermark=false is the Pro action (removing it).
+    if (gate(isProOnly("watermark", nextWatermark))) return;
+    patch({ watermark: nextWatermark });
+  }
+
+  function addTransition() {
+    const nextLen = transitions.length + 1;
+    if (gate(isProOnly("transitions", nextLen))) return;
+    patch({ transitions: [...transitions, defaultTransition()] });
+  }
+  function updateTransition(index: number, partial: Partial<RenderTransition>) {
+    patch({
+      transitions: transitions.map((t, i) =>
+        i === index ? { ...t, ...partial } : t,
+      ),
+    });
+  }
+  function removeTransition(index: number) {
+    patch({ transitions: transitions.filter((_, i) => i !== index) });
+  }
+
+  return (
+    <TooltipProvider>
+      <div className="space-y-6" aria-disabled={disabled}>
+        {/* Quality */}
+        <fieldset className="space-y-2" disabled={disabled}>
+          <Label id="rs-quality-label">Quality</Label>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={value.quality}
+            onValueChange={(v) => v && setQuality(v as RenderQuality)}
+            className="justify-start"
+            aria-labelledby="rs-quality-label"
+          >
+            {QUALITY_OPTIONS.map((opt) => {
+              const locked = isFree && isProOnly("quality", opt.value);
+              return (
+                <ToggleGroupItem
+                  key={opt.value}
+                  value={opt.value}
+                  // Keep clickable when locked so the upgrade nudge can fire.
+                  data-locked={locked}
+                  className="data-[locked=true]:opacity-60"
+                  aria-label={`${opt.label}${locked ? " (Pro)" : ""}`}
+                >
+                  {opt.label}
+                  {locked && <ProBadge />}
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        </fieldset>
+
+        {/* Format + Resolution */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <fieldset className="space-y-2" disabled={disabled}>
+            <Label htmlFor="rs-format">Format</Label>
+            <Select
+              value={value.format}
+              onValueChange={(v) => setFormat(v as RenderFormat)}
+            >
+              <SelectTrigger id="rs-format">
+                <SelectValue placeholder="Format" />
+              </SelectTrigger>
+              <SelectContent>
+                {FORMAT_OPTIONS.map((opt) => {
+                  const locked = isFree && isProOnly("format", opt.value);
+                  return (
+                    // Kept selectable on purpose: the root onValueChange routes
+                    // a locked pick to onUpgrade() instead of applying it.
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="flex items-center">
+                        {opt.label}
+                        {opt.hint && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {opt.hint}
+                          </span>
+                        )}
+                        {locked && <ProBadge />}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </fieldset>
+
+          <fieldset className="space-y-2" disabled={disabled}>
+            <Label htmlFor="rs-resolution">Resolution</Label>
+            <Select
+              value={value.resolution}
+              onValueChange={(v) => setResolution(v as RenderResolution)}
+            >
+              <SelectTrigger id="rs-resolution">
+                <SelectValue placeholder="Resolution" />
+              </SelectTrigger>
+              <SelectContent>
+                {RESOLUTION_OPTIONS.map((opt) => {
+                  const locked = isFree && isProOnly("resolution", opt.value);
+                  return (
+                    // Kept selectable on purpose: the root onValueChange routes
+                    // a locked pick to onUpgrade() instead of applying it.
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="flex items-center">
+                        {opt.label}
+                        {opt.hint && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {opt.hint}
+                          </span>
+                        )}
+                        {locked && <ProBadge />}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </fieldset>
+        </div>
+
+        {/* Frame rate */}
+        <fieldset className="space-y-2" disabled={disabled}>
+          <Label id="rs-fps-label">Frame rate</Label>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={String(value.fps)}
+            onValueChange={(v) => v && setFps(Number(v) as RenderFps)}
+            className="justify-start"
+            aria-labelledby="rs-fps-label"
+          >
+            {FPS_OPTIONS.map((opt) => {
+              const locked = isFree && isProOnly("fps", opt.value);
+              return (
+                <ToggleGroupItem
+                  key={opt.value}
+                  value={String(opt.value)}
+                  data-locked={locked}
+                  className="data-[locked=true]:opacity-60"
+                  aria-label={`${opt.label} fps${locked ? " (Pro)" : ""}`}
+                >
+                  {opt.label}
+                  {locked && <ProBadge />}
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+          <p className="text-xs text-muted-foreground">Frames per second.</p>
+        </fieldset>
+
+        {/* Transparency + watermark switches */}
+        <div className="space-y-4 rounded-lg border p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label
+                htmlFor="rs-transparent"
+                className="flex items-center gap-1"
+              >
+                Transparent background
+                {isFree && <ProBadge />}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {alphaSupported
+                  ? "Render with a transparent (alpha) background."
+                  : "Only available for WebM, MOV, or PNG sequence."}
+              </p>
+            </div>
+            {alphaSupported ? (
+              <Switch
+                id="rs-transparent"
+                checked={value.transparent}
+                disabled={disabled}
+                onCheckedChange={setTransparent}
+                aria-label="Transparent background"
+              />
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* span wrapper so the tooltip works on a disabled control */}
+                  <span tabIndex={0}>
+                    <Switch
+                      id="rs-transparent"
+                      checked={false}
+                      disabled
+                      aria-label="Transparent background (unavailable for this format)"
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Switch to WebM, MOV, or PNG sequence to enable transparency.
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="rs-watermark" className="flex items-center gap-1">
+                Remove watermark
+                {isFree && <ProBadge />}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Free renders include a Sorrel watermark.
+              </p>
+            </div>
+            <Switch
+              id="rs-watermark"
+              // The switch represents "remove watermark" → inverse of watermark.
+              checked={!value.watermark}
+              disabled={disabled}
+              onCheckedChange={(checked) => setWatermark(!checked)}
+              aria-label="Remove watermark"
+            />
+          </div>
+        </div>
+
+        {/* Transitions */}
+        <fieldset className="space-y-3" disabled={disabled}>
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Transitions
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addTransition}
+            >
+              <Plus className="h-4 w-4" />
+              Add transition
+            </Button>
+          </div>
+
+          {isFree && (
+            <p className="text-xs text-muted-foreground">
+              Free plan supports up to {FREE_MAX_TRANSITIONS} transition.
+              <span className="ml-1 inline-flex items-center">
+                More <ProBadge />
+              </span>
+            </p>
+          )}
+
+          {transitions.length === 0 ? (
+            <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+              No transitions yet. Add one to blend between scenes.
+            </p>
+          ) : (
+            <Tabs defaultValue="0" className="w-full">
+              <TabsList className="flex h-auto flex-wrap">
+                {transitions.map((_, i) => (
+                  <TabsTrigger key={i} value={String(i)}>
+                    #{i + 1}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {transitions.map((transition, index) => (
+                <TabsContent
+                  key={index}
+                  value={String(index)}
+                  className="space-y-4 rounded-lg border p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Transition {index + 1}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeTransition(index)}
+                      aria-label={`Remove transition ${index + 1}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor={`rs-tr-shader-${index}`}>Shader</Label>
+                      <Select
+                        value={transition.shader}
+                        onValueChange={(v) =>
+                          updateTransition(index, { shader: v })
+                        }
+                      >
+                        <SelectTrigger id={`rs-tr-shader-${index}`}>
+                          <SelectValue placeholder="Shader" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TRANSITION_SHADERS.map((shader) => (
+                            <SelectItem key={shader} value={shader}>
+                              {shaderLabel(shader)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`rs-tr-ease-${index}`}>Easing</Label>
+                      <Select
+                        value={transition.ease}
+                        onValueChange={(v) =>
+                          updateTransition(index, { ease: v })
+                        }
+                      >
+                        <SelectTrigger id={`rs-tr-ease-${index}`}>
+                          <SelectValue placeholder="Easing" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EASE_OPTIONS.map((ease) => (
+                            <SelectItem key={ease} value={ease}>
+                              {ease}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`rs-tr-time-${index}`}>Start time</Label>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {transition.time.toFixed(1)}s
+                      </span>
+                    </div>
+                    <Slider
+                      id={`rs-tr-time-${index}`}
+                      min={0}
+                      max={30}
+                      step={0.1}
+                      value={[transition.time]}
+                      onValueChange={([v]) =>
+                        updateTransition(index, { time: v })
+                      }
+                      aria-label={`Transition ${index + 1} start time in seconds`}
+                      aria-valuetext={`${transition.time.toFixed(1)} seconds`}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`rs-tr-duration-${index}`}>
+                        Duration
+                      </Label>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {transition.duration.toFixed(1)}s
+                      </span>
+                    </div>
+                    <Slider
+                      id={`rs-tr-duration-${index}`}
+                      min={0.1}
+                      max={5}
+                      step={0.1}
+                      value={[transition.duration]}
+                      onValueChange={([v]) =>
+                        updateTransition(index, { duration: v })
+                      }
+                      aria-label={`Transition ${index + 1} duration in seconds`}
+                      aria-valuetext={`${transition.duration.toFixed(1)} seconds`}
+                    />
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+        </fieldset>
+      </div>
+    </TooltipProvider>
+  );
+}

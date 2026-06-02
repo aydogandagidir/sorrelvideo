@@ -25,3 +25,10 @@ describe("POST /api/projects/:id/render", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("POST /api/projects/:id/render/cancel", () => {
+  it("returns 401 when no session is present", async () => {
+    const res = await request(app).post("/api/projects/1/render/cancel");
+    expect(res.status).toBe(401);
+  });
+});

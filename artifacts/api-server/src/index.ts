@@ -4,6 +4,10 @@ import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
 import { closeRenderQueue, startRenderWorker } from "./lib/renderQueue";
 import { recoverStuckRenders } from "./lib/recoverStuckRenders";
+import {
+  startLambdaProgressPoller,
+  stopLambdaProgressPoller,
+} from "./lib/lambdaProgressPoller";
 
 // Initialise Sentry (no-op without SENTRY_DSN), then wire its Express error
 // handler. Lazy-loaded so dev boots without the OpenTelemetry dependency graph.
@@ -44,6 +48,10 @@ await initBilling();
 // "rendering" with no live/pending job). Both are no-ops without REDIS_URL —
 // recovery still resets inline-mode orphans whose background render died.
 await startRenderWorker();
+// Start the distributed (Lambda) progress poller. No-op unless the lambda
+// backend is active (RENDER_BACKEND=lambda|auto AND AWS env present), so this is
+// inert in dev/test and the inline/bullmq deployments.
+startLambdaProgressPoller();
 await recoverStuckRenders();
 
 const server = app.listen(port, (err) => {
@@ -67,6 +75,7 @@ const server = app.listen(port, (err) => {
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     logger.info({ signal }, "Shutting down");
+    stopLambdaProgressPoller();
     server.close(() => {
       void closeRenderQueue().finally(() => process.exit(0));
     });

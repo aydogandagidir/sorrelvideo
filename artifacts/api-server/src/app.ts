@@ -27,11 +27,17 @@ app.use(
     origin:
       process.env.NODE_ENV === "production"
         ? (origin, cb) => {
-            if (!origin || allowedOrigins.includes(origin)) {
-              cb(null, true);
-            } else {
-              cb(new Error(`CORS: origin '${origin}' not allowed`));
-            }
+            // Allow requests with no Origin (same-origin navigations, curl,
+            // server-to-server) and any allow-listed origin. For everything
+            // else resolve with `false` — NOT an Error. A rejected origin must
+            // simply omit the `Access-Control-Allow-Origin` header (the browser
+            // then blocks the cross-origin read); it must never throw. Throwing
+            // makes cors call `next(err)` → a 500 that ALSO breaks same-origin
+            // asset loads, because Vite tags its module scripts `crossorigin`,
+            // so even same-origin script/style fetches carry an Origin header
+            // and run in CORS mode. A 500 there white-screens the whole SPA
+            // whenever ALLOWED_ORIGINS is unset or even slightly mismatched.
+            cb(null, !origin || allowedOrigins.includes(origin));
           }
         : true,
   }),
@@ -102,6 +108,26 @@ if (process.env.NODE_ENV === "production") {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const publicDir = path.resolve(here, "../public");
   app.use(express.static(publicDir, { maxAge: "1h", index: false }));
+
+  // Embedded @hyperframes/studio editor (M9): built by @workspace/studio-editor
+  // and copied to public/editor by the Dockerfile. Served same-origin under
+  // /editor/ so the `sid` cookie flows to its repointed /api/studio/* calls.
+  // Registered BEFORE the SPA fallback so /editor/* isn't swallowed by it; its
+  // assets sit under /editor/assets/* (Vite base=/editor/). A manual fallback
+  // returns the editor index.html for deep links (it uses hash routing).
+  const editorDir = path.join(publicDir, "editor");
+  app.use(
+    "/editor",
+    express.static(editorDir, { maxAge: "1h", index: "index.html" }),
+  );
+  app.use("/editor", (req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    fs.readFile(path.join(editorDir, "index.html"), (err, html) => {
+      if (err) return next(err);
+      res.type("html").send(html);
+    });
+  });
+
   const indexHtmlPath = path.join(publicDir, "index.html");
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();

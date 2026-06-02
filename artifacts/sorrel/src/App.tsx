@@ -19,6 +19,9 @@ import Templates from "./pages/templates";
 import Projects from "./pages/projects";
 import Brand from "./pages/brand";
 import Modules from "./pages/modules";
+import Bulk from "./pages/bulk";
+import Analytics from "./pages/analytics";
+import Collab from "./pages/collab";
 import Settings from "./pages/settings";
 import NotFound from "./pages/not-found";
 
@@ -84,6 +87,15 @@ function Router() {
       </Route>
       <Route path="/modules">
         <ProtectedRoute component={Modules} />
+      </Route>
+      <Route path="/bulk">
+        <ProtectedRoute component={Bulk} />
+      </Route>
+      <Route path="/analytics">
+        <ProtectedRoute component={Analytics} />
+      </Route>
+      <Route path="/collab">
+        <ProtectedRoute component={Collab} />
       </Route>
       <Route path="/settings">
         <ProtectedRoute component={Settings} />

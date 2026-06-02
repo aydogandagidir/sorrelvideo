@@ -14,7 +14,12 @@ import { useBillingCheckout, useBillingPrices } from "@/hooks/useBilling";
 interface UpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  reason?: "render_limit" | "premium_template" | "ai_limit" | "general";
+  reason?:
+    | "render_limit"
+    | "premium_template"
+    | "ai_limit"
+    | "render_quality"
+    | "general";
 }
 
 const REASON_MESSAGES: Record<string, { title: string; description: string }> =
@@ -33,6 +38,11 @@ const REASON_MESSAGES: Record<string, { title: string; description: string }> =
       title: "You've hit the free AI limit",
       description:
         "Free accounts get 10 AI suggestions per month. Upgrade to Pro for unlimited AI drafts.",
+    },
+    render_quality: {
+      title: "High-quality exports need Pro",
+      description:
+        "Free renders are capped at 1080p, 30fps, MP4 with a watermark and a single transition. Upgrade to Pro for 4K, 60fps, transparent backgrounds, ProRes/MOV and WebM exports, watermark removal, and multiple transitions.",
     },
     general: {
       title: "Upgrade to Sorrel Pro",

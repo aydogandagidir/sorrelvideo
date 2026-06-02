@@ -1,0 +1,23 @@
+{
+  "name": "@workspace/infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AWS CDK app for the distributed (Lambda) render backend. Lives OUTSIDE the Railway container — deployed independently to AWS, see README.md.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy"
+  },
+  "dependencies": {
+    "//": "Pinned to the Hyperframes 0.6.x line that api-server uses (@hyperframes/core + @hyperframes/producer are ^0.6.6). The orchestrator aligns this exact version when wiring infra into the workspace — keep it in lockstep with the engine, since renderToLambda / HyperframesRenderStack must match the deployed render runtime.",
+    "@hyperframes/aws-lambda": "^0.6.6"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.166.0",
+    "aws-cdk-lib": "^2.166.0",
+    "constructs": "^10.4.2",
+    "tsx": "catalog:",
+    "typescript": "^5.9.2"
+  }
+}

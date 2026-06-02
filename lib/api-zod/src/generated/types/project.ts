@@ -7,6 +7,7 @@
  */
 import type { ProjectCompositionVars } from './projectCompositionVars';
 import type { ProjectStatus } from './projectStatus';
+import type { RenderSettings } from './renderSettings';
 
 export interface Project {
   id: number;
@@ -27,6 +28,20 @@ export interface Project {
   renderError?: string | null;
   /** Studio placeholder values keyed by `user.*` / `brand.*`. Optional. */
   compositionVars?: ProjectCompositionVars;
+  /** Per-project render configuration. Null → server defaults. */
+  renderSettings?: RenderSettings | null;
+  /**
+     * Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive/optional.
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  renderProgress?: number | null;
+  /**
+     * Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive/optional.
+     * @nullable
+     */
+  renderCost?: number | null;
   createdAt: string;
   updatedAt: string;
 }

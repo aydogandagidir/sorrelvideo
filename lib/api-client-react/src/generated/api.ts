@@ -34,6 +34,8 @@ import type {
   ForgotPasswordRequest,
   GenericSuccess,
   HealthStatus,
+  LintRequest,
+  LintResponse,
   ListTemplatesParams,
   LoginRequest,
   LogoutSuccess,
@@ -44,6 +46,7 @@ import type {
   Project,
   ProjectInput,
   ProjectUpdate,
+  RenderSettingsInput,
   ResendVerificationRequest,
   ResetPasswordRequest,
   SignupRequest,
@@ -1559,6 +1562,76 @@ export const useStartProjectRender = <TError = ErrorType<void>,
       return useMutation(getStartProjectRenderMutationOptions(options));
     }
 
+export const getCancelProjectRenderUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/render/cancel`
+}
+
+/**
+ * @summary Request cancellation of a project's in-flight render
+ */
+export const cancelProjectRender = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getCancelProjectRenderUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCancelProjectRenderMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelProjectRender>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['cancelProjectRender'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelProjectRender>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelProjectRender(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelProjectRenderMutationResult = NonNullable<Awaited<ReturnType<typeof cancelProjectRender>>>
+
+    export type CancelProjectRenderMutationError = ErrorType<void>
+
+    /**
+ * @summary Request cancellation of a project's in-flight render
+ */
+export const useCancelProjectRender = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelProjectRender>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCancelProjectRenderMutationOptions(options));
+    }
+
 export const getGetProjectVideoUrl = (id: number,) => {
 
 
@@ -1568,6 +1641,7 @@ export const getGetProjectVideoUrl = (id: number,) => {
 }
 
 /**
+ * Streams the rendered video with the Content-Type matching the project's render format (mp4 → video/mp4, webm → video/webm, mov → video/quicktime). Projects rendered as a png-sequence have no single streamable file and return 409.
  * @summary Stream the rendered video file for a project
  */
 export const getProjectVideo = async (id: number, options?: RequestInit): Promise<Blob> => {
@@ -1635,6 +1709,233 @@ export function useGetProjectVideo<TData = Awaited<ReturnType<typeof getProjectV
 
 
 
+
+export const getGetProjectCompositionUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/composition`
+}
+
+/**
+ * Returns the composition HTML for a project with the brand kit and compositionVars already merged and substituted — the same output the render pipeline feeds Hyperframes — so the frontend player can preview it without a render. The optional `vars` query param is a base64-encoded JSON object whose keys override the project's saved compositionVars (so the Studio editor can preview unsaved edits); when absent the saved compositionVars are used. Served with `Cache-Control: no-store` so the preview always reflects live edits.
+ * @summary Serve a project's fully-substituted composition HTML for preview
+ */
+export const getProjectComposition = async (id: number, options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getGetProjectCompositionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectCompositionQueryKey = (id: number,) => {
+    return [
+    `/api/projects/${id}/composition`
+    ] as const;
+    }
+
+
+export const getGetProjectCompositionQueryOptions = <TData = Awaited<ReturnType<typeof getProjectComposition>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectComposition>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectCompositionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectComposition>>> = ({ signal }) => getProjectComposition(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectComposition>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectCompositionQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectComposition>>>
+export type GetProjectCompositionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Serve a project's fully-substituted composition HTML for preview
+ */
+
+export function useGetProjectComposition<TData = Awaited<ReturnType<typeof getProjectComposition>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectComposition>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectCompositionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetProjectThumbnailUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/thumbnail`
+}
+
+/**
+ * @summary Stream the rendered poster-frame thumbnail (PNG) for a project
+ */
+export const getProjectThumbnail = async (id: number, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetProjectThumbnailUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectThumbnailQueryKey = (id: number,) => {
+    return [
+    `/api/projects/${id}/thumbnail`
+    ] as const;
+    }
+
+
+export const getGetProjectThumbnailQueryOptions = <TData = Awaited<ReturnType<typeof getProjectThumbnail>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectThumbnailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectThumbnail>>> = ({ signal }) => getProjectThumbnail(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectThumbnail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectThumbnailQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectThumbnail>>>
+export type GetProjectThumbnailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Stream the rendered poster-frame thumbnail (PNG) for a project
+ */
+
+export function useGetProjectThumbnail<TData = Awaited<ReturnType<typeof getProjectThumbnail>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectThumbnailQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateProjectRenderSettingsUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/render-settings`
+}
+
+/**
+ * @summary Update a project's render settings (Pro-only capabilities gated)
+ */
+export const updateProjectRenderSettings = async (id: number,
+    renderSettingsInput: RenderSettingsInput, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getUpdateProjectRenderSettingsUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      renderSettingsInput,)
+  }
+);}
+
+
+
+
+export const getUpdateProjectRenderSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectRenderSettings>>, TError,{id: number;data: BodyType<RenderSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectRenderSettings>>, TError,{id: number;data: BodyType<RenderSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateProjectRenderSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectRenderSettings>>, {id: number;data: BodyType<RenderSettingsInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateProjectRenderSettings(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectRenderSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectRenderSettings>>>
+    export type UpdateProjectRenderSettingsMutationBody = BodyType<RenderSettingsInput>
+    export type UpdateProjectRenderSettingsMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a project's render settings (Pro-only capabilities gated)
+ */
+export const useUpdateProjectRenderSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectRenderSettings>>, TError,{id: number;data: BodyType<RenderSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectRenderSettings>>,
+        TError,
+        {id: number;data: BodyType<RenderSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateProjectRenderSettingsMutationOptions(options));
+    }
 
 export const getGetBrandKitUrl = () => {
 
@@ -2531,4 +2832,75 @@ export function useGetStats<TData = Awaited<ReturnType<typeof getStats>>, TError
 
 
 
+
+export const getLintCompositionUrl = () => {
+
+
+
+
+  return `/api/compositions/lint`
+}
+
+/**
+ * @summary Lint composition HTML and report findings (non-blocking)
+ */
+export const lintComposition = async (lintRequest: LintRequest, options?: RequestInit): Promise<LintResponse> => {
+
+  return customFetch<LintResponse>(getLintCompositionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      lintRequest,)
+  }
+);}
+
+
+
+
+export const getLintCompositionMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lintComposition>>, TError,{data: BodyType<LintRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof lintComposition>>, TError,{data: BodyType<LintRequest>}, TContext> => {
+
+const mutationKey = ['lintComposition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof lintComposition>>, {data: BodyType<LintRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  lintComposition(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LintCompositionMutationResult = NonNullable<Awaited<ReturnType<typeof lintComposition>>>
+    export type LintCompositionMutationBody = BodyType<LintRequest>
+    export type LintCompositionMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Lint composition HTML and report findings (non-blocking)
+ */
+export const useLintComposition = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lintComposition>>, TError,{data: BodyType<LintRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof lintComposition>>,
+        TError,
+        {data: BodyType<LintRequest>},
+        TContext
+      > => {
+      return useMutation(getLintCompositionMutationOptions(options));
+    }
 

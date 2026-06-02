@@ -1,0 +1,34 @@
+{
+  // Standalone strict config for the CDK app. Intentionally does NOT extend the
+  // monorepo tsconfig.base.json or use project references — infra/ is a
+  // self-contained app that ships to AWS, not part of the Railway build graph.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+
+    // Strict mode, fully enabled. No `any`, no implicit returns, no fallthrough.
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // We run via tsx (see cdk.json) and only ever type-check with --noEmit, so
+    // emit settings are inert but kept correct for clarity.
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": ["bin/**/*.ts", "lib/**/*.ts"],
+  "exclude": ["node_modules", "cdk.out"]
+}

@@ -416,11 +416,11 @@ paths:
         "409":
           description: Render already in progress
 
-  /projects/{id}/video:
-    get:
-      operationId: getProjectVideo
+  /projects/{id}/render/cancel:
+    post:
+      operationId: cancelProjectRender
       tags: [projects]
-      summary: Stream the rendered video file for a project
+      summary: Request cancellation of a project's in-flight render
       parameters:
         - name: id
           in: path
@@ -429,9 +429,49 @@ paths:
             type: integer
       responses:
         "200":
-          description: MP4 video stream
+          description: Cancellation requested — the worker finalizes the project to draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+        "409":
+          description: No render in progress
+
+  /projects/{id}/video:
+    get:
+      operationId: getProjectVideo
+      tags: [projects]
+      summary: Stream the rendered video file for a project
+      description: >-
+        Streams the rendered video with the Content-Type matching the
+        project's render format (mp4 → video/mp4, webm → video/webm,
+        mov → video/quicktime). Projects rendered as a png-sequence have no
+        single streamable file and return 409.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rendered video stream (format-dependent Content-Type)
           content:
             video/mp4:
+              schema:
+                type: string
+                format: binary
+            video/webm:
+              schema:
+                type: string
+                format: binary
+            video/quicktime:
               schema:
                 type: string
                 format: binary
@@ -441,6 +481,107 @@ paths:
           description: Forbidden
         "404":
           description: Video not available yet
+        "409":
+          description: Project rendered a PNG sequence; not streamable as a file
+
+  /projects/{id}/composition:
+    get:
+      operationId: getProjectComposition
+      tags: [projects]
+      summary: Serve a project's fully-substituted composition HTML for preview
+      description: >-
+        Returns the composition HTML for a project with the brand kit and
+        compositionVars already merged and substituted — the same output the
+        render pipeline feeds Hyperframes — so the frontend player can preview
+        it without a render. The optional `vars` query param is a base64-encoded
+        JSON object whose keys override the project's saved compositionVars
+        (so the Studio editor can preview unsaved edits); when absent the saved
+        compositionVars are used. Served with `Cache-Control: no-store` so the
+        preview always reflects live edits.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        # NOTE: the route also reads an optional `?vars=<base64-json>` override
+        # for live Studio preview. It is intentionally NOT declared as a typed
+        # query param: the player loads this URL via <hyperframes-player src=...>,
+        # never a typed hook, and declaring both a path param and a query param
+        # makes orval emit a colliding `GetProjectCompositionParams` (path zod vs
+        # query type). The Express route validates `vars` manually.
+      responses:
+        "200":
+          description: The substituted composition HTML
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Invalid project id or malformed vars
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Project not found
+
+  /projects/{id}/thumbnail:
+    get:
+      operationId: getProjectThumbnail
+      tags: [projects]
+      summary: Stream the rendered poster-frame thumbnail (PNG) for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PNG thumbnail image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Thumbnail not available
+
+  /projects/{id}/render-settings:
+    patch:
+      operationId: updateProjectRenderSettings
+      tags: [projects]
+      summary: Update a project's render settings (Pro-only capabilities gated)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenderSettingsInput"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden — upgrade_required for Pro-only settings
+        "404":
+          description: Not found
 
   /brand:
     get:
@@ -702,6 +843,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/PlatformStats"
 
+  /compositions/lint:
+    post:
+      operationId: lintComposition
+      tags: [compositions]
+      summary: Lint composition HTML and report findings (non-blocking)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LintRequest"
+      responses:
+        "200":
+          description: Lint findings (empty array means nothing to report).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LintResponse"
+        "400":
+          description: Request failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   parameters:
     AuthorizationSessionHeader:
@@ -915,6 +1087,24 @@ components:
               additionalProperties:
                 type: string
             - type: "null"
+        renderSettings:
+          description: Per-project render configuration. Null → server defaults.
+          oneOf:
+            - $ref: "#/components/schemas/RenderSettings"
+            - type: "null"
+        renderProgress:
+          description: >-
+            Live render progress (0–100) of the latest render job. Populated only
+            while `status` is `rendering`; null otherwise. Additive/optional.
+          type: ["integer", "null"]
+          minimum: 0
+          maximum: 100
+        renderCost:
+          description: >-
+            Estimated render cost in cents from the latest render job. Populated
+            only while `status` is `rendering` (when a metered backend reports it);
+            null otherwise. Additive/optional.
+          type: ["integer", "null"]
         createdAt:
           type: string
         updatedAt:
@@ -955,6 +1145,99 @@ components:
           type: object
           additionalProperties:
             type: string
+
+    RenderTransition:
+      type: object
+      required: [time, shader, duration, ease]
+      properties:
+        time:
+          type: number
+        shader:
+          type: string
+        duration:
+          type: number
+        ease:
+          type: string
+
+    RenderSettings:
+      type: object
+      required: [fps, quality, format, resolution, transparent, watermark]
+      properties:
+        fps:
+          type: integer
+          enum: [24, 30, 60]
+        quality:
+          type: string
+          enum: [draft, standard, high]
+        format:
+          type: string
+          enum: [mp4, webm, mov, png-sequence]
+        resolution:
+          type: string
+          enum: [landscape, portrait, square, landscape-4k, portrait-4k, square-4k]
+        transparent:
+          type: boolean
+        watermark:
+          type: boolean
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RenderTransition"
+
+    RenderSettingsInput:
+      type: object
+      description: Partial render settings; omitted fields keep their current value.
+      properties:
+        fps:
+          type: integer
+          enum: [24, 30, 60]
+        quality:
+          type: string
+          enum: [draft, standard, high]
+        format:
+          type: string
+          enum: [mp4, webm, mov, png-sequence]
+        resolution:
+          type: string
+          enum: [landscape, portrait, square, landscape-4k, portrait-4k, square-4k]
+        transparent:
+          type: boolean
+        watermark:
+          type: boolean
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RenderTransition"
+
+    LintMessage:
+      type: object
+      required: [severity, message]
+      properties:
+        severity:
+          type: string
+          enum: [error, warning, info]
+        message:
+          type: string
+        line:
+          type: integer
+        rule:
+          type: string
+
+    LintRequest:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+
+    LintResponse:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/LintMessage"
 
     BrandKit:
       type: object

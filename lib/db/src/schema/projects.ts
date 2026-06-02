@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import type { RenderSettings } from "./render";
 
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
@@ -25,6 +26,18 @@ export const projectsTable = pgTable("projects", {
   // (e.g. headline, bodyText, ctaText). Studio writes here; the render
   // service merges this with the user's brand kit at render time.
   compositionVars: jsonb("composition_vars").$type<Record<string, string>>(),
+  // Full studio-authored composition HTML. Written by the embedded Studio when
+  // a project's entry composition is saved (routes/studio.ts). When set (a
+  // non-empty string), renderService.buildCompositionHtml returns it VERBATIM —
+  // the document is already the final, fully-authored HTML, so the brand-kit +
+  // compositionVars template merge is bypassed. Null → the legacy template+vars
+  // merge, so existing projects (and the default render) are byte-identical.
+  compositionHtml: text("composition_html"),
+  // Per-project render configuration (fps, quality, format, resolution,
+  // transparency, watermark, transitions). Null → DEFAULT_RENDER_SETTINGS, so
+  // existing rows render exactly as before this column existed. Edited via
+  // PATCH /projects/:id/render-settings; consumed by renderService at render time.
+  renderSettings: jsonb("render_settings").$type<RenderSettings>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

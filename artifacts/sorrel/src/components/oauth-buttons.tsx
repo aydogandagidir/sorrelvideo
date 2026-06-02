@@ -1,37 +1,77 @@
 import { Github } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+
+type OAuthProvider = "github" | "google";
 
 /**
  * Continue-with-provider buttons rendered above the email/password form on
- * login + signup. The backend redirects to the provider, then back to
- * /api/auth/oauth/<provider>/callback, which creates a session and bounces
- * the browser to `returnTo`.
+ * login + signup. Only providers the backend has actually configured (client
+ * id + secret present) are shown — the SPA learns which from
+ * GET /api/auth/oauth/providers. If none are configured the whole block
+ * (buttons + "or continue with email" divider) renders nothing, so the email
+ * form stands alone instead of dangling a divider over buttons that full-page
+ * navigate to a raw 503 JSON error.
+ *
+ * Each button navigates to the backend, which redirects to the provider and
+ * then back to /api/auth/oauth/<provider>/callback.
  */
 export function OAuthButtons() {
+  const [providers, setProviders] = useState<OAuthProvider[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/oauth/providers", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : { providers: [] }))
+      .then((data: { providers?: unknown }) => {
+        if (!active) return;
+        setProviders(
+          Array.isArray(data.providers)
+            ? data.providers.filter(
+                (p): p is OAuthProvider => p === "github" || p === "google",
+              )
+            : [],
+        );
+      })
+      .catch(() => {
+        if (active) setProviders([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Unknown (still loading) or none configured → render nothing.
+  if (!providers || providers.length === 0) return null;
+
   return (
     <div className="space-y-2">
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        onClick={() => {
-          window.location.href = "/api/auth/oauth/github";
-        }}
-      >
-        <Github className="h-4 w-4" />
-        Continue with GitHub
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        onClick={() => {
-          window.location.href = "/api/auth/oauth/google";
-        }}
-      >
-        <GoogleIcon className="h-4 w-4" />
-        Continue with Google
-      </Button>
+      {providers.includes("github") && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            window.location.href = "/api/auth/oauth/github";
+          }}
+        >
+          <Github className="h-4 w-4" />
+          Continue with GitHub
+        </Button>
+      )}
+      {providers.includes("google") && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            window.location.href = "/api/auth/oauth/google";
+          }}
+        >
+          <GoogleIcon className="h-4 w-4" />
+          Continue with Google
+        </Button>
+      )}
       <div className="relative my-2">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t" />

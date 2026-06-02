@@ -62,6 +62,10 @@ core/
 **/renders/
 .tmp-frames/
 
+# Per-user Studio composition workspaces (M9): HTML the embedded editor
+# reads/writes via /api/studio/*. Runtime data like renders/, never source.
+artifacts/api-server/studio-workspaces/
+
 # Production SPA bundle staged for the api-server to serve (copied from
 # artifacts/sorrel/dist/public by the Dockerfile / single-port local serve).
 artifacts/api-server/public/

@@ -383,6 +383,19 @@ function clearOauthCookies(res: Response): void {
   res.clearCookie("oauth_return_to", { path: "/" });
 }
 
+// Which OAuth providers are actually configured (client id + secret present).
+// The SPA reads this to render only the available "Continue with …" buttons;
+// without it the buttons always show and clicking an unconfigured one full-page
+// navigates to a raw 503 JSON body. Registered BEFORE "/auth/oauth/:provider"
+// so the literal "providers" path isn't parsed as a provider name. Spec-exempt,
+// like the rest of the OAuth routes.
+router.get("/auth/oauth/providers", (_req: Request, res: Response): void => {
+  const providers = (["github", "google"] as const satisfies readonly OAuthProvider[]).filter(
+    isProviderConfigured,
+  );
+  res.json({ providers });
+});
+
 router.get("/auth/oauth/:provider", (req: Request, res: Response): void => {
   const provider = parseProvider(req.params.provider);
   if (!provider) {

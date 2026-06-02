@@ -237,6 +237,11 @@ export const GetTemplateResponse = zod.object({
 /**
  * @summary List video projects
  */
+export const listProjectsResponseRenderProgressMin = 0;
+export const listProjectsResponseRenderProgressMax = 100;
+
+
+
 export const ListProjectsResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -249,6 +254,22 @@ export const ListProjectsResponseItem = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(listProjectsResponseRenderProgressMin).max(listProjectsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -274,6 +295,11 @@ export const GetProjectParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const getProjectResponseRenderProgressMin = 0;
+export const getProjectResponseRenderProgressMax = 100;
+
+
+
 export const GetProjectResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -286,6 +312,22 @@ export const GetProjectResponse = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(getProjectResponseRenderProgressMin).max(getProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -307,6 +349,11 @@ export const UpdateProjectBody = zod.object({
   "compositionVars": zod.record(zod.string(), zod.string()).optional()
 })
 
+export const updateProjectResponseRenderProgressMin = 0;
+export const updateProjectResponseRenderProgressMax = 100;
+
+
+
 export const UpdateProjectResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -319,6 +366,22 @@ export const UpdateProjectResponse = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(updateProjectResponseRenderProgressMin).max(updateProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -341,10 +404,133 @@ export const StartProjectRenderParams = zod.object({
 
 
 /**
+ * @summary Request cancellation of a project's in-flight render
+ */
+export const CancelProjectRenderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const cancelProjectRenderResponseRenderProgressMin = 0;
+export const cancelProjectRenderResponseRenderProgressMax = 100;
+
+
+
+export const CancelProjectRenderResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
+  "module": zod.string(),
+  "templateId": zod.number().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "videoUrl": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
+  "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(cancelProjectRenderResponseRenderProgressMin).max(cancelProjectRenderResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * Streams the rendered video with the Content-Type matching the project's render format (mp4 → video/mp4, webm → video/webm, mov → video/quicktime). Projects rendered as a png-sequence have no single streamable file and return 409.
  * @summary Stream the rendered video file for a project
  */
 export const GetProjectVideoParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * Returns the composition HTML for a project with the brand kit and compositionVars already merged and substituted — the same output the render pipeline feeds Hyperframes — so the frontend player can preview it without a render. The optional `vars` query param is a base64-encoded JSON object whose keys override the project's saved compositionVars (so the Studio editor can preview unsaved edits); when absent the saved compositionVars are used. Served with `Cache-Control: no-store` so the preview always reflects live edits.
+ * @summary Serve a project's fully-substituted composition HTML for preview
+ */
+export const GetProjectCompositionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Stream the rendered poster-frame thumbnail (PNG) for a project
+ */
+export const GetProjectThumbnailParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Update a project's render settings (Pro-only capabilities gated)
+ */
+export const UpdateProjectRenderSettingsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateProjectRenderSettingsBody = zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]).optional(),
+  "quality": zod.enum(['draft', 'standard', 'high']).optional(),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']).optional(),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']).optional(),
+  "transparent": zod.boolean().optional(),
+  "watermark": zod.boolean().optional(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}).describe('Partial render settings; omitted fields keep their current value.')
+
+export const updateProjectRenderSettingsResponseRenderProgressMin = 0;
+export const updateProjectRenderSettingsResponseRenderProgressMax = 100;
+
+
+
+export const UpdateProjectRenderSettingsResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
+  "module": zod.string(),
+  "templateId": zod.number().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "videoUrl": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
+  "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(updateProjectRenderSettingsResponseRenderProgressMin).max(updateProjectRenderSettingsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 })
 
 
@@ -532,6 +718,11 @@ export const GetStorageObjectParams = zod.object({
 /**
  * @summary Get platform usage statistics
  */
+export const getStatsResponseRecentProjectsItemRenderProgressMin = 0;
+export const getStatsResponseRecentProjectsItemRenderProgressMax = 100;
+
+
+
 export const GetStatsResponse = zod.object({
   "totalProjects": zod.number(),
   "totalTemplates": zod.number(),
@@ -549,9 +740,42 @@ export const GetStatsResponse = zod.object({
   "duration": zod.number().nullish(),
   "renderError": zod.string().nullish(),
   "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional()
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(getStatsResponseRecentProjectsItemRenderProgressMin).max(getStatsResponseRecentProjectsItemRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })).optional()
+})
+
+
+/**
+ * @summary Lint composition HTML and report findings (non-blocking)
+ */
+export const LintCompositionBody = zod.object({
+  "source": zod.string()
+})
+
+export const LintCompositionResponse = zod.object({
+  "messages": zod.array(zod.object({
+  "severity": zod.enum(['error', 'warning', 'info']),
+  "message": zod.string(),
+  "line": zod.number().optional(),
+  "rule": zod.string().optional()
+}))
 })
 
 

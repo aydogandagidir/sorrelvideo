@@ -2,9 +2,19 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, pool, stripeSubscriptionsTable, usersTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
+import { countLambdaJobsSince } from "./renderJobsService";
 
 const FREE_RENDER_LIMIT = 3;
 const FREE_AI_LIMIT = 10;
+
+/**
+ * Monthly cap on DISTRIBUTED (Lambda) renders — applied even to Pro users.
+ * Lambda renders cost real AWS money per run, so unlike the inline/bullmq paths
+ * (which Pro gets unlimited) the distributed backend is metered for everyone to
+ * bound spend. Overridable via DISTRIBUTED_RENDER_LIMIT (default 100).
+ */
+const DISTRIBUTED_RENDER_LIMIT =
+  Number(process.env.DISTRIBUTED_RENDER_LIMIT ?? "100") || 100;
 
 export interface BillingInfo {
   plan: "free" | "pro";
@@ -21,6 +31,12 @@ export interface BillingInfo {
 function startOfNextMonth(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
+/** Returns the first instant of the current month in UTC. */
+function startOfThisMonth(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
 /** Returns true if the monthly reset date has passed. */
@@ -284,6 +300,35 @@ export async function checkAndIncrementAiCount(userId: string): Promise<void> {
 }
 
 /**
+ * Enforce the monthly DISTRIBUTED (Lambda) render cap — applied to EVERY plan,
+ * including Pro. Unlike `checkAndIncrementRenderCount` (which is the Free monthly
+ * quota that Pro bypasses), this bounds the per-run-cost Lambda backend for all
+ * users so a single account can't run up an unbounded AWS bill.
+ *
+ * Usage is COUNTED from the `render_jobs` ledger (backend='lambda', createdAt in
+ * the current UTC month) rather than tracked on a dedicated users column: one row
+ * per dispatch is already written, so the count IS the usage. Because the caller
+ * inserts the ledger row immediately AFTER this check passes (mirroring the
+ * existing render flow), the count reflects prior dispatches this month and the
+ * Nth dispatch is admitted while < limit.
+ *
+ * Throws `{ reason: "upgrade_required", status: 403 }` when the cap is hit — the
+ * SAME shape as the Free-quota / premium rejections, so the existing 403 handler
+ * and `UpgradeModal` fire unchanged.
+ */
+export async function checkAndIncrementDistributedRenderCount(
+  userId: string,
+): Promise<void> {
+  const used = await countLambdaJobsSince(userId, startOfThisMonth());
+  if (used >= DISTRIBUTED_RENDER_LIMIT) {
+    throw Object.assign(
+      new Error("Monthly distributed render limit reached — upgrade to Pro"),
+      { reason: "upgrade_required", status: 403 },
+    );
+  }
+}
+
+/**
  * Creates or retrieves a Stripe customer for the user, stores the ID in DB.
  */
 export async function ensureStripeCustomer(
@@ -314,4 +359,4 @@ export async function ensureStripeCustomer(
   return customer.id;
 }
 
-export { FREE_AI_LIMIT, FREE_RENDER_LIMIT };
+export { DISTRIBUTED_RENDER_LIMIT, FREE_AI_LIMIT, FREE_RENDER_LIMIT };
