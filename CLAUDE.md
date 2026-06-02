@@ -508,6 +508,22 @@ upload-sourcemaps` in the deploy workflow + strip `.map` from the
    (`0.6.6` → `0.6.65`) once the player / studio / `aws-lambda` packages are
    adopted. The `@hyperframes/aws-lambda` API used by the CDK stack is
    developer-stated and unverified until then.
+10. **Dependency security — residual dev-only `vitest` advisory**: `pnpm audit`
+    is clean for production (`pnpm audit --prod` → no vulnerabilities). Transitive
+    prod vulns (`qs` DoS, `uuid` bounds-check) and most dev ones (`undici`, `tmp`,
+    `vite`, `esbuild`) are pinned to patched versions via `pnpm.overrides`, using
+    scoped `pkg@<bad-range>: ^patched` selectors so non-vulnerable instances (e.g.
+    the frontend's own Vite/esbuild) are left untouched. After each override the
+    full workspace (`pnpm build` + `pnpm test`, all 4 projects) is re-verified.
+    One advisory remains: `vitest <4.1.0` (GHSA-5xrq-8626-4rwp — arbitrary file
+    read **when the Vitest UI server is listening**). It is **dev-only and
+    non-exploitable here**: we only ever run `vitest run` headless; the UI server
+    is never started, and vitest never ships. The fix is a `vitest`/`@vitest/
+    coverage-v8` 2→4 major bump — a real migration (v4 removes the root
+    `vitest.workspace.ts` / `defineWorkspace` form; it must move to `test.projects`
+    in a root `vitest.config.ts`). Deferred to a focused change that compares the
+    4-project test **count** (not just green) before/after, since a botched
+    migration can silently skip whole projects.
 
 ## User preferences
 
