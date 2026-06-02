@@ -48,7 +48,18 @@ const NOTICE_PATH = path.join(COMPOSITIONS_DIR, "REGISTRY-NOTICE.md");
  */
 const CURATION = [
   { slug: "apple-money-count", category: "Data", isPremium: false },
-  { slug: "data-chart", category: "Data", isPremium: false },
+  {
+    slug: "data-chart",
+    category: "Data",
+    isPremium: false,
+    // Brand injection: the two NYT-style data series (grey bars, blue line)
+    // adopt the brand palette while the editorial cream background + grid stay.
+    inject: [
+      { find: "#5c5c5c", replace: "{{brand.primaryColor}}" },
+      { find: "#326fa8", replace: "{{brand.accentColor}}" },
+      { find: "#326FA8", replace: "{{brand.accentColor}}" },
+    ],
+  },
   { slug: "world-map", category: "Data", isPremium: false },
   { slug: "us-map-bubble", category: "Data", isPremium: true },
   {

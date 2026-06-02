@@ -76,8 +76,8 @@
 
           <!-- Line Group (Conversion Rate) -->
           <g class="line-group">
-            <path class="conversion-path" fill="none" stroke="#326FA8" stroke-width="1.5" />
-            <circle class="line-dot" r="5" fill="#326FA8" style="opacity: 0" />
+            <path class="conversion-path" fill="none" stroke="{{brand.accentColor}}" stroke-width="1.5" />
+            <circle class="line-dot" r="5" fill="{{brand.accentColor}}" style="opacity: 0" />
           </g>
 
           <!-- Line Labels Group -->
@@ -151,13 +151,13 @@
         [data-composition-id="data-chart"] .key-box {
           width: 10px;
           height: 10px;
-          background-color: #5c5c5c;
+          background-color: {{brand.primaryColor}};
         }
 
         [data-composition-id="data-chart"] .key-line {
           width: 16px;
           height: 1.5px;
-          background-color: #326fa8;
+          background-color: {{brand.accentColor}};
         }
 
         [data-composition-id="data-chart"] .key-text {
@@ -193,7 +193,7 @@
         }
 
         [data-composition-id="data-chart"] .bar {
-          fill: #5c5c5c;
+          fill: {{brand.primaryColor}};
         }
 
         [data-composition-id="data-chart"] .bar-label {
@@ -205,7 +205,7 @@
 
         [data-composition-id="data-chart"] .line-label {
           font-size: 14px;
-          fill: #326fa8;
+          fill: {{brand.accentColor}};
           font-weight: 600;
           text-anchor: middle;
           opacity: 0;
