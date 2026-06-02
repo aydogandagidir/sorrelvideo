@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Website Showcase</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=block"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #07070b;
+        font-family: "Inter", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="website-showcase"
+      data-composition-id="website-showcase"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="9"
+    >
+      <div class="stage">
+        <!-- Browser window mockup containing the captured screenshot -->
+        <div class="browser">
+          <div class="titlebar">
+            <span class="dot red"></span>
+            <span class="dot amber"></span>
+            <span class="dot green"></span>
+            <div class="urlbar">{{capture.url}}</div>
+          </div>
+          <div class="viewport">
+            <img class="shot" src="{{capture.image}}" alt="" />
+          </div>
+        </div>
+
+        <!-- Branded intro card -->
+        <div class="intro">
+          <div class="intro-kicker">PRESENTING</div>
+          <div class="intro-name">{{brand.companyName}}</div>
+        </div>
+
+        <!-- Outro CTA -->
+        <div class="outro">
+          <div class="outro-title">{{capture.title}}</div>
+          <div class="outro-pill">{{capture.url}}</div>
+        </div>
+      </div>
+
+      <style>
+        [data-composition-id="website-showcase"] .stage {
+          width: 1920px;
+          height: 1080px;
+          position: relative;
+          overflow: hidden;
+          background:
+            radial-gradient(
+              1200px 700px at 50% -10%,
+              {{brand.primaryColor}}22,
+              transparent 70%
+            ),
+            #07070b;
+        }
+
+        [data-composition-id="website-showcase"] .browser {
+          position: absolute;
+          left: 310px;
+          top: 120px;
+          width: 1300px;
+          height: 800px;
+          background: #15151c;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow:
+            0 40px 120px rgba(0, 0, 0, 0.6),
+            0 0 0 1px rgba(255, 255, 255, 0.06);
+          opacity: 0;
+          transform: scale(0.92);
+        }
+        [data-composition-id="website-showcase"] .titlebar {
+          height: 52px;
+          background: #1d1d26;
+          display: flex;
+          align-items: center;
+          padding: 0 20px;
+          gap: 9px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        [data-composition-id="website-showcase"] .dot {
+          width: 13px;
+          height: 13px;
+          border-radius: 50%;
+        }
+        [data-composition-id="website-showcase"] .dot.red { background: #ff5f57; }
+        [data-composition-id="website-showcase"] .dot.amber { background: #febc2e; }
+        [data-composition-id="website-showcase"] .dot.green { background: #28c840; }
+        [data-composition-id="website-showcase"] .urlbar {
+          margin-left: 18px;
+          flex: 1;
+          height: 30px;
+          background: #0e0e14;
+          border-radius: 8px;
+          color: #8a8a99;
+          font-size: 15px;
+          display: flex;
+          align-items: center;
+          padding: 0 16px;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+        [data-composition-id="website-showcase"] .viewport {
+          position: absolute;
+          top: 52px;
+          left: 0;
+          width: 1300px;
+          height: 748px;
+          overflow: hidden;
+          background: #fff;
+        }
+        [data-composition-id="website-showcase"] .shot {
+          display: block;
+          width: 1300px; /* scaled from the 1280px capture viewport */
+          height: auto;
+          will-change: transform;
+        }
+
+        [data-composition-id="website-showcase"] .intro {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          background:
+            linear-gradient(135deg, {{brand.primaryColor}}, {{brand.secondaryColor}});
+        }
+        [data-composition-id="website-showcase"] .intro-kicker {
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 24px;
+          font-weight: 600;
+          letter-spacing: 8px;
+        }
+        [data-composition-id="website-showcase"] .intro-name {
+          color: #fff;
+          font-size: 96px;
+          font-weight: 800;
+          letter-spacing: -2px;
+          text-align: center;
+          max-width: 1600px;
+        }
+
+        [data-composition-id="website-showcase"] .outro {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 24px;
+          background: rgba(7, 7, 11, 0);
+          pointer-events: none;
+        }
+        [data-composition-id="website-showcase"] .outro-title {
+          color: #fff;
+          font-size: 64px;
+          font-weight: 700;
+          text-align: center;
+          max-width: 1500px;
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        [data-composition-id="website-showcase"] .outro-pill {
+          color: #07070b;
+          background: #fff;
+          font-size: 26px;
+          font-weight: 600;
+          padding: 14px 32px;
+          border-radius: 100px;
+          opacity: 0;
+          transform: translateY(20px);
+        }
+      </style>
+
+      <script>
+        (function () {
+          const root = '[data-composition-id="website-showcase"]';
+          const captureHeight = parseInt("{{capture.height}}", 10) || 800;
+          // The shot is drawn at 1300px wide (scaled from the 1280px capture),
+          // so its on-screen height scales by the same factor. Scroll the part
+          // that overflows the 748px viewport.
+          const scaledHeight = captureHeight * (1300 / 1280);
+          const viewportH = 748;
+          const scroll = Math.max(0, scaledHeight - viewportH);
+
+          const tl = gsap.timeline({ paused: true });
+
+          // 1. Intro card holds, then wipes up to reveal the browser.
+          tl.to(root + " .intro", { duration: 0.6, ease: "power3.inOut" }, 0); // hold
+          tl.to(
+            root + " .intro",
+            { yPercent: -100, duration: 0.8, ease: "power4.inOut" },
+            1.8,
+          );
+
+          // 2. Browser window scales/fades in.
+          tl.to(
+            root + " .browser",
+            { opacity: 1, scale: 1, duration: 0.9, ease: "power3.out" },
+            2.2,
+          );
+
+          // 3. Screenshot scrolls top → bottom to showcase the page.
+          tl.fromTo(
+            root + " .shot",
+            { y: 0 },
+            { y: -scroll, duration: 4.4, ease: "none" },
+            3.3,
+          );
+
+          // 4. Outro: darken + title/URL fade up.
+          tl.to(
+            root + " .outro",
+            { background: "rgba(7,7,11,0.82)", duration: 0.7, ease: "power2.out" },
+            7.7,
+          );
+          tl.to(
+            root + " .outro-title",
+            { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" },
+            7.9,
+          );
+          tl.to(
+            root + " .outro-pill",
+            { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+            8.2,
+          );
+
+          window.__timelines = window.__timelines || {};
+          window.__timelines["website-showcase"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>
