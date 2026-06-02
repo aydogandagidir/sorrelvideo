@@ -217,9 +217,14 @@ and provider response usage is logged but not persisted.
 Optional, gated by env. When
 `GITHUB_OAUTH_*` / `GOOGLE_OAUTH_*` are set, login and signup show
 "Continue with …" buttons that bounce through
-`/api/auth/oauth/<provider>` → provider authorize URL → callback. The
-callback exchanges the code via `arctic`, fetches the provider profile,
-and calls `findOrCreateOAuthUser`:
+`/api/auth/oauth/<provider>` → provider authorize URL → callback. The SPA
+discovers which providers are actually configured via
+`GET /api/auth/oauth/providers` (spec-exempt, registered before the
+`:provider` route) and renders only those buttons — when none are set the
+whole block, including the "or continue with email" divider, is hidden so
+the email/password form stands alone (otherwise a button would full-page
+navigate to a raw `503` JSON body). The callback exchanges the code via
+`arctic`, fetches the provider profile, and calls `findOrCreateOAuthUser`:
 
 - If the `(provider, providerAccountId)` pair already maps to a user →
   log them in.

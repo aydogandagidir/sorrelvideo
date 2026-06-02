@@ -41,3 +41,21 @@ describe("GET /api/auth/user", () => {
     expect(res.body).toEqual({ user: null });
   });
 });
+
+describe("GET /api/auth/oauth/providers", () => {
+  it("returns 200 with a providers array, matched before the :provider route", async () => {
+    const res = await request(app).get("/api/auth/oauth/providers");
+    // Not 404: the literal "providers" must NOT be parsed as a provider name
+    // by the "/auth/oauth/:provider" route registered just after it.
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.providers)).toBe(true);
+    expect(res.body.error).toBeUndefined();
+  });
+
+  it("lists no providers when none are configured (the default test env)", async () => {
+    const res = await request(app).get("/api/auth/oauth/providers");
+    // The test env sets no GITHUB_/GOOGLE_OAUTH_* vars, so nothing is offered —
+    // which is exactly what makes the SPA hide the buttons.
+    expect(res.body.providers).toEqual([]);
+  });
+});
