@@ -22,6 +22,27 @@ const CORE_DEST = path.join(CWD, "core", "dist");
 const WORK = path.join(CWD, "renders", "__verify__");
 const FPS = 8; // reduced — smoke for "renders without error", not visual fidelity
 
+// A distinctive sample brand so a glance at the output proves any injected
+// {{brand.*}} placeholders actually RESOLVE (vs rendering literal braces).
+// Mirrors renderService's STUDIO_FALLBACKS shape; unknown keys collapse to "".
+const SAMPLE_VARS = {
+  "brand.companyName": "SORREL DEMO",
+  "brand.initial": "S",
+  "brand.primaryColor": "#ff3366",
+  "brand.secondaryColor": "#3366ff",
+  "brand.accentColor": "#ffcc00",
+  "brand.fontFamily": "'Inter'",
+  "brand.logoUrl": "",
+  "user.headline": "Sorrel render check",
+  "user.bodyText": "Placeholder substitution verified.",
+  "user.ctaText": "Ship it",
+};
+function substitute(html) {
+  return html.replace(/{{\s*([a-zA-Z0-9._-]+)\s*}}/g, (_m, k) =>
+    SAMPLE_VARS[k] !== undefined ? SAMPLE_VARS[k] : "",
+  );
+}
+
 if (!fs.existsSync(CORE_DEST)) {
   if (!fs.existsSync(CORE_SRC)) { console.error("[verify] no core/dist"); process.exit(1); }
   fs.cpSync(CORE_SRC, CORE_DEST, { recursive: true, dereference: true });
@@ -36,7 +57,11 @@ for (const t of manifest) {
   const dir = path.join(WORK, t.slug);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  fs.copyFileSync(file, path.join(dir, "composition.html"));
+  fs.writeFileSync(
+    path.join(dir, "composition.html"),
+    substitute(fs.readFileSync(file, "utf-8")),
+    "utf-8",
+  );
   const out = path.join(dir, "out.mp4");
   try {
     const job = createRenderJob({ fps: { num: FPS, den: 1 }, quality: "draft", format: "mp4", entryFile: "composition.html" });
@@ -48,7 +73,9 @@ for (const t of manifest) {
     results.push({ slug: t.slug, ok: false, error: err instanceof Error ? err.message : String(err) });
     console.log(`[verify] ✗ ${t.slug.padEnd(34)} THREW: ${err instanceof Error ? err.message.split("\n")[0] : err}`);
   }
-  fs.rmSync(dir, { recursive: true, force: true });
+  if (!process.env.KEEP_VERIFY_OUTPUT) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 const failed = results.filter((r) => !r.ok);

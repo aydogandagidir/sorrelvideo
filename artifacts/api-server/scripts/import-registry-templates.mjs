@@ -51,7 +51,27 @@ const CURATION = [
   { slug: "data-chart", category: "Data", isPremium: false },
   { slug: "world-map", category: "Data", isPremium: false },
   { slug: "us-map-bubble", category: "Data", isPremium: true },
-  { slug: "logo-outro", category: "Branding", isPremium: false },
+  {
+    slug: "logo-outro",
+    category: "Branding",
+    isPremium: false,
+    // Brand injection: recolor the assembly logo with the brand palette and make
+    // the brand NAME the hero wordmark — the outro becomes the USER's brand while
+    // keeping the signature piece-by-piece animation. Existing brand-kit fields
+    // only (colors + companyName) and no extra assets, so it renders for every
+    // user (STUDIO_FALLBACKS cover blanks at render; PREVIEW_FALLBACKS in the
+    // gallery preview). The Hyperframes compiler still inlines the GSAP CDN dep.
+    inject: [
+      { find: 'fill="#F24E1E"', replace: 'fill="{{brand.primaryColor}}"' },
+      { find: 'fill="#A259FF"', replace: 'fill="{{brand.secondaryColor}}"' },
+      { find: 'fill="#FF7262"', replace: 'fill="{{brand.accentColor}}"' },
+      { find: 'fill="#1ABCFE"', replace: 'fill="{{brand.primaryColor}}"' },
+      { find: 'fill="#0ACF83"', replace: 'fill="{{brand.accentColor}}"' },
+      { find: "Nothing great is made alone.", replace: "{{brand.companyName}}" },
+      // Drop the placeholder vanity URL — no website field in the brand kit yet.
+      { find: /<div class="url-pill">[\s\S]*?<\/div>/, replace: "" },
+    ],
+  },
   { slug: "code-snippet-dark-modern", category: "Code", isPremium: false },
   { slug: "code-snippet-light-modern", category: "Code", isPremium: false },
   { slug: "code-snippet-apple-terminal-pro", category: "Code", isPremium: true },
@@ -105,7 +125,7 @@ async function main() {
   const imported = [];
   const skipped = [];
 
-  for (const { slug, category, isPremium } of CURATION) {
+  for (const { slug, category, isPremium, inject } of CURATION) {
     try {
       const item = JSON.parse(
         await fetchText(RAW(`registry/blocks/${slug}/registry-item.json`)),
@@ -132,9 +152,19 @@ async function main() {
       }
 
       const dims = item.dimensions || {};
+      // Apply per-template brand-injection rules (string replaceAll or regex):
+      // turn hard-coded brand elements into {{brand.*}} placeholders that
+      // renderService substitutes from the user's brand kit at render time.
+      let body = html;
+      for (const rule of inject ?? []) {
+        body =
+          typeof rule.find === "string"
+            ? body.replaceAll(rule.find, rule.replace)
+            : body.replace(rule.find, rule.replace);
+      }
       fs.writeFileSync(
         path.join(COMPOSITIONS_DIR, `${slug}.html`),
-        attributionHeader(slug, item) + html,
+        attributionHeader(slug, item) + body,
         "utf-8",
       );
       imported.push({
