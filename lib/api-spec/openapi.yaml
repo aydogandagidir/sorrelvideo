@@ -300,6 +300,29 @@ paths:
         "404":
           description: Not found
 
+  /templates/{id}/use:
+    post:
+      operationId: useTemplate
+      tags: [templates]
+      summary: Create a project from a template at its native aspect ratio
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: The created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "403":
+          description: Premium template requires a Pro plan
+        "404":
+          description: Template not found
+
   /projects:
     get:
       operationId: listProjects

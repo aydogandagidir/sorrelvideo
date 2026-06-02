@@ -1125,6 +1125,76 @@ export function useGetTemplate<TData = Awaited<ReturnType<typeof getTemplate>>, 
 
 
 
+export const getUseTemplateUrl = (id: number,) => {
+
+
+
+
+  return `/api/templates/${id}/use`
+}
+
+/**
+ * @summary Create a project from a template at its native aspect ratio
+ */
+export const useTemplate = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getUseTemplateUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getUseTemplateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof useTemplate>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof useTemplate>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['useTemplate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof useTemplate>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  useTemplate(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UseTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof useTemplate>>>
+
+    export type UseTemplateMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a project from a template at its native aspect ratio
+ */
+export const useUseTemplate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof useTemplate>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof useTemplate>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUseTemplateMutationOptions(options));
+    }
+
 export const getListProjectsUrl = () => {
 
 

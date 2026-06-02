@@ -5,6 +5,7 @@
 // build time, so there is no runtime file read. Both renderService (composition
 // map) and the platform-template seed read from here, making the manifest the
 // single source of truth.
+import type { RenderResolution } from "@workspace/db";
 import manifest from "../compositions/registry-templates.generated.json";
 
 export interface RegistryTemplate {
@@ -35,3 +36,18 @@ export const REGISTRY_TEMPLATES: RegistryTemplate[] =
  */
 export const REGISTRY_COMPOSITION_MAP: Record<string, string> =
   Object.fromEntries(REGISTRY_TEMPLATES.map((t) => [t.slug, `${t.slug}.html`]));
+
+/**
+ * The resolution preset matching a registry template's authored canvas, so a
+ * project created from it renders at the template's NATIVE aspect ratio instead
+ * of the portrait default (which would letterbox/distort a 1920×1080 block).
+ * Returns null for non-registry modules — the hand-authored templates are
+ * responsive and keep the existing portrait-first default.
+ */
+export function resolutionForModule(module: string): RenderResolution | null {
+  const t = REGISTRY_TEMPLATES.find((x) => x.slug === module);
+  if (!t) return null;
+  if (t.width > t.height) return "landscape";
+  if (t.height > t.width) return "portrait";
+  return "square";
+}

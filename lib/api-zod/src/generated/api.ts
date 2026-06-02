@@ -235,6 +235,14 @@ export const GetTemplateResponse = zod.object({
 
 
 /**
+ * @summary Create a project from a template at its native aspect ratio
+ */
+export const UseTemplateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary List video projects
  */
 export const listProjectsResponseRenderProgressMin = 0;
