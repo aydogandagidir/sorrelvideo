@@ -1,22 +1,24 @@
 import React, { useRef, useState } from "react";
 import { Layout } from "@/components/layout";
-import { useListTemplates } from "@workspace/api-client-react";
+import { useListTemplates, useUseTemplate } from "@workspace/api-client-react";
 import type { Template } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Clock, Lock, Play, Tag } from "lucide-react";
+import { AlertCircle, Clock, Loader2, Lock, Play, Tag } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { HfPlayer, type HfPlayerHandle } from "@/components/hf-player";
 import { useBillingInfo } from "@/hooks/useBilling";
+import { useToast } from "@/hooks/use-toast";
 
-// NOTE: importing the 9 official Hyperframes starter compositions is DEFERRED —
-// their HTML isn't vendored into this repo yet and sourcing them needs an
-// asset/licensing decision. This wave wires live hover-preview for Sorrel's
-// EXISTING templates/compositions only (each template's `module` maps to a
-// composition the backend serves at /api/templates/:id/composition).
+// Platform templates are seeded from the Apache-2.0 Hyperframes registry (see
+// the api-server importer + seedPlatformTemplates). Each template's `module`
+// maps to a composition the backend serves at /api/templates/:id/composition
+// for the live hover-preview; "Use Template" creates a project from it at the
+// template's native aspect ratio via POST /api/templates/:id/use.
 
 /** Backend live-preview endpoint for a template's brand-neutral base composition. */
 function compositionSrc(templateId: number): string {
@@ -36,10 +38,14 @@ function TemplateCard({
   template,
   isPro,
   onLockedClick,
+  onUse,
+  using,
 }: {
   template: Template;
   isPro: boolean;
   onLockedClick: () => void;
+  onUse: () => void;
+  using: boolean;
 }): React.JSX.Element {
   const playerRef = useRef<HfPlayerHandle>(null);
   // Mount the player only after the card has been hovered/focused once.
@@ -162,7 +168,16 @@ function TemplateCard({
             Unlock Template
           </Button>
         ) : (
-          <Button className="w-full">Use Template</Button>
+          <Button className="w-full" onClick={onUse} disabled={using}>
+            {using ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating…
+              </>
+            ) : (
+              "Use Template"
+            )}
+          </Button>
         )}
       </CardFooter>
     </Card>
@@ -174,6 +189,23 @@ export default function Templates() {
   const { data: billing } = useBillingInfo();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const isPro = billing?.plan === "pro";
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  // "Use Template" creates a project FROM the template (server-side, at the
+  // template's native aspect ratio) and drops the user onto it, focused, in the
+  // projects list — ready to render + download.
+  const useTemplateMut = useUseTemplate({
+    mutation: {
+      onSuccess: (project) => setLocation(`/projects?focus=${project.id}`),
+      onError: () =>
+        toast({
+          variant: "destructive",
+          title: "Couldn't create the project",
+          description: "Please try again in a moment.",
+        }),
+    },
+  });
 
   if (isError) {
     return (
@@ -220,6 +252,11 @@ export default function Templates() {
               template={template}
               isPro={isPro}
               onLockedClick={() => setUpgradeOpen(true)}
+              onUse={() => useTemplateMut.mutate({ id: template.id })}
+              using={
+                useTemplateMut.isPending &&
+                useTemplateMut.variables?.id === template.id
+              }
             />
           ))
         ) : (

@@ -1,0 +1,210 @@
+[
+  {
+    "slug": "cinematic-zoom",
+    "name": "Cinematic Zoom",
+    "description": "Shader transition with dramatic zoom blur",
+    "category": "Motion",
+    "isPremium": false,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/cinematic-zoom.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/cinematic-zoom"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-pro",
+    "name": "Code Snippet - Apple Terminal Pro",
+    "description": "Apple Terminal Pro profile: black background with grey text and lime green cursor, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-pro.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/code-snippet-apple-terminal-pro"
+  },
+  {
+    "slug": "data-chart",
+    "name": "Data Chart",
+    "description": "Animated bar + line chart with staggered reveal, NYT-style typography, and value labels",
+    "category": "Data",
+    "isPremium": false,
+    "duration": 15,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "data",
+      "chart",
+      "statistics"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/data-chart.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/data-chart"
+  },
+  {
+    "slug": "glitch",
+    "name": "Glitch",
+    "description": "Shader transition with digital glitch artifacts",
+    "category": "Motion",
+    "isPremium": false,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/glitch.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/glitch"
+  },
+  {
+    "slug": "light-leak",
+    "name": "Light Leak",
+    "description": "Shader transition with cinematic light leak overlay",
+    "category": "Motion",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/light-leak.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/light-leak"
+  },
+  {
+    "slug": "logo-outro",
+    "name": "Logo Outro",
+    "description": "Cinematic logo reveal with piece-by-piece assembly, glow bloom, tagline fade-in, and URL pill",
+    "category": "Branding",
+    "isPremium": false,
+    "duration": 6,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "branding",
+      "outro",
+      "logo"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/logo-outro.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/logo-outro"
+  },
+  {
+    "slug": "reddit-post",
+    "name": "Reddit Post Card",
+    "description": "Animated Reddit post card overlay with upvotes and comments",
+    "category": "Social",
+    "isPremium": false,
+    "duration": 5,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "social",
+      "overlay",
+      "reddit"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/reddit-post.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/reddit-post"
+  },
+  {
+    "slug": "spotify-card",
+    "name": "Spotify Now Playing",
+    "description": "Animated Spotify now-playing card with album art and progress bar",
+    "category": "Social",
+    "isPremium": true,
+    "duration": 5,
+    "width": 1080,
+    "height": 1920,
+    "tags": [
+      "social",
+      "overlay",
+      "spotify"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/spotify-card.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/spotify-card"
+  },
+  {
+    "slug": "swirl-vortex",
+    "name": "Swirl Vortex",
+    "description": "Shader transition with swirling vortex distortion",
+    "category": "Motion",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/swirl-vortex.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/swirl-vortex"
+  },
+  {
+    "slug": "us-map-bubble",
+    "name": "US Bubble Map",
+    "description": "Animated US bubble map with proportional city markers, value callouts, and connection lines — composable with us-map",
+    "category": "Data",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "data",
+      "map",
+      "geography",
+      "usa",
+      "bubble",
+      "cities"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/us-map-bubble.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/us-map-bubble"
+  },
+  {
+    "slug": "world-map",
+    "name": "World Map",
+    "description": "Animated world choropleth with country-by-country reveal, tooltip labels, and rotating globe inset — D3 Natural Earth projection",
+    "category": "Data",
+    "isPremium": false,
+    "duration": 14,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "data",
+      "map",
+      "geography",
+      "world",
+      "choropleth"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/world-map.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/world-map"
+  },
+  {
+    "slug": "x-post",
+    "name": "X Post Card",
+    "description": "Animated X/Twitter post card overlay with engagement metrics",
+    "category": "Social",
+    "isPremium": false,
+    "duration": 5,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "social",
+      "overlay",
+      "twitter"
+    ],
+    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/x-post.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/x-post"
+  }
+]

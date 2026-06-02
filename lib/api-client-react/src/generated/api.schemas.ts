@@ -451,6 +451,14 @@ export interface AiSuggestRequest {
   prompt: string;
 }
 
+export interface WebsiteToVideoRequest {
+  /**
+     * The public website URL to capture (http/https only).
+     * @maxLength 2048
+     */
+  url: string;
+}
+
 export interface AiSuggestResult {
   headline: string;
   bodyText: string;

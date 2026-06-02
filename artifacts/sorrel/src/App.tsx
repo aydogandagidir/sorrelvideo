@@ -16,6 +16,7 @@ import CheckYourEmail from "./pages/check-your-email";
 import Dashboard from "./pages/dashboard";
 import Studio from "./pages/studio";
 import Templates from "./pages/templates";
+import WebsiteToVideo from "./pages/website-to-video";
 import Projects from "./pages/projects";
 import Brand from "./pages/brand";
 import Modules from "./pages/modules";
@@ -78,6 +79,9 @@ function Router() {
       </Route>
       <Route path="/templates">
         <ProtectedRoute component={Templates} />
+      </Route>
+      <Route path="/website-to-video">
+        <ProtectedRoute component={WebsiteToVideo} />
       </Route>
       <Route path="/projects">
         <ProtectedRoute component={Projects} />

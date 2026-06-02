@@ -64,3 +64,4 @@ export * from './template';
 export * from './templateInput';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';
+export * from './websiteToVideoRequest';

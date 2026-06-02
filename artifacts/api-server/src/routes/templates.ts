@@ -3,19 +3,27 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { Router, type IRouter } from "express";
 import { eq, and, or, isNull } from "drizzle-orm";
-import { db, templatesTable, usersTable } from "@workspace/db";
+import {
+  db,
+  templatesTable,
+  usersTable,
+  projectsTable,
+  DEFAULT_RENDER_SETTINGS,
+} from "@workspace/db";
 import {
   ListTemplatesQueryParams,
   ListTemplatesResponse,
   CreateTemplateBody,
   GetTemplateParams,
   GetTemplateResponse,
+  GetProjectResponse,
 } from "@workspace/api-zod";
 import { getUserPlan } from "../services/billingService";
 import {
   resolveEntryFile,
   renderCompositionTemplate,
 } from "../services/renderService";
+import { resolutionForModule } from "../services/registryTemplates";
 
 const router: IRouter = Router();
 
@@ -252,6 +260,76 @@ router.get("/templates/:id/composition", async (req, res): Promise<void> => {
   // A string body is safe to res.send — the Express-5 spaces-in-path issue only
   // affects res.sendFile, which we deliberately avoid here.
   res.send(html);
+});
+
+// POST /api/templates/:id/use — create a project FROM a template, at the
+// template's NATIVE aspect ratio. Registry templates author a fixed canvas
+// (mostly 1920×1080); without matching the project's resolution to it the render
+// would force the portrait default and distort the composition. Premium
+// templates require a Pro plan (same gate as GET /templates/:id). The created
+// project is returned so the SPA can navigate straight to it.
+router.post("/templates/:id/use", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = GetTemplateParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [template] = await db
+    .select()
+    .from(templatesTable)
+    .where(eq(templatesTable.id, params.data.id));
+
+  if (!template) {
+    res.status(404).json({ error: "Template not found" });
+    return;
+  }
+  // A template owned by a different user must not leak — treat it as missing.
+  if (template.userId !== null && template.userId !== req.user.id) {
+    res.status(404).json({ error: "Template not found" });
+    return;
+  }
+  // Premium templates require a Pro plan (mirrors GET /templates/:id).
+  if (template.isPremium) {
+    const stripeCustomerId =
+      (
+        await db
+          .select({ stripeCustomerId: usersTable.stripeCustomerId })
+          .from(usersTable)
+          .where(eq(usersTable.id, req.user.id))
+          .limit(1)
+      )[0]?.stripeCustomerId ?? null;
+    const plan = await getUserPlan(stripeCustomerId);
+    if (plan === "free") {
+      res.status(403).json({ error: "Forbidden", reason: "upgrade_required" });
+      return;
+    }
+  }
+
+  // Match the project to the template's native aspect ratio. null for the
+  // responsive hand-authored templates → keep the portrait-first default.
+  const resolution = resolutionForModule(template.module);
+  const renderSettings = resolution
+    ? { ...DEFAULT_RENDER_SETTINGS, resolution }
+    : null;
+
+  const [project] = await db
+    .insert(projectsTable)
+    .values({
+      userId: req.user.id,
+      name: template.name,
+      module: template.module,
+      templateId: template.id,
+      renderSettings,
+    })
+    .returning();
+
+  res.status(201).json(GetProjectResponse.parse(serializeDates(project)));
 });
 
 export default router;

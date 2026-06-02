@@ -4,7 +4,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "lib": ["es2022", "dom", "dom.iterable"],
-    "types": ["node", "@webgpu/types"]
+    "types": ["node", "@webgpu/types"],
+    "resolveJsonModule": true
   },
   "include": ["src"],
   "references": [

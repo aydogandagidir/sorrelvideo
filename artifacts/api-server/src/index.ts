@@ -8,6 +8,7 @@ import {
   startLambdaProgressPoller,
   stopLambdaProgressPoller,
 } from "./lib/lambdaProgressPoller";
+import { seedPlatformTemplates } from "./services/platformTemplatesService";
 
 // Initialise Sentry (no-op without SENTRY_DSN), then wire its Express error
 // handler. Lazy-loaded so dev boots without the OpenTelemetry dependency graph.
@@ -27,6 +28,20 @@ async function initBilling(): Promise<void> {
   }
 }
 
+async function initTemplates(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    logger.warn("DATABASE_URL not set — skipping platform template seed");
+    return;
+  }
+
+  try {
+    const seeded = await seedPlatformTemplates();
+    if (seeded > 0) logger.info({ seeded }, "Seeded platform templates");
+  } catch (err) {
+    logger.warn({ err }, "Platform template seed failed — gallery may be empty");
+  }
+}
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
@@ -42,6 +57,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 await initBilling();
+await initTemplates();
 
 // Boot the render worker before recovery so any jobs already persisted in Redis
 // start draining immediately; recovery then only resets true orphans (rows in

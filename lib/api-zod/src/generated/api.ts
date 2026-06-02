@@ -235,6 +235,14 @@ export const GetTemplateResponse = zod.object({
 
 
 /**
+ * @summary Create a project from a template at its native aspect ratio
+ */
+export const UseTemplateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary List video projects
  */
 export const listProjectsResponseRenderProgressMin = 0;
@@ -776,6 +784,18 @@ export const LintCompositionResponse = zod.object({
   "line": zod.number().optional(),
   "rule": zod.string().optional()
 }))
+})
+
+
+/**
+ * @summary Capture a website and create a branded showcase video project
+ */
+export const websiteToVideoBodyUrlMax = 2048;
+
+
+
+export const WebsiteToVideoBody = zod.object({
+  "url": zod.string().max(websiteToVideoBodyUrlMax).describe('The public website URL to capture (http\/https only).')
 })
 
 

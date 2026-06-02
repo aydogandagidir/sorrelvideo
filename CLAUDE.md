@@ -106,6 +106,22 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 - **HTML compositions as templates**: each template is a self-contained HTML
   file in `artifacts/api-server/src/compositions/`. Chrome (Puppeteer + BeginFrame)
   rasterizes it and FFmpeg encodes the frames to MP4.
+- **Template library (registry-vendored, Apache-2.0)**: the hand-authored
+  compositions are joined by templates vendored from the open-source
+  [Hyperframes registry](https://github.com/heygen-com/hyperframes/tree/main/registry)
+  (Apache-2.0). `scripts/import-registry-templates.mjs` fetches curated, *self-
+  contained* blocks → writes `<slug>.html` (attribution header) + the
+  `compositions/registry-templates.generated.json` manifest + `REGISTRY-NOTICE.md`
+  (blocks that need co-located assets are skipped — the render pipeline serves a
+  single `composition.html` with no adjacent files). `scripts/verify-registry-renders.mjs`
+  render-checks every vendored block against the installed engine.
+  `services/registryTemplates.ts` types the manifest and feeds both renderService's
+  `COMPOSITION_MAP` (slug → file) and `seedPlatformTemplates()`
+  (`services/platformTemplatesService.ts`), which the api-server boot runs
+  **idempotently** (insert-if-missing keyed by `module`, never clobbering an
+  existing row) so a fresh environment's gallery is never empty. Re-run the
+  importer with more slugs to grow the library; a project's `module` is the
+  template slug, so no enum/migration is needed to add one.
 - **Direct Express video streaming**: `GET /api/projects/:id/video` streams
   from `artifacts/api-server/renders/<projectId>/output.mp4`. There is no CDN yet.
 - **OpenAPI-driven contracts**: edit `openapi.yaml`, run codegen, then implement
@@ -235,6 +251,36 @@ navigate to a raw `503` JSON body). The callback exchanges the code via
 
 The OAuth identity row lives in `oauth_accounts`. No provider tokens are
 stored; we only need the identity for sign-in.
+
+## Website → Video
+
+`POST /api/website-to-video { url }` screenshots a user-supplied URL and creates
+a draft project from the branded `website-showcase` composition, returned so the
+SPA (`pages/website-to-video.tsx`) navigates straight to it. The flow:
+`websiteToVideoService.createWebsiteVideoProject` →
+`websiteCaptureService.captureWebsite` (headless Chrome via Puppeteer) → embeds
+the screenshot as a `capture.image` **data URI** in `compositionVars`
+(+ `capture.height`/`title`/`url`), at the composition's native 1920×1080.
+`renderService` substitutes those (HTML-escaping the untrusted title/url) into
+`compositions/website-showcase.html` (intro → mac-style browser scrolling the
+screenshot → outro CTA).
+
+**Security (SSRF) — this loads an arbitrary user URL server-side:**
+
+- `lib/ssrfGuard.ts` `assertSafeUrl` rejects non-http(s) schemes, embedded
+  credentials, blocked hostnames (localhost, cloud metadata), and any host that
+  resolves (every address, via `net.BlockList`) to a loopback/private/link-local/
+  reserved range — incl. `169.254.169.254`. 21 unit tests.
+- The capture re-validates **every main-frame navigation** (redirect-to-internal
+  is aborted mid-flight). Residual DNS-rebinding + sub-resource SSRF is the infra
+  layer's job: the render box should have **no internal network egress**.
+- `websiteCaptureLimiter` (5 / 15 min) — Chrome capture is expensive. `SsrfError`
+  → 400, `WebsiteCaptureError` → 502.
+
+**`CAPTURE_NO_SANDBOX`**: Chrome's sandbox is ON by default (untrusted pages).
+Set `=true` ONLY on container hosts that can't start a sandboxed Chrome (root /
+no user namespaces). The captured screenshot is currently embedded as a data URI
+(capped at 2800px tall); moving it to object storage is a future optimisation.
 
 ## Billing
 
