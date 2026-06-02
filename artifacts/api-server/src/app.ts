@@ -27,11 +27,17 @@ app.use(
     origin:
       process.env.NODE_ENV === "production"
         ? (origin, cb) => {
-            if (!origin || allowedOrigins.includes(origin)) {
-              cb(null, true);
-            } else {
-              cb(new Error(`CORS: origin '${origin}' not allowed`));
-            }
+            // Allow requests with no Origin (same-origin navigations, curl,
+            // server-to-server) and any allow-listed origin. For everything
+            // else resolve with `false` — NOT an Error. A rejected origin must
+            // simply omit the `Access-Control-Allow-Origin` header (the browser
+            // then blocks the cross-origin read); it must never throw. Throwing
+            // makes cors call `next(err)` → a 500 that ALSO breaks same-origin
+            // asset loads, because Vite tags its module scripts `crossorigin`,
+            // so even same-origin script/style fetches carry an Origin header
+            // and run in CORS mode. A 500 there white-screens the whole SPA
+            // whenever ALLOWED_ORIGINS is unset or even slightly mismatched.
+            cb(null, !origin || allowedOrigins.includes(origin));
           }
         : true,
   }),

@@ -338,7 +338,16 @@ stored; we only need the identity for sign-in.
   `renderSettingsService` sidesteps this today by keeping a local `CANVAS_DIMENSIONS`
   copy (verified against 0.6.6) instead of importing it
 - CORS is permissive in dev (`origin: true`); in production it enforces
-  `ALLOWED_ORIGINS` strictly
+  `ALLOWED_ORIGINS` strictly. **`ALLOWED_ORIGINS` must include the app's own
+  public origin** — the api-server serves the SPA same-origin, and Vite tags its
+  module `<script>`/`<link>` tags `crossorigin`, so the browser fetches even
+  same-origin bundle assets in CORS mode (with an `Origin` header). The origin
+  callback resolves a disallowed origin to `false` (omit `Access-Control-Allow-Origin`;
+  the browser still blocks the cross-origin read) — it must **never** `cb(new Error())`.
+  Throwing makes `cors` call `next(err)` → a 500 that also kills those same-origin
+  asset loads, white-screening the whole SPA whenever `ALLOWED_ORIGINS` is unset or
+  even slightly mismatched (http/https, www, trailing slash). Regression-guarded by
+  `artifacts/api-server/src/app.test.ts`
 - Drizzle returns `Date` objects; before passing rows through Zod parsing,
   serialize via `JSON.parse(JSON.stringify(data))`
 - The Stripe webhook route is registered **before** `express.json()` so the
