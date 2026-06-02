@@ -106,6 +106,22 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 - **HTML compositions as templates**: each template is a self-contained HTML
   file in `artifacts/api-server/src/compositions/`. Chrome (Puppeteer + BeginFrame)
   rasterizes it and FFmpeg encodes the frames to MP4.
+- **Template library (registry-vendored, Apache-2.0)**: the hand-authored
+  compositions are joined by templates vendored from the open-source
+  [Hyperframes registry](https://github.com/heygen-com/hyperframes/tree/main/registry)
+  (Apache-2.0). `scripts/import-registry-templates.mjs` fetches curated, *self-
+  contained* blocks → writes `<slug>.html` (attribution header) + the
+  `compositions/registry-templates.generated.json` manifest + `REGISTRY-NOTICE.md`
+  (blocks that need co-located assets are skipped — the render pipeline serves a
+  single `composition.html` with no adjacent files). `scripts/verify-registry-renders.mjs`
+  render-checks every vendored block against the installed engine.
+  `services/registryTemplates.ts` types the manifest and feeds both renderService's
+  `COMPOSITION_MAP` (slug → file) and `seedPlatformTemplates()`
+  (`services/platformTemplatesService.ts`), which the api-server boot runs
+  **idempotently** (insert-if-missing keyed by `module`, never clobbering an
+  existing row) so a fresh environment's gallery is never empty. Re-run the
+  importer with more slugs to grow the library; a project's `module` is the
+  template slug, so no enum/migration is needed to add one.
 - **Direct Express video streaming**: `GET /api/projects/:id/video` streams
   from `artifacts/api-server/renders/<projectId>/output.mp4`. There is no CDN yet.
 - **OpenAPI-driven contracts**: edit `openapi.yaml`, run codegen, then implement
