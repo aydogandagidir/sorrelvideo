@@ -708,6 +708,28 @@ export const RequestUploadUrlResponse = zod.object({
 
 
 /**
+ * Second half of the two-phase upload. After PUTting the file bytes to the
+presigned URL from `request-url`, call this with the returned
+`objectPath` to record the per-object owner ACL. The owner is the
+authenticated caller (clients cannot choose it) and visibility is forced
+to private. Until an upload is finalized the object has no ACL and the
+object-serving route refuses to return it.
+
+ * @summary Stamp the owner ACL on a freshly uploaded object
+ */
+
+
+
+export const FinalizeUploadBody = zod.object({
+  "objectPath": zod.string().min(1).describe('The objectPath (or raw GCS upload URL) returned by request-url.')
+})
+
+export const FinalizeUploadResponse = zod.object({
+  "objectPath": zod.string().describe('Normalized object path now owned by the caller (e.g. \/objects\/uploads\/uuid).')
+})
+
+
+/**
  * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
  */
 export const GetPublicObjectParams = zod.object({

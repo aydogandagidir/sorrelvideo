@@ -520,6 +520,19 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+export interface FinalizeUploadRequest {
+  /**
+     * The objectPath (or raw GCS upload URL) returned by request-url.
+     * @minLength 1
+     */
+  objectPath: string;
+}
+
+export interface FinalizeUploadResult {
+  /** Normalized object path now owned by the caller (e.g. /objects/uploads/uuid). */
+  objectPath: string;
+}
+
 export interface PlatformStats {
   totalProjects: number;
   totalTemplates: number;

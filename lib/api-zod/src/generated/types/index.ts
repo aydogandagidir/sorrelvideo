@@ -23,6 +23,8 @@ export * from './checkoutRequest';
 export * from './checkoutResponse';
 export * from './consumeEmailVerificationParams';
 export * from './errorEnvelope';
+export * from './finalizeUploadRequest';
+export * from './finalizeUploadResult';
 export * from './forgotPasswordRequest';
 export * from './genericSuccess';
 export * from './healthStatus';

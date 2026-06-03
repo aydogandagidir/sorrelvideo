@@ -802,6 +802,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+
+  /storage/uploads/finalize:
+    put:
+      tags: [Storage]
+      operationId: finalizeUpload
+      summary: Stamp the owner ACL on a freshly uploaded object
+      description: |
+        Second half of the two-phase upload. After PUTting the file bytes to the
+        presigned URL from `request-url`, call this with the returned
+        `objectPath` to record the per-object owner ACL. The owner is the
+        authenticated caller (clients cannot choose it) and visibility is forced
+        to private. Until an upload is finalized the object has no ACL and the
+        object-serving route refuses to return it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeUploadRequest"
+      responses:
+        "200":
+          description: Owner ACL recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizeUploadResult"
+        "400":
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Object not found (never uploaded, or forged path).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to finalize upload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /storage/public-objects/{filePath}:
     get:
       tags: [Storage]
@@ -1500,6 +1550,22 @@ components:
           description: Normalized object path (e.g. /objects/uploads/uuid). Store this in your database.
         metadata:
           $ref: "#/components/schemas/UploadUrlRequest"
+
+    FinalizeUploadRequest:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
+          description: The objectPath (or raw GCS upload URL) returned by request-url.
+    FinalizeUploadResult:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+          description: Normalized object path now owned by the caller (e.g. /objects/uploads/uuid).
 
     PlatformStats:
       type: object
