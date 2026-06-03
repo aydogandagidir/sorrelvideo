@@ -73,6 +73,11 @@ export const openaiProvider: AiProvider = {
       usage: {
         inputTokens: response.usage?.prompt_tokens ?? 0,
         outputTokens: response.usage?.completion_tokens ?? 0,
+        // OpenAI caches prompt prefixes >1024 tokens AUTOMATICALLY (no
+        // cache_control knob), reporting reuse here. Surfaced for parity with
+        // Anthropic's cache_read; there is no separate cache-creation charge.
+        cacheReadInputTokens:
+          response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
       },
     };
   },

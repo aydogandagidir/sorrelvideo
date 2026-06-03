@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildSystemPrompt, buildUserPrompt } from "../prompt";
+import { SYSTEM_CORE, buildBrandContext, buildUserPrompt } from "../prompt";
 import {
   SuggestOutputSchema,
   type SuggestInput,
@@ -42,8 +42,30 @@ export const anthropicProvider: AiProvider = {
 
   async suggest(input: SuggestInput): Promise<SuggestResult> {
     const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
-    const system = buildSystemPrompt(input.brand);
     const userPrompt = buildUserPrompt(input.prompt);
+
+    // Structure the system prompt as cache-controlled blocks so the stable
+    // context is reused across requests instead of re-billed every call.
+    // Breakpoint 1 (SYSTEM_CORE): brand-independent → shareable across ALL
+    // users within the cache TTL. Breakpoint 2 (brand context): stable for a
+    // given brand → a user iterating on suggestions reuses the whole system
+    // prefix; only the user brief (the message below) varies. Anthropic caches
+    // the longest matching prefix, so both layers earn hits independently.
+    const system: Anthropic.TextBlockParam[] = [
+      {
+        type: "text",
+        text: SYSTEM_CORE,
+        cache_control: { type: "ephemeral" },
+      },
+    ];
+    const brandContext = buildBrandContext(input.brand);
+    if (brandContext) {
+      system.push({
+        type: "text",
+        text: brandContext,
+        cache_control: { type: "ephemeral" },
+      });
+    }
 
     const response = await getClient().messages.create({
       model,
@@ -73,6 +95,13 @@ export const anthropicProvider: AiProvider = {
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
+        // Surfaced so the caller can log cache effectiveness. `cache_read > 0`
+        // means the stable prefix was served from cache (~10% of input cost);
+        // `cache_creation > 0` is the one-time write that seeds it.
+        cacheCreationInputTokens:
+          response.usage.cache_creation_input_tokens ?? undefined,
+        cacheReadInputTokens:
+          response.usage.cache_read_input_tokens ?? undefined,
       },
     };
   },

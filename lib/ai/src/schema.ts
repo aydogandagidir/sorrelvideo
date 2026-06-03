@@ -32,6 +32,19 @@ export type SuggestOutput = z.infer<typeof SuggestOutputSchema>;
 export interface SuggestUsage {
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Tokens written to the prompt cache on this call — Anthropic's
+   * `cache_creation_input_tokens` (a one-time 25% surcharge for the first call
+   * that populates a breakpoint). Omitted when caching did not engage or the
+   * provider does not report it (e.g. OpenAI, which caches implicitly).
+   */
+  cacheCreationInputTokens?: number;
+  /**
+   * Tokens served FROM the prompt cache on this call — Anthropic's
+   * `cache_read_input_tokens` (billed at ~10% of the base input rate) or
+   * OpenAI's `prompt_tokens_details.cached_tokens`. `> 0` ⇒ a cache hit.
+   */
+  cacheReadInputTokens?: number;
 }
 
 export interface SuggestResult extends SuggestOutput {
