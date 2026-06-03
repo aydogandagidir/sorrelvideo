@@ -15,7 +15,9 @@ import {
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { resolveSettings, toEngineConfig } from "./renderSettingsService";
+import { decrementRenderCount } from "./billingService";
 import {
+  getJobById,
   getLatestJobForProject,
   isCancelRequested,
   markCancelled,
@@ -518,6 +520,24 @@ export async function executeRender(
     logger.error({ projectId, err }, "Render failed");
     await setProjectStatus(projectId, "failed", { renderError });
     if (renderJobId) await markFailed(renderJobId, renderError);
+
+    // REFUND the Free-quota render: it was charged at claim time but produced no
+    // output, so a failure must not permanently burn the user's monthly render.
+    // (A cancellation is handled above and intentionally does NOT refund.) The
+    // owning userId comes from the ledger row, which exists before this executor
+    // runs. Best-effort: a refund failure must not mask the render failure, and
+    // it's a harmless no-op for Pro (never charged) or a rolled-over month.
+    if (renderJobId) {
+      try {
+        const job = await getJobById(renderJobId);
+        if (job) await decrementRenderCount(job.userId);
+      } catch (refundErr) {
+        logger.warn(
+          { projectId, renderJobId, err: refundErr },
+          "Could not refund render quota after failure",
+        );
+      }
+    }
   }
 }
 

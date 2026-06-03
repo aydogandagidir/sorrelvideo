@@ -48,6 +48,7 @@ import {
 import {
   checkAndIncrementRenderCount,
   checkAndIncrementDistributedRenderCount,
+  decrementRenderCount,
   getUserPlan,
 } from "../services/billingService";
 import { findUnsafeCompositionVar } from "../lib/compositionVars";
@@ -445,6 +446,9 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
         .update(projectsTable)
         .set({ status: project.status })
         .where(eq(projectsTable.id, id));
+      // Refund the render charged just above: this attempt produced no output.
+      // No-op for Pro (never charged). Best-effort — never mask the 403.
+      await decrementRenderCount(req.user.id).catch(() => undefined);
       res.status(403).json({
         error: e.message ?? "Upgrade required",
         reason: "upgrade_required",
@@ -472,6 +476,9 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
       .update(projectsTable)
       .set({ status: project.status })
       .where(eq(projectsTable.id, id));
+    // Refund the render charged above: no ledger row, so nothing will ever run
+    // or produce output. No-op for Pro; best-effort so it never masks the 503.
+    await decrementRenderCount(req.user.id).catch(() => undefined);
     req.log.error({ projectId: id, err }, "Failed to open render-job ledger row");
     res
       .status(503)
@@ -505,6 +512,11 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
       renderJobId,
       err instanceof Error ? err.message : String(err),
     ).catch(() => undefined);
+    // Refund the render charged above: the enqueue failed, so the job never ran
+    // and produced no output. (RenderAlreadyActiveError above intentionally keeps
+    // the charge — the PREVIOUS render is still finishing and will produce one.)
+    // No-op for Pro; best-effort so it never masks the 503.
+    await decrementRenderCount(req.user.id).catch(() => undefined);
     req.log.error({ projectId: id, err }, "Failed to enqueue render");
     res.status(503).json({ error: "Could not start render. Please try again." });
     return;
