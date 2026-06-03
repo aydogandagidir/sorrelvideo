@@ -47,7 +47,6 @@ export * from './projectInputCompositionVars';
 export * from './projectStatus';
 export * from './projectUpdate';
 export * from './projectUpdateCompositionVars';
-export * from './projectUpdateStatus';
 export * from './renderSettings';
 export * from './renderSettingsFormat';
 export * from './renderSettingsFps';

@@ -249,24 +249,11 @@ export interface ProjectInput {
   compositionVars?: ProjectInputCompositionVars;
 }
 
-export type ProjectUpdateStatus = typeof ProjectUpdateStatus[keyof typeof ProjectUpdateStatus];
-
-
-export const ProjectUpdateStatus = {
-  draft: 'draft',
-  rendering: 'rendering',
-  ready: 'ready',
-  failed: 'failed',
-} as const;
-
 export type ProjectUpdateCompositionVars = {[key: string]: string};
 
 export interface ProjectUpdate {
   name?: string;
   description?: string;
-  status?: ProjectUpdateStatus;
-  thumbnailUrl?: string;
-  videoUrl?: string;
   compositionVars?: ProjectUpdateCompositionVars;
 }
 

@@ -6,13 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProjectUpdateCompositionVars } from './projectUpdateCompositionVars';
-import type { ProjectUpdateStatus } from './projectUpdateStatus';
 
 export interface ProjectUpdate {
   name?: string;
   description?: string;
-  status?: ProjectUpdateStatus;
-  thumbnailUrl?: string;
-  videoUrl?: string;
   compositionVars?: ProjectUpdateCompositionVars;
 }

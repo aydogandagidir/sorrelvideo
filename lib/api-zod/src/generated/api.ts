@@ -351,9 +351,6 @@ export const UpdateProjectParams = zod.object({
 export const UpdateProjectBody = zod.object({
   "name": zod.string().optional(),
   "description": zod.string().optional(),
-  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']).optional(),
-  "thumbnailUrl": zod.string().optional(),
-  "videoUrl": zod.string().optional(),
   "compositionVars": zod.record(zod.string(), zod.string()).optional()
 })
 

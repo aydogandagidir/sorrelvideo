@@ -1244,18 +1244,19 @@ components:
             type: string
 
     ProjectUpdate:
+      # User-editable project fields only. Server-managed lifecycle/denormalized
+      # render state (status, videoUrl, thumbnailUrl, renderError, duration) is
+      # deliberately NOT here: the render state machine — atomic claim, worker,
+      # cancel, and recoverStuckRenders — is the only writer of those columns. A
+      # generic PATCH that set status:'rendering' would strand the next render
+      # (409 "already in progress"), and flipping failed→ready would advertise a
+      # video that does not exist. Render config lives behind the dedicated,
+      # Pro-gated PATCH /projects/{id}/render-settings.
       type: object
       properties:
         name:
           type: string
         description:
-          type: string
-        status:
-          type: string
-          enum: [draft, rendering, ready, failed]
-        thumbnailUrl:
-          type: string
-        videoUrl:
           type: string
         compositionVars:
           type: object
