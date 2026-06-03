@@ -2,6 +2,7 @@ import { initSentry, setupSentryErrorHandler } from "./lib/sentry";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
+import { applyRenderJobsMigration } from "./lib/applyRenderJobsMigration";
 import { closeRenderQueue, startRenderWorker } from "./lib/renderQueue";
 import { recoverStuckRenders } from "./lib/recoverStuckRenders";
 import {
@@ -25,6 +26,24 @@ async function initBilling(): Promise<void> {
     await applyBillingMigration();
   } catch (err) {
     logger.warn({ err }, "Billing migration failed — payments may misbehave");
+  }
+}
+
+async function initRenderJobs(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    logger.warn("DATABASE_URL not set — skipping render-jobs migration");
+    return;
+  }
+
+  try {
+    await applyRenderJobsMigration();
+  } catch (err) {
+    // The render-jobs ledger row is created on every render; without the table
+    // each render 500s. Surface this loudly so a missed `db push` is obvious.
+    logger.warn(
+      { err },
+      "Render-jobs migration failed — renders may fail to start",
+    );
   }
 }
 
@@ -57,6 +76,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 await initBilling();
+await initRenderJobs();
 await initTemplates();
 
 // Boot the render worker before recovery so any jobs already persisted in Redis

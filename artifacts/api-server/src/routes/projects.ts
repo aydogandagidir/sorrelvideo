@@ -426,14 +426,29 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
   }
 
   // Open a render-job ledger row before enqueueing so the pipeline has an id to
-  // advance through queued → rendering → ready/failed/cancelled.
-  const renderJobId = await createRenderJobRow({
-    projectId: id,
-    userId: req.user.id,
-    backend: isQueueEnabled() ? "bullmq" : "inline",
-    config: settings,
-    format: settings.format,
-  });
+  // advance through queued → rendering → ready/failed/cancelled. If the INSERT
+  // fails (e.g. the render_jobs table is missing), release the claim back to the
+  // prior status so the project is never stranded in "rendering", then 503.
+  let renderJobId: string;
+  try {
+    renderJobId = await createRenderJobRow({
+      projectId: id,
+      userId: req.user.id,
+      backend: isQueueEnabled() ? "bullmq" : "inline",
+      config: settings,
+      format: settings.format,
+    });
+  } catch (err) {
+    await db
+      .update(projectsTable)
+      .set({ status: project.status })
+      .where(eq(projectsTable.id, id));
+    req.log.error({ projectId: id, err }, "Failed to open render-job ledger row");
+    res
+      .status(503)
+      .json({ error: "Could not start render. Please try again." });
+    return;
+  }
 
   // Durable enqueue when REDIS_URL is set; inline fire-and-forget otherwise.
   // If enqueue fails, release the claim so the project isn't stranded in

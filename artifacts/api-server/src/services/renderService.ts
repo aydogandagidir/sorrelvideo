@@ -17,6 +17,7 @@ import { logger } from "../lib/logger";
 import { resolveSettings, toEngineConfig } from "./renderSettingsService";
 import {
   getLatestJobForProject,
+  isCancelRequested,
   markCancelled,
   markFailed,
   markProgress,
@@ -369,21 +370,51 @@ export async function executeRender(
 
     const job = createRenderJob(config);
 
-    await executeRenderJob(job, dir, outputPath, (j, msg) => {
-      logger.debug(
-        { projectId, percent: Math.round(j.progress * 100), msg },
-        "Render progress",
-      );
-      if (renderJobId) {
-        void markProgress(renderJobId, Math.round(j.progress * 100)).catch(
-          (err) =>
-            logger.warn(
-              { renderJobId, err },
-              "Could not persist render progress",
-            ),
+    // Cancellation: the cancel route flags `render_jobs.cancelRequested`; the
+    // engine only stops if it's handed an AbortSignal. Each progress tick polls
+    // the flag and aborts the controller, which makes executeRenderJob throw a
+    // RenderCancelledError (caught below → rollback to draft + markCancelled).
+    const abortController = new AbortController();
+
+    await executeRenderJob(
+      job,
+      dir,
+      outputPath,
+      (j, msg) => {
+        logger.debug(
+          { projectId, percent: Math.round(j.progress * 100), msg },
+          "Render progress",
         );
-      }
-    });
+        if (renderJobId) {
+          void markProgress(renderJobId, Math.round(j.progress * 100)).catch(
+            (err) =>
+              logger.warn(
+                { renderJobId, err },
+                "Could not persist render progress",
+              ),
+          );
+          if (!abortController.signal.aborted) {
+            void isCancelRequested(renderJobId)
+              .then((cancel) => {
+                if (cancel && !abortController.signal.aborted) {
+                  logger.info(
+                    { projectId, renderJobId },
+                    "Cancel requested — aborting render",
+                  );
+                  abortController.abort();
+                }
+              })
+              .catch((err) =>
+                logger.warn(
+                  { renderJobId, err },
+                  "Could not check cancel flag",
+                ),
+              );
+          }
+        }
+      },
+      abortController.signal,
+    );
 
     const videoUrl = `/api/projects/${projectId}/video`;
     // Real clip length comes from the composition's window.__hf.duration,
