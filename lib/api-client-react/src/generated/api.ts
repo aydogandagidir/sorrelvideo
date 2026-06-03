@@ -2409,7 +2409,7 @@ export const createCheckoutSession = async (checkoutRequest: CheckoutRequest, op
 
 
 
-export const getCreateCheckoutSessionMutationOptions = <TError = ErrorType<void>,
+export const getCreateCheckoutSessionMutationOptions = <TError = ErrorType<void | ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCheckoutSession>>, TError,{data: BodyType<CheckoutRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createCheckoutSession>>, TError,{data: BodyType<CheckoutRequest>}, TContext> => {
 
@@ -2438,12 +2438,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateCheckoutSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createCheckoutSession>>>
     export type CreateCheckoutSessionMutationBody = BodyType<CheckoutRequest>
-    export type CreateCheckoutSessionMutationError = ErrorType<void>
+    export type CreateCheckoutSessionMutationError = ErrorType<void | ErrorEnvelope>
 
     /**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
-export const useCreateCheckoutSession = <TError = ErrorType<void>,
+export const useCreateCheckoutSession = <TError = ErrorType<void | ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCheckoutSession>>, TError,{data: BodyType<CheckoutRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createCheckoutSession>>,

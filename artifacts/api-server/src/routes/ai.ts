@@ -37,6 +37,40 @@ router.post(
       return;
     }
 
+    const [brand] = await db
+      .select()
+      .from(brandKitTable)
+      .where(eq(brandKitTable.userId, req.user.id));
+
+    const provider = getProvider();
+
+    let result: Awaited<ReturnType<typeof provider.suggest>>;
+    try {
+      const input = SuggestInputSchema.parse({
+        prompt: parsed.data.prompt,
+        brand: {
+          companyName: brand?.companyName ?? null,
+          voice: brand?.brandVoice ?? null,
+          voiceDescription: brand?.voiceDescription ?? null,
+        },
+      });
+
+      result = await provider.suggest(input);
+    } catch (err) {
+      req.log.error(
+        { err, provider: provider.name },
+        "AI suggest provider call failed",
+      );
+      res
+        .status(502)
+        .json({ error: "AI provider could not generate a suggestion" });
+      return;
+    }
+
+    // Charge quota only AFTER a successful generation — a provider 502 must not
+    // burn a Free user's monthly unit for a result they never got (mirrors the
+    // render path not consuming quota on failure). Abuse is already bounded by
+    // aiSuggestLimiter, so deferring the increment past the LLM call is safe.
     try {
       await checkAndIncrementAiCount(req.user.id);
     } catch (err) {
@@ -51,39 +85,11 @@ router.post(
       throw err;
     }
 
-    const [brand] = await db
-      .select()
-      .from(brandKitTable)
-      .where(eq(brandKitTable.userId, req.user.id));
-
-    const provider = getProvider();
-
-    try {
-      const input = SuggestInputSchema.parse({
-        prompt: parsed.data.prompt,
-        brand: {
-          companyName: brand?.companyName ?? null,
-          voice: brand?.brandVoice ?? null,
-          voiceDescription: brand?.voiceDescription ?? null,
-        },
-      });
-
-      const result = await provider.suggest(input);
-
-      res.status(200).json({
-        headline: result.headline,
-        bodyText: result.bodyText,
-        ctaText: result.ctaText,
-      });
-    } catch (err) {
-      req.log.error(
-        { err, provider: provider.name },
-        "AI suggest provider call failed",
-      );
-      res
-        .status(502)
-        .json({ error: "AI provider could not generate a suggestion" });
-    }
+    res.status(200).json({
+      headline: result.headline,
+      bodyText: result.bodyText,
+      ctaText: result.ctaText,
+    });
   },
 );
 

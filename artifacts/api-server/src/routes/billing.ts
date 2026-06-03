@@ -1,5 +1,9 @@
 import { Router, type IRouter } from "express";
-import { getBillingInfo, ensureStripeCustomer } from "../services/billingService";
+import {
+  getBillingInfo,
+  ensureStripeCustomer,
+  getUserPlan,
+} from "../services/billingService";
 import { getUncachableStripeClient } from "../stripeClient";
 
 const router: IRouter = Router();
@@ -97,6 +101,19 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     req.user.id,
     req.user.email ?? null,
   );
+
+  // Guard against duplicate subscriptions. An already-Pro user (or a
+  // double-click / two open tabs) must not be able to buy a SECOND concurrent
+  // subscription on the same customer — that bills them twice. Mirrors the
+  // existing "already entitled" 403s elsewhere; we send the client to the
+  // Customer Portal to manage the plan they already have.
+  if ((await getUserPlan(customerId)) === "pro") {
+    res.status(409).json({
+      error: "You already have an active Pro subscription.",
+      reason: "already_subscribed",
+    });
+    return;
+  }
 
   const origin = process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
 
