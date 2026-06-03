@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Express } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { authMiddleware } from "./middlewares/authMiddleware";
@@ -11,6 +12,38 @@ import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./webhookHandlers";
 
 const app: Express = express();
+
+// Behind Railway's reverse proxy. Trust exactly ONE proxy hop so req.ip is read
+// from the right-most X-Forwarded-For entry. Must run BEFORE the rate-limit
+// middleware/routes mount (see middlewares/rateLimit.ts) — otherwise every
+// request appears to originate from the proxy's IP and the IP-keyed limiters
+// collapse into a single shared bucket. Numeric `1` (one hop) on purpose, NOT
+// `true`: `trust proxy: true` trusts the entire chain, which trips
+// express-rate-limit's ERR_ERL_PERMISSIVE_TRUST_PROXY validation (a client
+// could spoof X-Forwarded-For to dodge the limit).
+app.set("trust proxy", 1);
+
+// Security response headers, applied as early as possible so every response
+// (API, SPA shell, static assets, error pages) carries them.
+app.use(
+  helmet({
+    // CSP is DISABLED deliberately. helmet's default policy is strict
+    // (`default-src 'self'`, no inline) and would white-screen the app: the
+    // Vite SPA emits inline styles, and the vendored HTML compositions load
+    // CDN scripts (GSAP/D3) plus inline <script> tags — a strict CSP would
+    // block both, breaking the UI and every render. A tailored CSP (allow-list
+    // the specific CDNs + hashed inline) is a deliberate follow-up.
+    contentSecurityPolicy: false,
+    // Keep X-Content-Type-Options: nosniff (helmet default) — no override.
+    // SAMEORIGIN, not DENY: the embedded same-origin <hyperframes-player>
+    // iframe (and the /editor mount) must still be framable by the app itself.
+    frameguard: { action: "sameorigin" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    // HSTS only in production — over plain-HTTP local dev it would pin the
+    // browser to https for the dev host and is meaningless without TLS.
+    hsts: process.env.NODE_ENV === "production",
+  }),
+);
 
 // In production, ALLOWED_ORIGINS is a comma-separated list of full origin URLs
 // (e.g. "https://app.example.com,https://www.example.com").
