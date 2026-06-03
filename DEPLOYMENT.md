@@ -28,9 +28,14 @@ are automatic via GitHub Actions.
 4. In the api service settings, **Variables → Reference**: link
    `DATABASE_URL` from the Postgres service.
 5. Add a **Volume** to the api service mounted at **`/data`** (5 GB is plenty
-   for soft launch) and set env **`RENDERS_DIR=/data/renders`**. This persists
-   rendered mp4s across deploys. (The app otherwise writes them next to the
-   bundle at `/app/renders`, which is ephemeral.)
+   for soft launch) and set env **`RENDERS_DIR=/data/renders`** AND
+   **`STUDIO_WORKSPACE_DIR=/data/studio-workspaces`**. Both persist user output
+   across deploys: `RENDERS_DIR` the rendered mp4s, `STUDIO_WORKSPACE_DIR` the
+   compositions authored in the embedded Studio editor. (The app otherwise writes
+   them next to the bundle at `/app/renders` and `/app/studio-workspaces`, which
+   are ephemeral — every deploy auto-ships, so an unset `STUDIO_WORKSPACE_DIR`
+   silently wipes Studio content and re-seeds the blank template, looking like
+   data loss.)
 6. (Recommended for production) **+ New → Database → Redis**. In the api service
    **Variables → Reference**: link `REDIS_URL` from the Redis service. This moves
    renders onto a durable BullMQ queue + in-process worker that survives restarts.
