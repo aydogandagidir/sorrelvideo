@@ -48,6 +48,7 @@ import {
   checkAndIncrementDistributedRenderCount,
   getUserPlan,
 } from "../services/billingService";
+import { findUnsafeCompositionVar } from "../lib/compositionVars";
 
 const router: IRouter = Router();
 
@@ -114,6 +115,16 @@ router.post("/projects", async (req, res): Promise<void> => {
     return;
   }
 
+  // compositionVars is overlaid over the brand kit at render time and reaches
+  // dangerous composition contexts (an `<img src>` attribute, unquoted CSS/SVG
+  // paint) where the template's quote-preserving escaping can't protect it.
+  // Reject injection-unsafe values up front, mirroring the brand-kit logoUrl gate.
+  const unsafeVar = findUnsafeCompositionVar(parsed.data.compositionVars);
+  if (unsafeVar) {
+    res.status(400).json({ error: unsafeVar.reason });
+    return;
+  }
+
   const [project] = await db
     .insert(projectsTable)
     .values({ ...parsed.data, userId: req.user.id })
@@ -168,6 +179,15 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
   const parsed = UpdateProjectBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  // Same compositionVars injection gate as POST /projects — a PATCH must not be
+  // able to smuggle an attribute-breakout logoUrl/image or a CSS url() color past
+  // the render template's quote-preserving escaping.
+  const unsafeVar = findUnsafeCompositionVar(parsed.data.compositionVars);
+  if (unsafeVar) {
+    res.status(400).json({ error: unsafeVar.reason });
     return;
   }
 
