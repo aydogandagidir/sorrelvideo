@@ -16,7 +16,14 @@ export const sessionsTable = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
+  (table) => [
+    index("IDX_session_expire").on(table.expire),
+    // userId lives inside the `sess` jsonb (SessionData), not a top-level
+    // column. This expression index keeps deleteSessionsForUser() — invoked on
+    // password reset to revoke every existing session — an indexed lookup
+    // rather than a full-table scan.
+    index("IDX_session_user").on(sql`((${table.sess}->>'userId'))`),
+  ],
 );
 
 export const usersTable = pgTable("users", {

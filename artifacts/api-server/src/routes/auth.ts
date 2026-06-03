@@ -11,6 +11,7 @@ import { GetCurrentAuthUserResponse } from "@workspace/api-zod";
 import {
   clearSession,
   createSession,
+  deleteSessionsForUser,
   generateToken,
   getSessionId,
   hashPassword,
@@ -283,6 +284,11 @@ router.post("/auth/reset-password", async (req: Request, res: Response) => {
     .set({ usedAt: new Date() })
     .where(eq(passwordResetsTable.id, row.id));
 
+  // Invalidate every existing session for this user. A reset is the response to
+  // a (suspected) compromise, so any pre-existing attacker session must die now
+  // rather than survive up to the 7-day TTL.
+  await deleteSessionsForUser(row.userId);
+
   res.status(200).json({ success: true });
 });
 
@@ -452,6 +458,10 @@ router.get(
 
     try {
       let profileEmail: string | null = null;
+      // Only true when the *provider* attests the email belongs to this
+      // identity. Gates the email→account auto-link in findOrCreateOAuthUser;
+      // an unverified email must never link to a pre-existing account.
+      let emailVerified = false;
       let providerAccountId: string;
       let firstName: string | null = null;
       let lastName: string | null = null;
@@ -465,9 +475,12 @@ router.get(
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (!userRes.ok) throw new Error(`GitHub user fetch ${userRes.status}`);
+        // NB: the profile's own `email` field is deliberately NOT read — GitHub
+        // does not require it to be verified, so trusting it for account
+        // linking enables takeover. We resolve the email solely from
+        // /user/emails below, accepting only a primary AND verified address.
         const ghUser = (await userRes.json()) as {
           id: number;
-          email: string | null;
           name: string | null;
           login: string;
           avatar_url: string | null;
@@ -479,21 +492,22 @@ router.get(
         firstName = space > 0 ? fullName.slice(0, space) : fullName;
         lastName = space > 0 ? fullName.slice(space + 1) : null;
 
-        // GitHub may hide the primary email; fetch /user/emails to find a
-        // verified primary, falling back to the noreply alias.
-        profileEmail = ghUser.email;
-        if (!profileEmail) {
-          const emailsRes = await fetch("https://api.github.com/user/emails", {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-          if (emailsRes.ok) {
-            const emails = (await emailsRes.json()) as Array<{
-              email: string;
-              primary: boolean;
-              verified: boolean;
-            }>;
-            const primary = emails.find((e) => e.primary && e.verified);
-            profileEmail = primary?.email ?? null;
+        // Resolve the email from /user/emails and accept ONLY the entry that is
+        // both primary and verified. Anything else (unverified, or merely
+        // additional) is treated as "no email" so it can't auto-link.
+        const emailsRes = await fetch("https://api.github.com/user/emails", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (emailsRes.ok) {
+          const emails = (await emailsRes.json()) as Array<{
+            email: string;
+            primary: boolean;
+            verified: boolean;
+          }>;
+          const primaryVerified = emails.find((e) => e.primary && e.verified);
+          if (primaryVerified) {
+            profileEmail = primaryVerified.email;
+            emailVerified = true;
           }
         }
       } else {
@@ -523,7 +537,10 @@ router.get(
           picture: string | null;
         };
         providerAccountId = gUser.sub;
-        profileEmail = gUser.email_verified ? gUser.email : null;
+        // Google's `email_verified` is the provider's attestation; mirror the
+        // GitHub guarantee — only a verified email is trusted for linking.
+        emailVerified = Boolean(gUser.email_verified && gUser.email);
+        profileEmail = emailVerified ? gUser.email : null;
         firstName = gUser.given_name;
         lastName = gUser.family_name;
         profileImageUrl = gUser.picture;
@@ -532,6 +549,7 @@ router.get(
       const user = await findOrCreateOAuthUser(provider, {
         providerAccountId,
         email: profileEmail,
+        emailVerified,
         firstName,
         lastName,
         profileImageUrl,

@@ -62,6 +62,16 @@ export { generateState, generateCodeVerifier };
 interface ProviderProfile {
   providerAccountId: string;
   email: string | null;
+  /**
+   * Whether the provider has *verified* `email` belongs to this identity.
+   * The caller MUST only set this when the provider attests it (GitHub:
+   * primary && verified from /user/emails; Google: `email_verified`). An
+   * unverified email is never trusted for the email→account auto-link in
+   * step 2, because owning a GitHub/Google account does not prove ownership
+   * of an arbitrary address attached to it — trusting it would let an
+   * attacker take over a Sorrel account by attaching the victim's email.
+   */
+  emailVerified: boolean;
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
@@ -69,9 +79,12 @@ interface ProviderProfile {
 
 /**
  * Find a Sorrel user matching this provider identity, linking the OAuth
- * account if needed. Returns the user (or creates a new one). Auto-links
- * on email match — this is fine for our trust model since both GitHub and
- * Google verify their primary emails.
+ * account if needed. Returns the user (or creates a new one).
+ *
+ * Auto-linking by email (step 2) happens ONLY when `profile.emailVerified` is
+ * true. The provider email is still stored on the oauth_accounts row for
+ * reference either way, but an unverified address never grants access to a
+ * pre-existing account.
  */
 export async function findOrCreateOAuthUser(
   provider: OAuthProvider,
@@ -96,8 +109,11 @@ export async function findOrCreateOAuthUser(
     if (linked) return linked;
   }
 
-  // 2) Existing user with this email? Link the new identity.
-  if (profile.email) {
+  // 2) Existing user with this email? Link the new identity — but ONLY when the
+  // provider verified the email. Without that guarantee, an attacker who owns a
+  // provider account could attach a victim's email to it and silently take over
+  // the victim's Sorrel account.
+  if (profile.email && profile.emailVerified) {
     const normalized = profile.email.toLowerCase().trim();
     const [byEmail] = await db
       .select()
@@ -122,12 +138,18 @@ export async function findOrCreateOAuthUser(
     }
   }
 
-  // 3) Brand new user. emailVerifiedAt is set because the provider verified it.
+  // 3) Brand new user. We only persist (and mark verified) an email the
+  // provider verified — an unverified address is dropped so it can't later be
+  // matched against, or collide with, a real account's email.
+  const verifiedEmail =
+    profile.email && profile.emailVerified
+      ? profile.email.toLowerCase().trim()
+      : null;
   const [newUser] = await db
     .insert(usersTable)
     .values({
-      email: profile.email ? profile.email.toLowerCase().trim() : null,
-      emailVerifiedAt: profile.email ? new Date() : null,
+      email: verifiedEmail,
+      emailVerifiedAt: verifiedEmail ? new Date() : null,
       firstName: profile.firstName,
       lastName: profile.lastName,
       profileImageUrl: profile.profileImageUrl,
@@ -138,6 +160,8 @@ export async function findOrCreateOAuthUser(
     userId: newUser.id,
     provider,
     providerAccountId: profile.providerAccountId,
+    // Record the raw provider email (verified or not) for reference/debugging;
+    // it carries no auth weight.
     providerEmail: profile.email,
   });
 
