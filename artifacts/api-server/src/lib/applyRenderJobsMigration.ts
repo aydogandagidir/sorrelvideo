@@ -40,6 +40,16 @@ export async function applyRenderJobsMigration(): Promise<void> {
       CREATE INDEX IF NOT EXISTS "IDX_render_jobs_project"
         ON render_jobs (project_id)
     `);
+    // Backs countLambdaJobsSince (user_id = ? AND backend = ? AND created_at >= ?).
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_render_jobs_user_backend_created"
+        ON render_jobs (user_id, backend, created_at)
+    `);
+    // Backs getActiveLambdaJobs / boot recovery (backend = ? AND status = ?).
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_render_jobs_backend_status"
+        ON render_jobs (backend, status)
+    `);
     logger.info("Render-jobs migration applied (idempotent)");
   } catch (err) {
     logger.error({ err }, "Render-jobs migration failed");

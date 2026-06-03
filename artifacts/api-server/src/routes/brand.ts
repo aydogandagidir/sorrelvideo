@@ -26,6 +26,10 @@ router.get("/brand", async (req, res): Promise<void> => {
     .limit(1);
 
   if (!kit) {
+    // First touch: create the default kit. `onConflictDoNothing` on the
+    // UNIQUE(user_id) target makes this safe under a concurrent first GET —
+    // the loser's insert is a no-op (returns nothing) instead of duplicating
+    // the row, so we fall back to re-reading the winner's kit.
     const [created] = await db
       .insert(brandKitTable)
       .values({
@@ -34,8 +38,18 @@ router.get("/brand", async (req, res): Promise<void> => {
         secondaryColor: "#8b5cf6",
         fontFamily: "Inter",
       })
+      .onConflictDoNothing({ target: brandKitTable.userId })
       .returning();
-    res.json(GetBrandKitResponse.parse(serializeDates(created)));
+    if (created) {
+      res.json(GetBrandKitResponse.parse(serializeDates(created)));
+      return;
+    }
+    const [existing] = await db
+      .select()
+      .from(brandKitTable)
+      .where(eq(brandKitTable.userId, req.user.id))
+      .limit(1);
+    res.json(GetBrandKitResponse.parse(serializeDates(existing)));
     return;
   }
 
@@ -64,36 +78,30 @@ router.put("/brand", async (req, res): Promise<void> => {
     return;
   }
 
-  const [existing] = await db
-    .select()
-    .from(brandKitTable)
-    .where(eq(brandKitTable.userId, req.user.id))
-    .limit(1);
-
-  if (existing) {
-    if (existing.userId !== req.user.id) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
-    const [kit] = await db
-      .update(brandKitTable)
-      .set(parsed.data)
-      .where(eq(brandKitTable.userId, req.user.id))
-      .returning();
-    res.json(UpdateBrandKitResponse.parse(serializeDates(kit)));
-  } else {
-    const [kit] = await db
-      .insert(brandKitTable)
-      .values({
-        userId: req.user.id,
-        primaryColor: "#6366f1",
-        secondaryColor: "#8b5cf6",
-        fontFamily: "Inter",
-        ...parsed.data,
-      })
-      .returning();
-    res.json(UpdateBrandKitResponse.parse(serializeDates(kit)));
-  }
+  // Idempotent upsert keyed on UNIQUE(user_id): inserts the row on first touch,
+  // updates it otherwise — in one statement, so two concurrent first-touch PUTs
+  // can't duplicate the row (the loser hits the conflict and updates instead).
+  // The row is always the caller's (keyed by req.user.id), so no ownership
+  // branch is needed; the previous select-then-update could 403 a row that
+  // could never belong to anyone else.
+  const [kit] = await db
+    .insert(brandKitTable)
+    .values({
+      userId: req.user.id,
+      primaryColor: "#6366f1",
+      secondaryColor: "#8b5cf6",
+      fontFamily: "Inter",
+      ...parsed.data,
+    })
+    .onConflictDoUpdate({
+      target: brandKitTable.userId,
+      // Always include user_id (a no-op self-assignment) so the SET clause is
+      // never empty — an empty PUT body (every field optional) would otherwise
+      // emit invalid `DO UPDATE SET` SQL. updatedAt still bumps via $onUpdate.
+      set: { userId: req.user.id, ...parsed.data },
+    })
+    .returning();
+  res.json(UpdateBrandKitResponse.parse(serializeDates(kit)));
 });
 
 export default router;
