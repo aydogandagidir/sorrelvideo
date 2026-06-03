@@ -10,6 +10,7 @@ import { db, stripeSubscriptionsTable, usersTable } from "@workspace/db";
 export async function truncateAll(): Promise<void> {
   await db.execute(sql`
     TRUNCATE TABLE
+      processed_stripe_events,
       stripe_subscriptions,
       password_resets,
       email_verifications,
