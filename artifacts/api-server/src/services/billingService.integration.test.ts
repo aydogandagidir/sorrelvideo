@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { db, stripeSubscriptionsTable, usersTable } from "@workspace/db";
+import { db, usersTable } from "@workspace/db";
 import {
   FREE_AI_LIMIT,
   FREE_RENDER_LIMIT,
@@ -8,34 +8,8 @@ import {
   checkAndIncrementRenderCount,
   getBillingInfo,
 } from "./billingService";
-import { truncateAll } from "../test/integration";
+import { createFreeUser, createProUser, truncateAll } from "../test/integration";
 import { INTEGRATION_AVAILABLE } from "../test/setup";
-
-async function createFreeUser(): Promise<string> {
-  const [row] = await db
-    .insert(usersTable)
-    .values({ email: `free-${Date.now()}-${Math.random()}@test.local` })
-    .returning();
-  return row.id;
-}
-
-async function createProUser(): Promise<string> {
-  const customerId = `cus_test_${Math.random().toString(36).slice(2)}`;
-  const [row] = await db
-    .insert(usersTable)
-    .values({
-      email: `pro-${Date.now()}-${Math.random()}@test.local`,
-      stripeCustomerId: customerId,
-    })
-    .returning();
-  await db.insert(stripeSubscriptionsTable).values({
-    id: `sub_${customerId}`,
-    customerId,
-    status: "active",
-    cancelAtPeriodEnd: false,
-  });
-  return row.id;
-}
 
 beforeEach(async () => {
   await truncateAll();

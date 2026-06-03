@@ -54,3 +54,22 @@ describe("GET /api/templates/thumbnails/:slug", () => {
     expect(res.status).toBe(200);
   });
 });
+
+// Mirrors compositions.test.ts / projects.test.ts: the unit harness imports the
+// real `app`, whose authMiddleware resolves sessions against Postgres. Without a
+// DB-backed session it can only exercise the unauthenticated path, so the authed
+// 201 + premium-gate + landscape-resolution cases live in
+// templates.integration.test.ts. The auth guard runs before id validation, so
+// even a non-numeric :id is rejected as 401 here.
+describe("POST /api/templates/:id/use", () => {
+  it("returns 401 when no session is present", async () => {
+    const res = await request(app).post("/api/templates/1/use");
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 401 before validating the id (auth gate is first)", async () => {
+    const res = await request(app).post("/api/templates/not-a-number/use");
+    expect(res.status).toBe(401);
+  });
+});
