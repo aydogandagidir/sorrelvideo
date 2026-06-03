@@ -45,8 +45,22 @@ export async function captureWebsite(
   fs.mkdirSync(outDir, { recursive: true });
   const screenshotPath = path.join(outDir, "capture.png");
 
+  // Resolve an explicit Chrome binary the way the render engine does, so prod
+  // works. The full `puppeteer` package downloads Chrome into ~/.cache/puppeteer
+  // at build, but the Docker runtime image copies only node_modules — not that
+  // cache — so a bare launch() throws "Could not find Chrome" and every
+  // website→video call 502s. Reusing PRODUCER_HEADLESS_SHELL_PATH (already
+  // /usr/bin/chromium in the image) fixes prod with zero new env. Undefined
+  // locally keeps puppeteer's default cache resolution (dev has the binary).
+  const executablePath =
+    process.env.CAPTURE_CHROME_PATH ||
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.PRODUCER_HEADLESS_SHELL_PATH ||
+    undefined;
+
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath,
     args: [
       "--disable-dev-shm-usage",
       // Keep Chrome's sandbox ON by default (we load untrusted pages). Some

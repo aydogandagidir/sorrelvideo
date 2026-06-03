@@ -65,11 +65,13 @@ ENV NODE_ENV=production \
     BASE_PATH=/ \
     PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
-    # Hyperframes (puppeteer-core) needs an explicit Chromium binary. We install
-    # the system chromium package below and point the engine at it via this env
-    # (read in @hyperframes/engine browserManager.ts), instead of relying on
-    # puppeteer's version-stamped cache path.
+    # Both the render engine (puppeteer-core) and the website→video capture
+    # (full puppeteer) need an explicit Chromium binary: we install the system
+    # chromium package below and point both at it, instead of relying on
+    # puppeteer's version-stamped download cache (which isn't copied into this
+    # runtime stage — only node_modules is).
     PRODUCER_HEADLESS_SHELL_PATH=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_DOWNLOAD=true
 
 # Chromium + its runtime libraries

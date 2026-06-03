@@ -277,6 +277,15 @@ screenshot → outro CTA).
 - `websiteCaptureLimiter` (5 / 15 min) — Chrome capture is expensive. `SsrfError`
   → 400, `WebsiteCaptureError` → 502.
 
+**Chrome binary**: `captureWebsite` uses the full `puppeteer` package, whose
+downloaded Chrome lands in `~/.cache/puppeteer` — which the Docker runtime image
+does NOT copy (only `node_modules`). So it resolves `executablePath` from
+`CAPTURE_CHROME_PATH ?? PUPPETEER_EXECUTABLE_PATH ?? PRODUCER_HEADLESS_SHELL_PATH`
+(the image sets the latter two to `/usr/bin/chromium`), falling back to
+`undefined` (puppeteer's cache) for local dev. Without this the capture 502s in
+prod while normal renders still work — they go through the engine, which already
+reads `PRODUCER_HEADLESS_SHELL_PATH`.
+
 **`CAPTURE_NO_SANDBOX`**: Chrome's sandbox is ON by default (untrusted pages).
 Set `=true` ONLY on container hosts that can't start a sandboxed Chrome (root /
 no user namespaces). The captured screenshot is currently embedded as a data URI
