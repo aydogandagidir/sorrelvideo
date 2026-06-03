@@ -136,3 +136,71 @@ export function installFetchMock(routes: FetchRoute[] = []): FetchMockHandle {
     restore: () => vi.unstubAllGlobals(),
   };
 }
+
+/**
+ * A single matcher → response rule for {@link installApiFetchMock}. Adds an
+ * optional `method` to {@link FetchRoute} so two handlers that share a path
+ * (e.g. `GET /api/projects/:id` vs `DELETE /api/projects/:id`) can be told
+ * apart by the request method.
+ */
+export interface ApiFetchRoute extends FetchRoute {
+  /** Optional HTTP method to match (case-insensitive). Omit to match any. */
+  method?: string;
+}
+
+/**
+ * Like {@link installFetchMock}, but resolves each call to a REAL `Response`
+ * object (`{ "content-type": "application/json" }`) instead of a hand-rolled
+ * `{ ok, status, json }` stub.
+ *
+ * The generated Orval hooks (`@workspace/api-client-react`) go through
+ * `customFetch`, which reads `response.text()`, `response.headers`, and
+ * `response.body` — none of which the lightweight `installFetchMock` stub
+ * implements. Page tests that exercise those hooks need this richer mock; it
+ * works equally well for the plain-`fetch` billing/auth hooks, so a page that
+ * mixes both (e.g. a `Layout`-wrapped page) can use a single handle.
+ *
+ * Unmatched URLs resolve to a JSON 404 so a missing stub surfaces loudly. The
+ * `mock` is a `vi.fn()` so callers can assert on `fetch` call args (URL +
+ * method) — the delete-confirmation flow leans on this.
+ */
+export function installApiFetchMock(
+  routes: ApiFetchRoute[] = [],
+): FetchMockHandle {
+  const mock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+    const method = (
+      init?.method ??
+      (typeof input === "object" && "method" in input ? input.method : "GET")
+    ).toUpperCase();
+
+    const route = routes.find((r) => {
+      const urlMatch =
+        typeof r.url === "string" ? url.includes(r.url) : r.url.test(url);
+      const methodMatch = !r.method || r.method.toUpperCase() === method;
+      return urlMatch && methodMatch;
+    });
+
+    const status = route?.status ?? (route ? 200 : 404);
+    const body = route ? (route.json ?? {}) : { error: `No stub for ${url}` };
+
+    return Promise.resolve(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  });
+
+  vi.stubGlobal("fetch", mock);
+
+  return {
+    mock,
+    restore: () => vi.unstubAllGlobals(),
+  };
+}
