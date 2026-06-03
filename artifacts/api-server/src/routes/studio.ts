@@ -657,10 +657,15 @@ router.get("/studio/events", async (req, res): Promise<void> => {
 const TERMINAL_STATUSES = new Set(["ready", "failed", "cancelled"]);
 
 /**
- * Pull a `{ fps, quality, format, resolution }` partial off an untrusted JSON
- * body without `any`. Each field is read as `unknown` and forwarded to
- * `resolveSettings`, which coerces/validates it (unknown values fall back to the
- * defaults), so a malformed body degrades to the default render rather than 500.
+ * Pull a `{ fps, quality, format, resolution, transparent, watermark,
+ * transitions }` partial off an untrusted JSON body without `any` — the same
+ * shape `PATCH /projects/:id/render-settings` accepts, so a render started from
+ * the embedded studio honors every Pro lever (transparent / watermark removal /
+ * multi-transition) exactly like `POST /projects/:id/render`. Each field is read
+ * as `unknown` and forwarded to `resolveSettings`, which coerces/validates it
+ * (unknown values fall back to the defaults), so a malformed body degrades to the
+ * default render rather than 500; `assertRenderSettingsAllowed` then re-gates the
+ * resolved object so Pro-only knobs stay gated.
  */
 function settingsFromBody(body: unknown): Partial<RenderSettings> {
   if (typeof body !== "object" || body === null) return {};
@@ -676,6 +681,13 @@ function settingsFromBody(body: unknown): Partial<RenderSettings> {
     out.format = b.format as RenderSettings["format"];
   if (typeof b.resolution === "string")
     out.resolution = b.resolution as RenderSettings["resolution"];
+  if (typeof b.transparent === "boolean") out.transparent = b.transparent;
+  if (typeof b.watermark === "boolean") out.watermark = b.watermark;
+  // transitions is forwarded when it's an array (resolveSettings keeps it only
+  // for an array; the Pro gate then rejects >1 for Free). Mirrors the
+  // render-settings body shape rather than parsing each element here.
+  if (Array.isArray(b.transitions))
+    out.transitions = b.transitions as RenderSettings["transitions"];
   return out;
 }
 
