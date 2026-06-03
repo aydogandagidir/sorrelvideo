@@ -52,10 +52,11 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `AI_PROVIDER`                                                   | api-server (AI suggest)                 | `anthropic` (default) or `openai`. Picks which provider `lib/ai` routes calls to.                |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`                         | api-server (when AI_PROVIDER=anthropic) | API key + optional model override (defaults to `claude-haiku-4-5`).                              |
 | `OPENAI_API_KEY` / `OPENAI_MODEL`                               | api-server (when AI_PROVIDER=openai)    | API key + optional model override (defaults to `gpt-4o-mini`).                                   |
-| `SENTRY_DSN` / `VITE_SENTRY_DSN`                                | api-server / sorrel (optional)          | Sentry error tracking. Init is a no-op when unset, app still runs.                               |
-| `SENTRY_TRACES_SAMPLE_RATE`                                     | api-server / sorrel (optional)          | Sentry trace sampling — defaults to `0.1` (10 %).                                                |
-| `LOGTAIL_SOURCE_TOKEN`                                          | api-server (optional)                   | Better Stack / Logtail log sink. Logs ship to stdout regardless; this just adds a remote target. |
-| `GIT_SHA`                                                       | api-server (optional, set by CI)        | Pinned to `github.event.workflow_run.head_sha`; surfaces as the `release` tag in Sentry events.  |
+| `SENTRY_DSN`                                                    | api-server (optional)                   | Backend Sentry error tracking (runtime). Init is a no-op when unset, app still runs.             |
+| `VITE_SENTRY_DSN` / `VITE_SENTRY_TRACES_SAMPLE_RATE`           | sorrel (optional, **build-time**)       | Frontend Sentry. Vite inlines `import.meta.env.VITE_*` at build → must be a Docker build ARG (Railway injects matching service vars). Unset → browser SDK no-ops. |
+| `SENTRY_TRACES_SAMPLE_RATE`                                     | api-server (optional)                   | Backend Sentry trace sampling — defaults to `0.1` (10 %).                                        |
+| `LOG_LEVEL`                                                     | api-server (optional)                   | Pino level (default `info`). Logs are JSON on stdout; ship them off Railway with a **log drain**, not an in-process transport. |
+| `GIT_SHA` / `VITE_GIT_SHA`                                      | api-server / sorrel (optional, set by CI) | `deploy.yml` pins both to `github.event.workflow_run.head_sha`; surface as the `release` tag in backend / frontend Sentry events (`VITE_GIT_SHA` is a build ARG). |
 
 ## Stack
 
@@ -513,13 +514,20 @@ using a `RAILWAY_TOKEN` secret. Subsequent pushes auto-ship.
 **Observability**:
 
 - **Sentry** (`@sentry/node` + `@sentry/react`) — error tracking;
-  release tag pinned to the deploy commit's `GIT_SHA`. `beforeSend`
-  scrubs password / token fields from request bodies. No-op when
-  `SENTRY_DSN` is unset so local dev stays clean.
-- **Better Stack / Logtail** (`@logtail/pino`) — structured log sink
-  layered on top of Pino. Stdout always carries the logs (Railway
-  scrapes that too); the Logtail target is only attached when
-  `LOGTAIL_SOURCE_TOKEN` is present.
+  release tag pinned to the deploy commit's `GIT_SHA` (backend) /
+  `VITE_GIT_SHA` (frontend). `beforeSend` scrubs password / token fields
+  from request bodies. No-op when the DSN is unset so local dev stays
+  clean. The **frontend DSN is build-time**: Vite inlines
+  `import.meta.env.VITE_SENTRY_DSN` when the SPA is bundled inside the
+  Docker image, so the Dockerfile declares `VITE_SENTRY_DSN` /
+  `VITE_SENTRY_TRACES_SAMPLE_RATE` / `VITE_GIT_SHA` as build `ARG`s and
+  Railway forwards the matching service variables into the build.
+- **Logs** — structured JSON via Pino straight to **stdout** (Railway
+  captures it). `lib/logger.ts` reads only `LOG_LEVEL`; there is **no
+  in-process Logtail transport** and no `LOGTAIL_SOURCE_TOKEN`. To ship
+  logs to Better Stack / Logtail, attach a Railway native **log drain**
+  (Project → Settings → Log drains) — this avoids the fragile
+  worker-thread bundling a Pino transport needs under esbuild.
 
 **One-time setup** for every clean environment: see `DEPLOYMENT.md` —
 Stripe products + webhook, Resend domain verify, GCS bucket + service

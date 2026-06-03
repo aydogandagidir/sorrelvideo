@@ -37,6 +37,22 @@ jobs:
           curl -fsSL https://railway.com/install.sh | sh
           echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
+      # Pin the release SHA Railway uses for THIS build. `railway up` builds the
+      # Dockerfile on Railway's builders and has no --build-arg flag — Railway
+      # forwards matching service variables into the build as ARGs instead. So we
+      # set the SHA-derived vars as service variables first (--skip-deploys avoids
+      # triggering an extra deploy). GIT_SHA → runtime API Sentry release;
+      # VITE_GIT_SHA → the Dockerfile ARG the SPA build reads (frontend Sentry
+      # release). The static VITE_SENTRY_DSN / VITE_SENTRY_TRACES_SAMPLE_RATE are
+      # operator-managed service variables (see DEPLOYMENT.md), not set here.
+      - name: Pin release SHA as build/runtime variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway variables --service api --skip-deploys \
+            --set "GIT_SHA=$GIT_SHA" \
+            --set "VITE_GIT_SHA=$GIT_SHA"
+
       - name: Deploy
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

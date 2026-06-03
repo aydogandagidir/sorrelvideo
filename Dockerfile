@@ -42,6 +42,19 @@ COPY . .
 ENV NODE_ENV=production \
     BASE_PATH=/ \
     PORT=8080
+# Frontend (Vite) Sentry config is BUILD-TIME: `import.meta.env.VITE_*` is
+# inlined when the SPA is bundled, so these must be present here — not at
+# container runtime. Declare them as ARGs (Railway injects matching service
+# variables into the Dockerfile build automatically; locally pass them with
+# `docker build --build-arg`) and promote to ENV so Vite picks them up. Unset
+# → Vite inlines `undefined`, the browser Sentry SDK no-ops, and prod has no
+# frontend error tracking. See DEPLOYMENT.md (Sentry) + .env.production.example.
+ARG VITE_SENTRY_DSN=""
+ARG VITE_SENTRY_TRACES_SAMPLE_RATE=""
+ARG VITE_GIT_SHA=""
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
+    VITE_SENTRY_TRACES_SAMPLE_RATE=$VITE_SENTRY_TRACES_SAMPLE_RATE \
+    VITE_GIT_SHA=$VITE_GIT_SHA
 # Typecheck everything, but only build what ships: the api-server bundle, the
 # sorrel SPA, and the embedded studio-editor (served at /editor/). mockup-sandbox
 # is a dev-only Hyperframes playground and is not deployed.
