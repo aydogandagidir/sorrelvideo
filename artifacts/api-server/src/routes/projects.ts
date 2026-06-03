@@ -35,11 +35,13 @@ import {
   enqueueRender,
   isQueueEnabled,
   removeQueuedRender,
+  RenderAlreadyActiveError,
 } from "../lib/renderQueue";
 import { selectBackend } from "../lib/renderBackend";
 import {
   createRenderJob as createRenderJobRow,
   markFailed,
+  markCancelled,
   requestCancel,
   getLatestJobForProject,
 } from "../services/renderJobsService";
@@ -472,7 +474,7 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
 
   // Durable enqueue when REDIS_URL is set; inline fire-and-forget otherwise.
   // If enqueue fails, release the claim so the project isn't stranded in
-  // "rendering" and mark the ledger row failed.
+  // "rendering" and resolve the just-opened ledger row.
   try {
     await enqueueRender(id, project.module, project.templateId, renderJobId, plan);
   } catch (err) {
@@ -480,6 +482,18 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
       .update(projectsTable)
       .set({ status: project.status })
       .where(eq(projectsTable.id, id));
+    // RenderAlreadyActiveError is transient, not a failure: the PREVIOUS render
+    // of this project is still finishing (its BullMQ job lock is held), so this
+    // attempt was never queued. Release the claim, mark this attempt's ledger
+    // row cancelled (it never ran), and 409 so the client retries shortly —
+    // exactly like losing the atomic claim. The burned quota increment is the
+    // accepted cost of a near-simultaneous double render (rare; the previous
+    // render still completes).
+    if (err instanceof RenderAlreadyActiveError) {
+      await markCancelled(renderJobId).catch(() => undefined);
+      res.status(409).json({ error: "Render already in progress" });
+      return;
+    }
     await markFailed(
       renderJobId,
       err instanceof Error ? err.message : String(err),

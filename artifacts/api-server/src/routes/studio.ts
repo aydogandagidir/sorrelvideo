@@ -63,10 +63,12 @@ import {
   enqueueRender,
   isQueueEnabled,
   removeQueuedRender,
+  RenderAlreadyActiveError,
 } from "../lib/renderQueue";
 import {
   createRenderJob,
   markFailed,
+  markCancelled,
   requestCancel,
 } from "../services/renderJobsService";
 import {
@@ -794,6 +796,15 @@ router.post(
         .update(projectsTable)
         .set({ status: project.status })
         .where(eq(projectsTable.id, project.id));
+      // Transient: the previous render of this project is still finishing (its
+      // BullMQ job lock is held), so this attempt was never queued. Release the
+      // claim, cancel this never-run ledger row, and 409 so the client retries —
+      // never strand "rendering". (See routes/projects.ts for the same handling.)
+      if (err instanceof RenderAlreadyActiveError) {
+        await markCancelled(jobId).catch(() => undefined);
+        res.status(409).json({ error: "Render already in progress" });
+        return;
+      }
       await markFailed(
         jobId,
         err instanceof Error ? err.message : String(err),

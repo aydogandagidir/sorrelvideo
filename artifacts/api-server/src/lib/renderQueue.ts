@@ -43,6 +43,27 @@ function jobIdFor(projectId: number): string {
   return `render-${projectId}`;
 }
 
+/**
+ * Thrown by `enqueueRender` when the previous render of the SAME project is
+ * still locked by a live BullMQ worker, so its job id can't be reused yet.
+ *
+ * Why this can happen even though the route already won the atomic claim: the
+ * executor flips the PROJECT to ready/draft/failed BEFORE its BullMQ worker fn
+ * returns, so there's a window where the project is claimable again while the
+ * old job still holds its lock. `q.remove(jobId)` returns 0 (locked) in that
+ * window, and a follow-up `q.add` with the same jobId would be silently
+ * dedup-dropped — stranding the project in "rendering" until the next restart's
+ * recovery, plus burning a quota increment. We surface this as a distinct error
+ * so the route releases the claim and 409s ("retry shortly") instead of adding
+ * a job that never runs.
+ */
+export class RenderAlreadyActiveError extends Error {
+  constructor(projectId: number) {
+    super(`A render for project ${projectId} is still finishing`);
+    this.name = "RenderAlreadyActiveError";
+  }
+}
+
 let connection: Redis | null = null;
 let queue: Queue<RenderJobData> | null = null;
 let worker: Worker<RenderJobData> | null = null;
@@ -168,7 +189,17 @@ export async function enqueueRender(
     const jobId = jobIdFor(projectId);
     // Drop any finished job sharing this id so a re-render of the same project
     // isn't rejected by the jobId dedup (bounded history keeps Redis tidy).
-    await q.remove(jobId).catch(() => undefined);
+    // `remove` returns 1 when the job was removed OR never existed, and 0 ONLY
+    // when the job is currently locked by a live worker (BullMQ's removeJob Lua:
+    // it refuses to remove an active/locked job). A 0 means the previous render
+    // is still finishing — `q.add` with this same jobId would be silently
+    // dedup-dropped, stranding the project in "rendering". Surface it so the
+    // route releases the claim and 409s instead of dropping the add. Errors
+    // from remove itself are swallowed (treated as "nothing to drop").
+    const removed = await q.remove(jobId).catch(() => 1);
+    if (removed === 0) {
+      throw new RenderAlreadyActiveError(projectId);
+    }
     await q.add(
       "render",
       { projectId, module, templateId, renderJobId },
