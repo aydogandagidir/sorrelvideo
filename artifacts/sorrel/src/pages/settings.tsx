@@ -92,6 +92,10 @@ function BillingCard() {
   const renderCount = billing?.renderCount ?? 0;
   const renderLimit = billing?.renderLimit ?? 3;
   const renderPct = isPro ? 0 : Math.min((renderCount / renderLimit) * 100, 100);
+  const aiCount = billing?.aiCount ?? 0;
+  const aiLimit = billing?.aiLimit ?? 10;
+  const aiPct = isPro ? 0 : Math.min((aiCount / aiLimit) * 100, 100);
+  const aiRemaining = Math.max(aiLimit - aiCount, 0);
 
   return (
     <Card>
@@ -173,12 +177,26 @@ function BillingCard() {
                 </p>
               )}
             </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">AI drafts this month</span>
+                <span className="font-medium">
+                  {aiCount} / {aiLimit}
+                </span>
+              </div>
+              <Progress value={aiPct} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                {aiRemaining > 0
+                  ? `${aiRemaining} AI ${aiRemaining === 1 ? "draft" : "drafts"} left — upgrade to Pro for unlimited.`
+                  : "You're out of AI drafts this month — upgrade to Pro for unlimited."}
+              </p>
+            </div>
           </>
         )}
 
         {isPro && (
           <p className="text-sm text-muted-foreground">
-            Unlimited renders included with your Pro plan.
+            Unlimited renders and AI drafts included with your Pro plan.
           </p>
         )}
       </CardContent>

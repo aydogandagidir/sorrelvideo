@@ -37,8 +37,22 @@ function HeroSection() {
           <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
             Enter Workspace
           </Link>
-          <Button variant="outline" size="lg" className="h-12 px-8">
+          {/*
+            No public documentation site exists yet. Keep the button visible
+            (it sets the expectation) but disabled with a "coming soon" cue,
+            rather than linking to a dead URL.
+          */}
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-12 px-8"
+            disabled
+            title="Documentation is coming soon"
+          >
             View Documentation
+            <span className="ml-2 text-xs text-muted-foreground">
+              (coming soon)
+            </span>
           </Button>
         </div>
       </motion.div>
@@ -89,7 +103,6 @@ export default function Home() {
           </Link>
           <nav className="hidden md:flex gap-6 text-sm font-medium">
             <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#modules" className="text-muted-foreground hover:text-foreground transition-colors">Modules</a>
             <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
           </nav>
           <Link href="/dashboard" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">

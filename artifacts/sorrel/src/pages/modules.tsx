@@ -111,11 +111,23 @@ export default function Modules() {
               <CardFooter className="border-t p-6 mt-auto bg-muted/20">
                 <div className="flex items-center justify-between w-full">
                   <span className="text-sm font-medium">
-                    {module.status === 'coming_soon' ? 'Not Available' : 'Enable Module'}
+                    {module.status === "coming_soon"
+                      ? "Not Available"
+                      : module.status === "active"
+                        ? "Enabled"
+                        : "Available"}
                   </span>
-                  <Switch 
-                    disabled={module.status === 'coming_soon'} 
-                    checked={module.status === 'active'}
+                  {/*
+                    Read-only status indicator, NOT a user control. Module
+                    availability is provisioned server-side (by plan/rollout),
+                    so the Switch only reflects `module.status` and is always
+                    disabled — there is no self-serve enable/disable endpoint yet.
+                  */}
+                  <Switch
+                    disabled
+                    checked={module.status === "active"}
+                    aria-label={`${module.name} status`}
+                    aria-readonly
                   />
                 </div>
               </CardFooter>

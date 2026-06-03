@@ -5,6 +5,12 @@ export interface BillingInfo {
   renderCount: number;
   renderLimit: number | null;
   renderResetAt: string | null;
+  // AI suggestion quota — mirrors the render counters. The backend
+  // (GET /api/billing/me) and OpenAPI `BillingInfo` schema already return these;
+  // Free users get a numeric `aiLimit`, Pro users get `null` (unlimited).
+  aiCount: number;
+  aiLimit: number | null;
+  aiResetAt: string | null;
   stripeCustomerId: string | null;
 }
 

@@ -61,6 +61,13 @@ export default function StudioPage() {
 
   const plan = billing?.plan ?? "free";
 
+  // AI quota readout for the "warn before the cap" hint under the AI button.
+  // Free users get a numeric `aiLimit`; Pro is unlimited (null), so no hint.
+  const aiLimit = billing?.aiLimit ?? null;
+  const aiCount = billing?.aiCount ?? 0;
+  const aiRemaining = aiLimit != null ? Math.max(aiLimit - aiCount, 0) : null;
+  const aiNearCap = aiRemaining != null && aiRemaining <= 2;
+
   const [name, setName] = useState("Untitled Studio Project");
   const [aiPrompt, setAiPrompt] = useState("");
   const [headline, setHeadline] = useState(DEFAULT_HEADLINE);
@@ -369,6 +376,17 @@ export default function StudioPage() {
                     </>
                   )}
                 </Button>
+                {aiRemaining != null && (
+                  <p
+                    className={`text-xs ${
+                      aiNearCap ? "text-amber-500" : "text-muted-foreground"
+                    }`}
+                  >
+                    {aiRemaining > 0
+                      ? `${aiRemaining} AI ${aiRemaining === 1 ? "draft" : "drafts"} left this month`
+                      : "You're out of AI drafts this month — upgrade to Pro for unlimited."}
+                  </p>
+                )}
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5" noValidate>
