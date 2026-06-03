@@ -60,6 +60,10 @@ const CURATION = [
       { find: "#326FA8", replace: "{{brand.accentColor}}" },
     ],
   },
+  // NOTE: brand injection was evaluated for world-map + us-map-bubble and
+  // reverted — a choropleth's sequential color scale is a perceptual data
+  // encoding, and recoloring only the CSS legend (not the D3 fill scale) left the
+  // legend and map inconsistent. Data-viz palettes are kept as-authored.
   { slug: "world-map", category: "Data", isPremium: false },
   { slug: "us-map-bubble", category: "Data", isPremium: true },
   {
@@ -85,7 +89,19 @@ const CURATION = [
   },
   { slug: "code-snippet-dark-modern", category: "Code", isPremium: false },
   { slug: "code-snippet-light-modern", category: "Code", isPremium: false },
-  { slug: "code-snippet-apple-terminal-pro", category: "Code", isPremium: true },
+  {
+    slug: "code-snippet-apple-terminal-pro",
+    category: "Code",
+    isPremium: true,
+    // The composition uses gsap's TextPlugin syntax (tl.set(el,{text:""})) to
+    // clear the line, but only gsap core is bundled, so every render logs
+    // "Missing plugin? TextPlugin". The typing itself is driven by direct
+    // textContent writes, so this set is a no-op — replace it with a plain DOM
+    // write to silence the log without loading the (heavier) plugin.
+    inject: [
+      { find: 'tl.set(typedEl, { text: "" }, 0);', replace: 'typedEl.textContent = "";' },
+    ],
+  },
   { slug: "x-post", category: "Social", isPremium: false },
   { slug: "reddit-post", category: "Social", isPremium: false },
   { slug: "instagram-follow", category: "Social", isPremium: false },
