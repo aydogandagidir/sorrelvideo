@@ -23,9 +23,19 @@ import {
   resolveEntryFile,
   renderCompositionTemplate,
 } from "../services/renderService";
-import { resolutionForModule } from "../services/registryTemplates";
+import {
+  resolutionForModule,
+  REGISTRY_TEMPLATES,
+} from "../services/registryTemplates";
 
 const router: IRouter = Router();
+
+/**
+ * Slugs that ship a self-hosted poster PNG under compositions/thumbnails/. Built
+ * from the vendored registry manifest so the thumbnails route only ever serves a
+ * known template's poster (an allow-list — never an arbitrary `:slug` off disk).
+ */
+const THUMBNAIL_SLUGS = new Set(REGISTRY_TEMPLATES.map((t) => t.slug));
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -110,6 +120,51 @@ router.get("/templates", async (req, res): Promise<void> => {
     .orderBy(templatesTable.id);
 
   res.json(ListTemplatesResponse.parse(serializeDates(templates)));
+});
+
+// GET /api/templates/thumbnails/:slug — serve a platform template's self-hosted
+// gallery poster (PNG). These are first-frame stills rendered FROM each vendored
+// composition (scripts/generate-thumbnails.mjs → compositions/thumbnails/<slug>.png)
+// and committed, replacing the dependency on HeyGen's static.heygen.ai CDN. The
+// manifest's `thumbnailUrl` points here; seedPlatformTemplates persists it.
+//
+// PUBLIC (intentional, NOT auth-gated): the gallery renders this as a plain
+// `<img src>` and a brand-neutral sample poster is the same "look before you
+// buy" affordance as the static CDN thumbnail it replaces — exactly like the
+// already-public hover-preview. Serving it starts no render and consumes no
+// quota.
+//
+// SPEC-EXEMPT: loaded directly by the browser as an <img> source, not through
+// the OpenAPI-generated React Query hooks — like the /composition preview + the
+// project video/thumbnail stream routes. Deliberately absent from openapi.yaml.
+//
+// MUST be registered before `GET /templates/:id` so "thumbnails" isn't parsed as
+// an :id. The :slug is matched against the vendored manifest (an allow-list), so
+// a crafted value can't traverse out of the thumbnails dir.
+router.get("/templates/thumbnails/:slug", (req, res): void => {
+  const raw = Array.isArray(req.params.slug)
+    ? req.params.slug[0]
+    : req.params.slug;
+  // Tolerate the ".png" suffix the manifest URL carries (…/<slug>.png).
+  const slug = raw.replace(/\.png$/i, "");
+  if (!THUMBNAIL_SLUGS.has(slug)) {
+    res.status(404).json({ error: "Thumbnail not found" });
+    return;
+  }
+
+  const thumbPath = path.join(COMPOSITIONS_DIR, "thumbnails", `${slug}.png`);
+  if (!fs.existsSync(thumbPath)) {
+    res.status(404).json({ error: "Thumbnail not available" });
+    return;
+  }
+
+  // Committed, content-addressed by slug and brand-neutral → safe to cache hard.
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.setHeader("Content-Type", "image/png");
+  // Stream manually rather than res.sendFile — Express 5's send() rejects
+  // absolute paths containing spaces (the repo can live under ".../Artificial
+  // Inteligence/..."), same constraint as the project video/thumbnail routes.
+  fs.createReadStream(thumbPath).pipe(res);
 });
 
 router.post("/templates", async (req, res): Promise<void> => {

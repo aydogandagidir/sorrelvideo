@@ -20,7 +20,19 @@ export interface RegistryTemplate {
   width: number;
   height: number;
   tags: string[];
+  /**
+   * Self-hosted gallery poster: a first-frame PNG rendered FROM this
+   * composition (scripts/generate-thumbnails.mjs) and served by the api-server
+   * at `/api/templates/thumbnails/<slug>.png`. seedPlatformTemplates persists
+   * this onto the template row. Replaces the dependency on HeyGen's CDN.
+   */
   thumbnailUrl: string;
+  /**
+   * The original `static.heygen.ai` CDN poster URL from the registry, kept as a
+   * documented fallback. NOT fetched at runtime — `thumbnailUrl` (self-hosted)
+   * is authoritative; this only records provenance / a manual recovery path.
+   */
+  cdnThumbnailUrl?: string;
   /** Upstream registry block URL, for attribution. */
   source: string;
 }

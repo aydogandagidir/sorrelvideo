@@ -30,6 +30,13 @@ const REF = "main";
 const RAW = (p) => `https://raw.githubusercontent.com/${REPO}/${REF}/${p}`;
 const SOURCE_URL = (slug) =>
   `https://github.com/${REPO}/tree/${REF}/registry/blocks/${slug}`;
+// Self-hosted poster path. Each template's gallery thumbnail is a first-frame
+// PNG rendered FROM ITS OWN composition (scripts/generate-thumbnails.mjs →
+// src/compositions/thumbnails/<slug>.png) and served by the api-server at this
+// static route (see app.ts). This replaces the registry's `static.heygen.ai`
+// CDN URL as the canonical `thumbnailUrl`; the CDN URL is retained per-template
+// as `cdnThumbnailUrl` (a documented fallback — never fetched at runtime).
+const THUMBNAIL_URL = (slug) => `/api/templates/thumbnails/${slug}.png`;
 
 const CWD = process.cwd(); // artifacts/api-server when run via pnpm exec
 const COMPOSITIONS_DIR = path.join(CWD, "src", "compositions");
@@ -252,7 +259,10 @@ async function main() {
         width: dims.width ?? 1920,
         height: dims.height ?? 1080,
         tags: Array.isArray(item.tags) ? item.tags : [],
-        thumbnailUrl: item.preview?.poster ?? item.preview?.video ?? "",
+        // Self-hosted poster (rendered from this composition); the upstream CDN
+        // URL is kept alongside as a documented, never-fetched fallback.
+        thumbnailUrl: THUMBNAIL_URL(slug),
+        cdnThumbnailUrl: item.preview?.poster ?? item.preview?.video ?? "",
         source: SOURCE_URL(slug),
       });
       console.log(`[import] ✓ ${slug} (${imported.at(-1).width}x${imported.at(-1).height}, ${imported.at(-1).duration}s)`);
