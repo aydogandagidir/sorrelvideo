@@ -35,19 +35,23 @@ import {
   enqueueRender,
   isQueueEnabled,
   removeQueuedRender,
+  RenderAlreadyActiveError,
 } from "../lib/renderQueue";
 import { selectBackend } from "../lib/renderBackend";
 import {
   createRenderJob as createRenderJobRow,
   markFailed,
+  markCancelled,
   requestCancel,
   getLatestJobForProject,
 } from "../services/renderJobsService";
 import {
   checkAndIncrementRenderCount,
   checkAndIncrementDistributedRenderCount,
+  decrementRenderCount,
   getUserPlan,
 } from "../services/billingService";
+import { findUnsafeCompositionVar } from "../lib/compositionVars";
 
 const router: IRouter = Router();
 
@@ -114,6 +118,16 @@ router.post("/projects", async (req, res): Promise<void> => {
     return;
   }
 
+  // compositionVars is overlaid over the brand kit at render time and reaches
+  // dangerous composition contexts (an `<img src>` attribute, unquoted CSS/SVG
+  // paint) where the template's quote-preserving escaping can't protect it.
+  // Reject injection-unsafe values up front, mirroring the brand-kit logoUrl gate.
+  const unsafeVar = findUnsafeCompositionVar(parsed.data.compositionVars);
+  if (unsafeVar) {
+    res.status(400).json({ error: unsafeVar.reason });
+    return;
+  }
+
   const [project] = await db
     .insert(projectsTable)
     .values({ ...parsed.data, userId: req.user.id })
@@ -171,6 +185,15 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  // Same compositionVars injection gate as POST /projects — a PATCH must not be
+  // able to smuggle an attribute-breakout logoUrl/image or a CSS url() color past
+  // the render template's quote-preserving escaping.
+  const unsafeVar = findUnsafeCompositionVar(parsed.data.compositionVars);
+  if (unsafeVar) {
+    res.status(400).json({ error: unsafeVar.reason });
+    return;
+  }
+
   const [existing] = await db
     .select({ userId: projectsTable.userId })
     .from(projectsTable)
@@ -222,6 +245,13 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  // Deleting the project also prunes its render_jobs ledger rows: the
+  // render_jobs.project_id → projects.id FK is ON DELETE CASCADE (see
+  // lib/db/src/schema/render.ts), so the DB removes them in the same statement.
+  // This keeps the ledger from accumulating orphans (it is scanned on every
+  // distributed-quota check and boot recovery). NOTE: the cascade only exists
+  // once the new FK is applied via `pnpm --filter @workspace/db run push`
+  // (manual on prod); until then deletes leave render_jobs rows behind.
   await db.delete(projectsTable).where(eq(projectsTable.id, params.data.id));
 
   res.sendStatus(204);
@@ -416,6 +446,9 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
         .update(projectsTable)
         .set({ status: project.status })
         .where(eq(projectsTable.id, id));
+      // Refund the render charged just above: this attempt produced no output.
+      // No-op for Pro (never charged). Best-effort — never mask the 403.
+      await decrementRenderCount(req.user.id).catch(() => undefined);
       res.status(403).json({
         error: e.message ?? "Upgrade required",
         reason: "upgrade_required",
@@ -426,18 +459,36 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
   }
 
   // Open a render-job ledger row before enqueueing so the pipeline has an id to
-  // advance through queued → rendering → ready/failed/cancelled.
-  const renderJobId = await createRenderJobRow({
-    projectId: id,
-    userId: req.user.id,
-    backend: isQueueEnabled() ? "bullmq" : "inline",
-    config: settings,
-    format: settings.format,
-  });
+  // advance through queued → rendering → ready/failed/cancelled. If the INSERT
+  // fails (e.g. the render_jobs table is missing), release the claim back to the
+  // prior status so the project is never stranded in "rendering", then 503.
+  let renderJobId: string;
+  try {
+    renderJobId = await createRenderJobRow({
+      projectId: id,
+      userId: req.user.id,
+      backend: isQueueEnabled() ? "bullmq" : "inline",
+      config: settings,
+      format: settings.format,
+    });
+  } catch (err) {
+    await db
+      .update(projectsTable)
+      .set({ status: project.status })
+      .where(eq(projectsTable.id, id));
+    // Refund the render charged above: no ledger row, so nothing will ever run
+    // or produce output. No-op for Pro; best-effort so it never masks the 503.
+    await decrementRenderCount(req.user.id).catch(() => undefined);
+    req.log.error({ projectId: id, err }, "Failed to open render-job ledger row");
+    res
+      .status(503)
+      .json({ error: "Could not start render. Please try again." });
+    return;
+  }
 
   // Durable enqueue when REDIS_URL is set; inline fire-and-forget otherwise.
   // If enqueue fails, release the claim so the project isn't stranded in
-  // "rendering" and mark the ledger row failed.
+  // "rendering" and resolve the just-opened ledger row.
   try {
     await enqueueRender(id, project.module, project.templateId, renderJobId, plan);
   } catch (err) {
@@ -445,10 +496,27 @@ router.post("/projects/:id/render", async (req, res): Promise<void> => {
       .update(projectsTable)
       .set({ status: project.status })
       .where(eq(projectsTable.id, id));
+    // RenderAlreadyActiveError is transient, not a failure: the PREVIOUS render
+    // of this project is still finishing (its BullMQ job lock is held), so this
+    // attempt was never queued. Release the claim, mark this attempt's ledger
+    // row cancelled (it never ran), and 409 so the client retries shortly —
+    // exactly like losing the atomic claim. The burned quota increment is the
+    // accepted cost of a near-simultaneous double render (rare; the previous
+    // render still completes).
+    if (err instanceof RenderAlreadyActiveError) {
+      await markCancelled(renderJobId).catch(() => undefined);
+      res.status(409).json({ error: "Render already in progress" });
+      return;
+    }
     await markFailed(
       renderJobId,
       err instanceof Error ? err.message : String(err),
     ).catch(() => undefined);
+    // Refund the render charged above: the enqueue failed, so the job never ran
+    // and produced no output. (RenderAlreadyActiveError above intentionally keeps
+    // the charge — the PREVIOUS render is still finishing and will produce one.)
+    // No-op for Pro; best-effort so it never masks the 503.
+    await decrementRenderCount(req.user.id).catch(() => undefined);
     req.log.error({ projectId: id, err }, "Failed to enqueue render");
     res.status(503).json({ error: "Could not start render. Please try again." });
     return;

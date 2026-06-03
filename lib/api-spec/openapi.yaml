@@ -737,6 +737,12 @@ paths:
           description: Bad request
         "401":
           description: Unauthorized
+        "409":
+          description: Already subscribed — an active Pro subscription exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /billing/portal:
     post:
@@ -798,6 +804,56 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "500":
           description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /storage/uploads/finalize:
+    put:
+      tags: [Storage]
+      operationId: finalizeUpload
+      summary: Stamp the owner ACL on a freshly uploaded object
+      description: |
+        Second half of the two-phase upload. After PUTting the file bytes to the
+        presigned URL from `request-url`, call this with the returned
+        `objectPath` to record the per-object owner ACL. The owner is the
+        authenticated caller (clients cannot choose it) and visibility is forced
+        to private. Until an upload is finalized the object has no ACL and the
+        object-serving route refuses to return it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeUploadRequest"
+      responses:
+        "200":
+          description: Owner ACL recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizeUploadResult"
+        "400":
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Object not found (never uploaded, or forged path).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to finalize upload.
           content:
             application/json:
               schema:
@@ -1194,18 +1250,19 @@ components:
             type: string
 
     ProjectUpdate:
+      # User-editable project fields only. Server-managed lifecycle/denormalized
+      # render state (status, videoUrl, thumbnailUrl, renderError, duration) is
+      # deliberately NOT here: the render state machine — atomic claim, worker,
+      # cancel, and recoverStuckRenders — is the only writer of those columns. A
+      # generic PATCH that set status:'rendering' would strand the next render
+      # (409 "already in progress"), and flipping failed→ready would advertise a
+      # video that does not exist. Render config lives behind the dedicated,
+      # Pro-gated PATCH /projects/{id}/render-settings.
       type: object
       properties:
         name:
           type: string
         description:
-          type: string
-        status:
-          type: string
-          enum: [draft, rendering, ready, failed]
-        thumbnailUrl:
-          type: string
-        videoUrl:
           type: string
         compositionVars:
           type: object
@@ -1500,6 +1557,22 @@ components:
           description: Normalized object path (e.g. /objects/uploads/uuid). Store this in your database.
         metadata:
           $ref: "#/components/schemas/UploadUrlRequest"
+
+    FinalizeUploadRequest:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
+          description: The objectPath (or raw GCS upload URL) returned by request-url.
+    FinalizeUploadResult:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+          description: Normalized object path now owned by the caller (e.g. /objects/uploads/uuid).
 
     PlatformStats:
       type: object

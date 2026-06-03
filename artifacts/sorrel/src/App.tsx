@@ -1,5 +1,5 @@
 import { type ComponentType } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,7 +24,10 @@ import Bulk from "./pages/bulk";
 import Analytics from "./pages/analytics";
 import Collab from "./pages/collab";
 import Settings from "./pages/settings";
+import Terms from "./pages/terms";
+import Privacy from "./pages/privacy";
 import NotFound from "./pages/not-found";
+import { CookieConsent } from "@/components/cookie-consent";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +44,7 @@ function ProtectedRoute({
   component: ComponentType;
 }) {
   const { isAuthenticated, isLoading, login } = useAuth();
+  const [location] = useLocation();
 
   if (isLoading) {
     return (
@@ -53,7 +57,8 @@ function ProtectedRoute({
   }
 
   if (!isAuthenticated) {
-    login();
+    // Preserve the attempted deep link so login bounces back here afterward.
+    login(location);
     return null;
   }
 
@@ -71,6 +76,8 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/email-verified" component={EmailVerified} />
       <Route path="/check-your-email" component={CheckYourEmail} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
       <Route path="/dashboard">
         <ProtectedRoute component={Dashboard} />
       </Route>
@@ -115,6 +122,7 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
+          <CookieConsent />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

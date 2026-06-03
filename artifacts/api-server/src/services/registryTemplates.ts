@@ -5,6 +5,7 @@
 // build time, so there is no runtime file read. Both renderService (composition
 // map) and the platform-template seed read from here, making the manifest the
 // single source of truth.
+import type { CompositionVariable } from "@hyperframes/core";
 import type { RenderResolution } from "@workspace/db";
 import manifest from "../compositions/registry-templates.generated.json";
 
@@ -20,9 +21,32 @@ export interface RegistryTemplate {
   width: number;
   height: number;
   tags: string[];
+  /**
+   * Self-hosted gallery poster: a first-frame PNG rendered FROM this
+   * composition (scripts/generate-thumbnails.mjs) and served by the api-server
+   * at `/api/templates/thumbnails/<slug>.png`. seedPlatformTemplates persists
+   * this onto the template row. Replaces the dependency on HeyGen's CDN.
+   */
   thumbnailUrl: string;
+  /**
+   * The original `static.heygen.ai` CDN poster URL from the registry, kept as a
+   * documented fallback. NOT fetched at runtime — `thumbnailUrl` (self-hosted)
+   * is authoritative; this only records provenance / a manual recovery path.
+   */
+  cdnThumbnailUrl?: string;
   /** Upstream registry block URL, for attribution. */
   source: string;
+  /**
+   * Native Hyperframes typed-variable declarations (`CompositionVariable[]`),
+   * mirroring the `data-composition-variables` JSON baked into the composition's
+   * `<html>`. Present only for templates that expose editable content this way
+   * (currently `data-chart`); undefined for the rest. TYPE-ONLY surface for now
+   * — a future Studio form reads each entry's `type`/`label`/`default` to render
+   * the right control. The render path doesn't consume this (it forwards
+   * `compositionVars` to `config.variables`, which the engine merges over the
+   * HTML-declared defaults); this is purely the manifest's typed view of them.
+   */
+  variables?: CompositionVariable[];
 }
 
 export const REGISTRY_TEMPLATES: RegistryTemplate[] =

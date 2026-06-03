@@ -25,6 +25,23 @@ export const stripeSubscriptionsTable = pgTable(
     currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    /**
+     * Logical timestamp of the most recent webhook event applied to this row
+     * (the originating `event.created`). Used for monotonicity: Stripe neither
+     * guarantees delivery order nor exactly-once (it retries for up to 3 days),
+     * so a write whose event is OLDER than what we already applied is skipped —
+     * otherwise a late `updated(active)` could revive a canceled sub, or a late
+     * `deleted` could revoke a paying one. Null on legacy rows → first write wins.
+     */
+    eventTs: timestamp("event_ts", { withTimezone: true }),
+    /**
+     * Set when a `customer.subscription.deleted` tombstones this row (status is
+     * also flipped to 'canceled'). A non-null value is TERMINAL: a subsequently
+     * delivered (but logically older) `updated` event must NOT resurrect the
+     * subscription. Stripe never reuses a deleted subscription id — resubscribing
+     * mints a new one — so reviving this id is always wrong.
+     */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -39,3 +56,24 @@ export const stripeSubscriptionsTable = pgTable(
 
 export type StripeSubscription = typeof stripeSubscriptionsTable.$inferSelect;
 export type NewStripeSubscription = typeof stripeSubscriptionsTable.$inferInsert;
+
+/**
+ * Idempotency ledger for processed Stripe webhook events. Stripe may deliver
+ * the same event id more than once (at-least-once delivery + up to 3 days of
+ * retries); recording each handled `event.id` lets `processWebhook` no-op a
+ * replay instead of re-applying it. One row per event, PK on the event id.
+ *
+ * Never hand-edit; rows are written by the webhook handler after a successful
+ * dispatch.
+ */
+export const processedStripeEventsTable = pgTable("processed_stripe_events", {
+  id: varchar("id").primaryKey(),
+  processedAt: timestamp("processed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type ProcessedStripeEvent =
+  typeof processedStripeEventsTable.$inferSelect;
+export type NewProcessedStripeEvent =
+  typeof processedStripeEventsTable.$inferInsert;

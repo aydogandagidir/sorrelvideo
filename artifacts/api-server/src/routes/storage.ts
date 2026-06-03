@@ -1,10 +1,13 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import {
+  FinalizeUploadBody,
+  FinalizeUploadResponse,
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { ObjectPermission } from "../lib/objectAcl";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -44,6 +47,51 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   } catch (error) {
     req.log.error({ err: error }, "Error generating upload URL");
     res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+/**
+ * PUT /storage/uploads/finalize
+ *
+ * Stamp the per-object owner ACL after the client has PUT the file bytes to the
+ * presigned URL returned by `request-url`. This is the second half of the
+ * two-phase upload: the object does not exist at `request-url` time, so its ACL
+ * (which `GET /storage/objects/*` enforces) can only be written here, once the
+ * bytes have landed.
+ *
+ * The owner is always the authenticated caller — the client cannot pick an
+ * owner — and visibility is forced to `private`. Without this step the object
+ * has no ACL policy and is unreadable (the read route fails closed), so callers
+ * MUST finalize an upload before the file can be served back.
+ */
+router.put("/storage/uploads/finalize", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const parsed = FinalizeUploadBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Missing or invalid required fields" });
+    return;
+  }
+
+  try {
+    const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+      parsed.data.objectPath,
+      { owner: req.user.id, visibility: "private" },
+    );
+
+    res.json(FinalizeUploadResponse.parse({ objectPath }));
+  } catch (error) {
+    if (error instanceof ObjectNotFoundError) {
+      // The client claimed an upload that does not exist (never PUT, or a forged
+      // path). Don't leak which it is.
+      res.status(404).json({ error: "Object not found" });
+      return;
+    }
+    req.log.error({ err: error }, "Error finalizing upload");
+    res.status(500).json({ error: "Failed to finalize upload" });
   }
 });
 
@@ -88,31 +136,43 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 /**
  * GET /storage/objects/*
  *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * These are served from a separate path from /public-objects and can optionally
- * be protected with authentication or ACL checks based on the use case.
+ * Serve a private object entity from PRIVATE_OBJECT_DIR.
+ *
+ * These files are per-tenant private uploads, addressed by an unguessable UUID
+ * path. The UUID is NOT an authorization boundary — anyone who learns the path
+ * (logs, referrer headers, a leaked link) could otherwise read the object. So
+ * the route is gated twice:
+ *
+ *   1. Authentication — `req.isAuthenticated()` (401 otherwise).
+ *   2. Per-object ownership — `canAccessObjectEntity` reads the object's stored
+ *      ACL policy and only returns true for the owner, a matching ACL rule, or a
+ *      `public`-visibility READ. Objects with NO ACL policy fail closed (403),
+ *      so a file can never be served cross-tenant just because its path leaked.
+ *
+ * Owner ACLs are stamped by `PUT /storage/uploads/finalize` after the client
+ * has PUT the bytes to the presigned URL (see below).
  */
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
-    // --- Protected route example (uncomment to gate behind a logged-in user) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
+    const canAccess = await objectStorageService.canAccessObjectEntity({
+      userId: req.user.id,
+      objectFile,
+      requestedPermission: ObjectPermission.READ,
+    });
+    if (!canAccess) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
 
     const response = await objectStorageService.downloadObject(objectFile);
 

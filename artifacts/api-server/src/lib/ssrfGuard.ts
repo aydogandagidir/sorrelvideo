@@ -57,10 +57,93 @@ const BLOCKED_HOSTNAMES = new Set([
   "instance-data",
 ]);
 
+/**
+ * Canonicalize a non-canonical / packed IPv4 host to dotted-quad form.
+ *
+ * `net.isIP()` only recognizes the canonical dotted-decimal notation, so packed
+ * forms — decimal (`2130706433`), hex (`0x7f000001`), octal (`0177.0.0.1`), and
+ * the 1–3 "part" shorthands `inet_aton` accepts — return 0 and would otherwise
+ * skip the IP BlockList and fall through to `dns.lookup`, whose expansion of
+ * these forms is platform/libc-dependent (some resolvers happily reach
+ * loopback / 169.254.169.254). We reproduce the classic `inet_aton` grammar
+ * here so the result is checked against `blocked` deterministically, on every
+ * platform, before any DNS happens.
+ *
+ * Grammar: 1–4 dot-separated parts. Each part is hex (`0x`/`0X` prefix),
+ * octal (leading `0`), or decimal. The final part absorbs the remaining
+ * low-order bytes (e.g. `127.1` → `127.0.0.1`, `2130706433` → `127.0.0.1`).
+ *
+ * Returns the dotted-quad string; `null` when the host is plainly not a numeric
+ * IPv4 candidate (caller proceeds to hostname/DNS handling); or the
+ * `INVALID_NUMERIC_IPV4` sentinel when the host *is* numeric but out of range —
+ * the caller rejects that rather than letting a bogus packed integer reach DNS.
+ */
+const INVALID_NUMERIC_IPV4 = Symbol("invalid-numeric-ipv4");
+
+function canonicalizeNumericIpv4(host: string): string | typeof INVALID_NUMERIC_IPV4 | null {
+  const rawParts = host.split(".");
+  if (rawParts.length === 0 || rawParts.length > 4) return null;
+
+  // Parse each part per the inet_aton grammar (hex / octal / decimal). Track
+  // whether any part is non-canonical-decimal (hex prefix, leading-zero octal)
+  // so a plain dotted-decimal quad can be left untouched for net.isIP().
+  let looksNumeric = false;
+  const values: number[] = [];
+  for (const part of rawParts) {
+    if (part === "") return null; // empty label (e.g. trailing dot) → not our case
+    let value: number;
+    if (/^0[xX][0-9a-fA-F]+$/.test(part)) {
+      looksNumeric = true;
+      value = parseInt(part.slice(2), 16);
+    } else if (/^0[0-7]+$/.test(part)) {
+      looksNumeric = true;
+      value = parseInt(part.slice(1), 8);
+    } else if (/^[0-9]+$/.test(part)) {
+      value = parseInt(part, 10);
+    } else {
+      return null; // contains a letter / hostname char → not a numeric IPv4
+    }
+    if (!Number.isSafeInteger(value) || value < 0) return INVALID_NUMERIC_IPV4;
+    values.push(value);
+  }
+
+  // A plain dotted-decimal quad with every octet in range is already canonical;
+  // defer to net.isIP() so this helper only ever *adds* coverage. Everything
+  // else (any hex/octal part, or any <4-part shorthand) is packed below.
+  if (!looksNumeric && rawParts.length === 4 && values.every((v) => v <= 255)) {
+    return null;
+  }
+
+  // inet_aton packing: the last part fills the remaining low-order bytes; each
+  // earlier part is exactly one byte.
+  const n = values.length;
+  const octets = [0, 0, 0, 0];
+  for (let i = 0; i < n - 1; i++) {
+    if (values[i] > 255) return INVALID_NUMERIC_IPV4;
+    octets[i] = values[i];
+  }
+  const last = values[n - 1];
+  const remainingBytes = 4 - (n - 1);
+  const maxLast = remainingBytes === 4 ? 0xffffffff : Math.pow(256, remainingBytes) - 1;
+  if (last > maxLast) return INVALID_NUMERIC_IPV4;
+  for (let b = 0; b < remainingBytes; b++) {
+    octets[3 - b] = (last >>> (8 * b)) & 0xff;
+  }
+  return octets.join(".");
+}
+
 function isBlockedIp(ip: string): boolean {
-  // IPv4-mapped IPv6 (::ffff:10.0.0.1) — check the embedded IPv4 too.
-  const mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-  if (mapped && blocked.check(mapped[1], "ipv4")) return true;
+  // IPv4-mapped / -compatible IPv6 — check the embedded IPv4 too. Covers both
+  // the dotted form (::ffff:127.0.0.1) and the all-hex form (::ffff:7f00:1).
+  const mappedDotted = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (mappedDotted && blocked.check(mappedDotted[1], "ipv4")) return true;
+  const mappedHex = ip.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (mappedHex) {
+    const hi = parseInt(mappedHex[1], 16);
+    const lo = parseInt(mappedHex[2], 16);
+    const dotted = [(hi >>> 8) & 0xff, hi & 0xff, (lo >>> 8) & 0xff, lo & 0xff].join(".");
+    if (blocked.check(dotted, "ipv4")) return true;
+  }
   const family = net.isIPv6(ip) ? "ipv6" : "ipv4";
   return blocked.check(ip, family);
 }
@@ -91,9 +174,20 @@ export async function assertSafeUrl(raw: string): Promise<URL> {
     throw new SsrfError(`Host not allowed: ${host}`);
   }
 
+  // Canonicalize packed / non-canonical IPv4 (decimal, hex, octal, shorthand)
+  // BEFORE the BlockList check. net.isIP() returns 0 for these, so without this
+  // they would skip the IP checks and fall through to DNS — whose expansion is
+  // platform-dependent and may reach loopback / 169.254.169.254. After this,
+  // such a host is a dotted-quad caught deterministically by isBlockedIp().
+  const numericIpv4 = canonicalizeNumericIpv4(host);
+  if (numericIpv4 === INVALID_NUMERIC_IPV4) {
+    throw new SsrfError(`Host not allowed: ${host}`);
+  }
+  const effectiveHost = numericIpv4 ?? host;
+
   let addresses: string[];
-  if (net.isIP(host)) {
-    addresses = [host];
+  if (net.isIP(effectiveHost)) {
+    addresses = [effectiveHost];
   } else {
     try {
       addresses = (await dns.lookup(host, { all: true })).map((a) => a.address);

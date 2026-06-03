@@ -73,14 +73,96 @@ export async function getUserPlan(
   }
 }
 
+/**
+ * Apply the monthly rollover reset for a user UNDER THE SAME ROW LOCK the
+ * increment helpers use, then return the (possibly reset) counters.
+ *
+ * Why a lock: `getBillingInfo` used to do an UNLOCKED `db.update(... = 0)` when
+ * the month had rolled over. That write raced the `FOR UPDATE` increment helpers
+ * — a GET /billing landing between a concurrent `checkAndIncrement*`'s SELECT and
+ * COMMIT could clobber a just-incremented count back to 0 (a free-usage leak).
+ * Taking the row lock here serializes the reset against those helpers, so the
+ * zeroing only ever happens when no increment is mid-flight, and `getBillingInfo`
+ * itself becomes read-only (it just consumes these values).
+ *
+ * The reset is conditional and idempotent: each counter is zeroed (and its
+ * reset-at cleared) only when its window has elapsed (`isNewMonth`). When nothing
+ * is due, no UPDATE runs and the committed transaction is a plain locked read.
+ */
+async function applyMonthlyResetLocked(userId: string): Promise<{
+  renderCount: number;
+  renderResetAt: Date | null;
+  aiCount: number;
+  aiResetAt: Date | null;
+}> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const lockResult = await client.query<{
+      render_count: number;
+      render_reset_at: Date | null;
+      ai_count: number;
+      ai_reset_at: Date | null;
+    }>(
+      `SELECT render_count, render_reset_at, ai_count, ai_reset_at
+         FROM users
+        WHERE id = $1
+          FOR UPDATE`,
+      [userId],
+    );
+
+    const row = lockResult.rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      throw new Error("User not found");
+    }
+
+    let renderCount = row.render_count;
+    let renderResetAt: Date | null = row.render_reset_at;
+    let aiCount = row.ai_count;
+    let aiResetAt: Date | null = row.ai_reset_at;
+
+    const sets: string[] = [];
+    const values: unknown[] = [];
+    if (isNewMonth(renderResetAt)) {
+      renderCount = 0;
+      renderResetAt = null;
+      sets.push(`render_count = 0`, `render_reset_at = NULL`);
+    }
+    if (isNewMonth(aiResetAt)) {
+      aiCount = 0;
+      aiResetAt = null;
+      sets.push(`ai_count = 0`, `ai_reset_at = NULL`);
+    }
+    if (sets.length > 0) {
+      values.push(userId);
+      await client.query(
+        `UPDATE users SET ${sets.join(", ")} WHERE id = $1`,
+        values,
+      );
+    }
+
+    await client.query("COMMIT");
+    return { renderCount, renderResetAt, aiCount, aiResetAt };
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 /** Returns billing info for a user.
  *
  * If the monthly period has rolled over, the counter is reset in the DB so
  * that the next call (and the render-count check) see a consistent zero value.
+ * The reset runs under the same row lock as the increment helpers
+ * (`applyMonthlyResetLocked`), so it can't clobber a concurrent increment.
  */
 export async function getBillingInfo(userId: string): Promise<BillingInfo> {
   const [user] = await db
-    .select()
+    .select({ stripeCustomerId: usersTable.stripeCustomerId })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
 
@@ -88,27 +170,9 @@ export async function getBillingInfo(userId: string): Promise<BillingInfo> {
 
   const plan = await getUserPlan(user.stripeCustomerId);
 
-  let renderCount = user.renderCount;
-  let renderResetAt = user.renderResetAt;
-  let aiCount = user.aiCount;
-  let aiResetAt = user.aiResetAt;
-
-  const updates: Partial<typeof usersTable.$inferInsert> = {};
-  if (isNewMonth(renderResetAt)) {
-    renderCount = 0;
-    renderResetAt = null;
-    updates.renderCount = 0;
-    updates.renderResetAt = null;
-  }
-  if (isNewMonth(aiResetAt)) {
-    aiCount = 0;
-    aiResetAt = null;
-    updates.aiCount = 0;
-    updates.aiResetAt = null;
-  }
-  if (Object.keys(updates).length > 0) {
-    await db.update(usersTable).set(updates).where(eq(usersTable.id, userId));
-  }
+  // Locked, idempotent monthly rollover; returns the live (post-reset) counters.
+  const { renderCount, renderResetAt, aiCount, aiResetAt } =
+    await applyMonthlyResetLocked(userId);
 
   return {
     plan,
@@ -205,6 +269,76 @@ export async function checkAndIncrementRenderCount(
           SET render_count = $1, render_reset_at = $2
         WHERE id = $3`,
       [renderCount + 1, renderResetAt, userId],
+    );
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * REFUND one render against a Free user's monthly quota.
+ *
+ * `checkAndIncrementRenderCount` is charged at render-CLAIM time (so the count
+ * guards concurrency), but a render that never produces output — the
+ * `executeRender` failure path, or a post-claim release (render-settings re-gate
+ * rejection, ledger-row insert failure, enqueue failure) — would otherwise burn
+ * that Free render permanently. This gives it back.
+ *
+ * Discipline mirrors the increment helper (pg `FOR UPDATE` row lock) so a refund
+ * can't race a concurrent increment/reset. Two guards keep it safe:
+ *   - FLOORED AT 0 — never drive the count negative (defends against a double
+ *     refund or a refund with nothing charged).
+ *   - CURRENT-MONTH WINDOW ONLY — if the period has already rolled over
+ *     (`isNewMonth(render_reset_at)`), the charge being refunded belonged to an
+ *     expired window that the next read/increment will zero anyway, so refunding
+ *     would wrongly eat into the fresh month's allowance. In that case it's a
+ *     no-op.
+ *
+ * Pro users are never charged (the increment is skipped), so a refund is a
+ * harmless no-op for them — `render_count` stays 0, floored. Best-effort by
+ * design: callers invoke it on an error path and should not let a refund failure
+ * mask the original error.
+ */
+export async function decrementRenderCount(userId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const lockResult = await client.query<{
+      render_count: number;
+      render_reset_at: Date | null;
+    }>(
+      `SELECT render_count, render_reset_at
+         FROM users
+        WHERE id = $1
+          FOR UPDATE`,
+      [userId],
+    );
+
+    const row = lockResult.rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      return;
+    }
+
+    // Only refund a charge that belongs to the CURRENT window. A rolled-over
+    // window resets to 0 on the next read anyway; decrementing here would steal
+    // from next month's allowance.
+    if (isNewMonth(row.render_reset_at) || row.render_count <= 0) {
+      await client.query("COMMIT");
+      return;
+    }
+
+    await client.query(
+      `UPDATE users
+          SET render_count = render_count - 1
+        WHERE id = $1`,
+      [userId],
     );
 
     await client.query("COMMIT");

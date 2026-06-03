@@ -202,7 +202,7 @@
 
       const tl = gsap.timeline({ paused: true });
 
-      tl.set(typedEl, { text: "" }, 0);
+      typedEl.textContent = "";
 
       const charDuration = 1.5 / command.length;
       command.split("").forEach((char, i) => {

@@ -52,10 +52,11 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `AI_PROVIDER`                                                   | api-server (AI suggest)                 | `anthropic` (default) or `openai`. Picks which provider `lib/ai` routes calls to.                |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`                         | api-server (when AI_PROVIDER=anthropic) | API key + optional model override (defaults to `claude-haiku-4-5`).                              |
 | `OPENAI_API_KEY` / `OPENAI_MODEL`                               | api-server (when AI_PROVIDER=openai)    | API key + optional model override (defaults to `gpt-4o-mini`).                                   |
-| `SENTRY_DSN` / `VITE_SENTRY_DSN`                                | api-server / sorrel (optional)          | Sentry error tracking. Init is a no-op when unset, app still runs.                               |
-| `SENTRY_TRACES_SAMPLE_RATE`                                     | api-server / sorrel (optional)          | Sentry trace sampling — defaults to `0.1` (10 %).                                                |
-| `LOGTAIL_SOURCE_TOKEN`                                          | api-server (optional)                   | Better Stack / Logtail log sink. Logs ship to stdout regardless; this just adds a remote target. |
-| `GIT_SHA`                                                       | api-server (optional, set by CI)        | Pinned to `github.event.workflow_run.head_sha`; surfaces as the `release` tag in Sentry events.  |
+| `SENTRY_DSN`                                                    | api-server (optional)                   | Backend Sentry error tracking (runtime). Init is a no-op when unset, app still runs.             |
+| `VITE_SENTRY_DSN` / `VITE_SENTRY_TRACES_SAMPLE_RATE`           | sorrel (optional, **build-time**)       | Frontend Sentry. Vite inlines `import.meta.env.VITE_*` at build → must be a Docker build ARG (Railway injects matching service vars). Unset → browser SDK no-ops. |
+| `SENTRY_TRACES_SAMPLE_RATE`                                     | api-server (optional)                   | Backend Sentry trace sampling — defaults to `0.1` (10 %).                                        |
+| `LOG_LEVEL`                                                     | api-server (optional)                   | Pino level (default `info`). Logs are JSON on stdout; ship them off Railway with a **log drain**, not an in-process transport. |
+| `GIT_SHA` / `VITE_GIT_SHA`                                      | api-server / sorrel (optional, set by CI) | `deploy.yml` pins both to `github.event.workflow_run.head_sha`; surface as the `release` tag in backend / frontend Sentry events (`VITE_GIT_SHA` is a build ARG). |
 
 ## Stack
 
@@ -122,6 +123,24 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
   existing row) so a fresh environment's gallery is never empty. Re-run the
   importer with more slugs to grow the library; a project's `module` is the
   template slug, so no enum/migration is needed to add one.
+- **Self-hosted gallery thumbnails**: each template's gallery poster is a
+  first-frame PNG rendered FROM its own composition (`scripts/generate-thumbnails.mjs`
+  picks the richest frame across 40–95 % of the duration — blank early frames
+  compress tiny — and flattens onto a neutral bg), committed under
+  `compositions/thumbnails/<slug>.png` and served by the **allow-listed**
+  `GET /api/templates/thumbnails/:slug` (public, brand-neutral, `:slug` matched
+  against the manifest so it can't traverse). This replaces the runtime dependency
+  on HeyGen's `static.heygen.ai` CDN; the original CDN URL is kept per-template as
+  `cdnThumbnailUrl` (a documented fallback, never fetched).
+- **Parametric templates** (`data-chart` is the first): editable content uses the
+  engine's **native typed-variable** pipeline — a `data-composition-variables` JSON
+  on `<html>` declares typed scalars (`CompositionVariable`: string|number|color|
+  boolean|enum), read at runtime via `getVariables()` with defaults equal to the
+  authored literals (so a no-vars render is byte-identical — sha256-proven). The
+  manifest carries a `variables?` field per template for a future Studio form. The
+  render path forwards `compositionVars` to `config.variables`, which the engine
+  merges over the HTML-declared defaults (the typed schema has no array type, so
+  list-valued series stay code-side defaults overridable via `compositionVars`).
 - **Direct Express video streaming**: `GET /api/projects/:id/video` streams
   from `artifacts/api-server/renders/<projectId>/output.mp4`. There is no CDN yet.
 - **OpenAPI-driven contracts**: edit `openapi.yaml`, run codegen, then implement
@@ -137,6 +156,25 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
   (`POST /projects/:id/render`).
 - **Auth**: cookie + bearer-token sessions; Argon2id password hashes; sessions
   stored in `sessions` table with 7-day TTL. Provider-agnostic frontend hook.
+- **Security hardening baseline** (enforced app-wide, regression-tested): `app.ts`
+  sets `trust proxy = 1` (Railway runs one proxy hop — without it every IP-keyed
+  `express-rate-limit` collapses to a single global bucket) and mounts `helmet`
+  early for `nosniff` / `frameguard: SAMEORIGIN` (the same-origin
+  `<hyperframes-player>` iframe + `/editor` mount must stay framable) /
+  `Referrer-Policy` / HSTS-in-prod. helmet's **CSP is deliberately disabled** — a
+  strict default CSP white-screens the SPA (inline styles) and breaks renders
+  (compositions load CDN GSAP/D3 + inline scripts); a tailored CSP is tracked
+  follow-up. Private object reads (`GET /api/storage/objects/*`) are **auth-gated +
+  per-object owner-ACL'd** (`canAccessObjectEntity`; objects with no ACL fail
+  closed) — the UUID path is never an authorization boundary; uploads are a 2-phase
+  flow (`request-url` → client PUT → `PUT /storage/uploads/finalize` stamps
+  `owner = req.user.id, visibility = private`). All untrusted text that lands in a
+  composition is validated server-side at the write path: `lib/compositionVars.ts`
+  (`findUnsafeCompositionVar` in routes, `assertSafeCompositionVars` in services)
+  runs every `compositionVars` value that resolves into a URL/attribute/color
+  context through `isSafeLogoUrl` / a strict color pattern — because
+  `renderCompositionTemplate`'s `escapeMarkup` does **not** escape quotes (it can't:
+  `brand.fontFamily` is `'Inter'`, single-quoted, used in CSS).
 
 ## Development workflow
 
@@ -188,6 +226,10 @@ unverified, and `/api/auth/resend-verification` can re-send the link.
 avoid email enumeration. If the email matches a user, a token (30-minute
 TTL, single-use, stored as HMAC hash in `password_resets`) is mailed. The
 user posts the token + new password to `/api/auth/reset-password`.
+Consuming it **invalidates every existing session for that user**
+(`deleteSessionsForUser`, backed by the `IDX_session_user` expression index)
+— a reset must lock out an attacker who already has a live session, so a
+stale session can't survive the password change for the 7-day TTL.
 
 **Rate limiting** (`express-rate-limit`, in-memory): `/api/auth/login` 5/15min
 per IP+email, `/api/auth/signup` 3/hour per IP, `/api/auth/forgot-password`
@@ -249,6 +291,14 @@ navigate to a raw `503` JSON body). The callback exchanges the code via
 - Else create a new user. Email coming from the provider counts as
   verified — `users.emailVerifiedAt` is set immediately.
 
+**Only a verified provider email is ever trusted for the email-match link**
+(step 2) — otherwise it is account-takeover. GitHub's `/user` profile `email`
+field is **not** required to be verified, so it is deliberately ignored; the
+email is resolved solely from `/user/emails`, accepting only the entry that is
+both `primary` AND `verified` (else the user signs in email-less and won't
+auto-link). Google gates on `email_verified`. A GitHub user could otherwise set
+their profile email to a victim's address and link into the victim's account.
+
 The OAuth identity row lives in `oauth_accounts`. No provider tokens are
 stored; we only need the identity for sign-in.
 
@@ -277,6 +327,15 @@ screenshot → outro CTA).
 - `websiteCaptureLimiter` (5 / 15 min) — Chrome capture is expensive. `SsrfError`
   → 400, `WebsiteCaptureError` → 502.
 
+**Chrome binary**: `captureWebsite` uses the full `puppeteer` package, whose
+downloaded Chrome lands in `~/.cache/puppeteer` — which the Docker runtime image
+does NOT copy (only `node_modules`). So it resolves `executablePath` from
+`CAPTURE_CHROME_PATH ?? PUPPETEER_EXECUTABLE_PATH ?? PRODUCER_HEADLESS_SHELL_PATH`
+(the image sets the latter two to `/usr/bin/chromium`), falling back to
+`undefined` (puppeteer's cache) for local dev. Without this the capture 502s in
+prod while normal renders still work — they go through the engine, which already
+reads `PRODUCER_HEADLESS_SHELL_PATH`.
+
 **`CAPTURE_NO_SANDBOX`**: Chrome's sandbox is ON by default (untrusted pages).
 Set `=true` ONLY on container hosts that can't start a sandboxed Chrome (root /
 no user namespaces). The captured screenshot is currently embedded as a data URI
@@ -291,9 +350,22 @@ no user namespaces). The captured screenshot is currently embedded as a data URI
   `'pro'` if any row has `status IN ('active', 'trialing')`, else `'free'`
 - The webhook URL must be registered manually in the Stripe Dashboard at
   `${APP_URL}/api/billing/webhook` and `STRIPE_WEBHOOK_SECRET` must be set
-- `applyBillingMigration()` runs on startup; it only ensures billing columns
-  exist on `users` (idempotent). The `stripe_subscriptions` table comes from
-  Drizzle schema push
+- **Webhook idempotency + ordering** (`webhookHandlers.ts`): Stripe delivery is
+  at-least-once and unordered (retries up to 3 days), so the cache is guarded two
+  ways. (1) Idempotency — each handled `event.id` is recorded in
+  `processed_stripe_events`; a replay no-ops (route still 200s so Stripe stops
+  retrying). (2) Monotonicity — `upsert/deleteSubscription` compare the incoming
+  `event.created` against the row's stored `event_ts` watermark and **skip
+  logically-older writes**, and `customer.subscription.deleted` is a **terminal
+  tombstone** (`status = 'canceled'` + `deleted_at`, never overwritten) — so a
+  late `deleted` can't be undone by an older `updated(active)` (revenue leak) and
+  the inverse can't revoke a paying customer. `POST /billing/checkout` also
+  pre-checks `getUserPlan` and 409s an already-Pro user (no duplicate charges).
+- `applyBillingMigration()` runs on startup; it idempotently ensures billing
+  columns on `users`, the `stripe_subscriptions` ordering columns
+  (`event_ts`, `deleted_at`), and the `processed_stripe_events` table exist
+  (`ADD COLUMN / CREATE TABLE IF NOT EXISTS`) — so a fresh boot self-heals. The
+  `stripe_subscriptions` table itself still comes from Drizzle schema push
 - `users.plan` and `users.stripeSubscriptionId` are reserved schema columns;
   never use them as the source of truth
 - **Render-settings capability matrix**: the Free floor reproduces today's render
@@ -346,6 +418,32 @@ no user namespaces). The captured screenshot is currently embedded as a data URI
   `toEngineConfig(resolveSettings(...), entryFile)`. The previously hardcoded
   `{ fps: {num:30,den:1}, quality: "draft" }` is gone. `enqueueRender` / `executeRender`
   thread a `renderJobId` through both the inline and BullMQ paths.
+- **Watermark + transparency actually take effect** (they were gated/billed but no-ops
+  before): when resolved `settings.watermark` is true (always true for Free — the
+  monetization lever — removable on Pro), `injectWatermark()` burns a static, fixed
+  bottom-right "Made with Sorrel" pill (`data-sorrel-watermark`) into the per-project
+  `composition.html` just before `</body>`, AFTER template substitution so it's never
+  escaped/substituted and always wins the stacking context. Transparency is
+  **format-derived**: `settings.transparent` maps to an alpha-capable format (webm
+  VP9-alpha / mov ProRes4444 / png-sequence RGBA) — the `transparent` flag itself is a
+  no-op at the engine-config level by design. Engine constraint: alpha output and a
+  resolution/DPR upscale are mutually exclusive (`resolveDeviceScaleFactor` throws), so a
+  `transparent` render is emitted at the composition's authored resolution and a `-4k`
+  preset is effectively ignored — the editor should disable 4K when transparent is on.
+  NOTE: the watermark is burned only on the RENDER path, not the live-preview
+  `GET /:id/composition` route (preview stays clean — intentional).
+- **Cancel now genuinely aborts** an in-flight render (it was documented-but-false):
+  `executeRender` creates an `AbortController`, passes `ac.signal` to `executeRenderJob`,
+  and the progress callback polls `isCancelRequested(renderJobId)` → `ac.abort()`. The
+  `RenderCancelledError` catch maps to project `draft` + `markCancelled` (not `failed`).
+  Cancel does NOT refund the already-incremented quota (anti-abuse).
+- **`render_jobs` boot migration + claim safety**: `applyRenderJobsMigration()` (idempotent
+  `CREATE TABLE IF NOT EXISTS`, deliberately FK-free so a missing prod `db push` never
+  hard-fails boot) runs alongside `applyBillingMigration()`; the ledger INSERT sits inside
+  a try/catch that **releases the `rendering` claim and 503s** on failure (a failed ledger
+  never strands a project). On the Redis path, a re-render fired while a prior job is still
+  finishing throws `RenderAlreadyActiveError` → 409 instead of silently dropping the
+  re-add (which would strand the project in `rendering`).
 - **`render_jobs` ledger**: a per-attempt audit table (`lib/db/src/schema/render.ts`,
   row type `RenderJobRow`) distinct from the project's own `status`/`renderError`. One
   row per render attempt: `id` (uuid — doubles as a queue correlation id, so non-numeric
@@ -366,7 +464,13 @@ no user namespaces). The captured screenshot is currently embedded as a data URI
 ## Known gotchas
 
 - Run `pnpm --filter @workspace/db run push` after every schema change before
-  restarting the API server
+  restarting the API server. **Outstanding pushes from recent work**: the
+  `IDX_session_user` session index, the `stripe_subscriptions` ordering columns +
+  `processed_stripe_events` table, and the four tenant **cascade FKs**
+  (`projects.userId`, `brand_kit.userId`, `render_jobs.userId`+`projectId`).
+  Boot migrations self-heal the billing/render_jobs tables, but the FKs + index
+  exist only via `db push`. **The FK push FAILS on prod if orphan rows already
+  exist** (a tenant row whose parent was deleted) — clean those up first, then push.
 - Run `pnpm --filter @workspace/api-spec run codegen` after every OpenAPI edit;
   generated files are committed
 - `@hyperframes/engine` ships TypeScript that needs `dom`, `dom.iterable` and
@@ -504,13 +608,20 @@ using a `RAILWAY_TOKEN` secret. Subsequent pushes auto-ship.
 **Observability**:
 
 - **Sentry** (`@sentry/node` + `@sentry/react`) — error tracking;
-  release tag pinned to the deploy commit's `GIT_SHA`. `beforeSend`
-  scrubs password / token fields from request bodies. No-op when
-  `SENTRY_DSN` is unset so local dev stays clean.
-- **Better Stack / Logtail** (`@logtail/pino`) — structured log sink
-  layered on top of Pino. Stdout always carries the logs (Railway
-  scrapes that too); the Logtail target is only attached when
-  `LOGTAIL_SOURCE_TOKEN` is present.
+  release tag pinned to the deploy commit's `GIT_SHA` (backend) /
+  `VITE_GIT_SHA` (frontend). `beforeSend` scrubs password / token fields
+  from request bodies. No-op when the DSN is unset so local dev stays
+  clean. The **frontend DSN is build-time**: Vite inlines
+  `import.meta.env.VITE_SENTRY_DSN` when the SPA is bundled inside the
+  Docker image, so the Dockerfile declares `VITE_SENTRY_DSN` /
+  `VITE_SENTRY_TRACES_SAMPLE_RATE` / `VITE_GIT_SHA` as build `ARG`s and
+  Railway forwards the matching service variables into the build.
+- **Logs** — structured JSON via Pino straight to **stdout** (Railway
+  captures it). `lib/logger.ts` reads only `LOG_LEVEL`; there is **no
+  in-process Logtail transport** and no `LOGTAIL_SOURCE_TOKEN`. To ship
+  logs to Better Stack / Logtail, attach a Railway native **log drain**
+  (Project → Settings → Log drains) — this avoids the fragile
+  worker-thread bundling a Pino transport needs under esbuild.
 
 **One-time setup** for every clean environment: see `DEPLOYMENT.md` —
 Stripe products + webhook, Resend domain verify, GCS bucket + service
@@ -532,8 +643,10 @@ Tracked here so it does not get rediscovered each time:
    follow-on is backing the in-memory `express-rate-limit` auth limiters with
    `rate-limit-redis` (reusing `REDIS_URL`) so they stay correct across more than
    one instance.
-2. **Legal pages**: static Terms / Privacy / cookie banner. Stripe +
-   any EU user makes this mandatory before broad launch.
+2. **Legal pages**: static `/terms` + `/privacy` routes (outside
+   `ProtectedRoute`) + a localStorage cookie-consent banner have **landed**, but
+   the copy is **DRAFT** — review with counsel before public launch. (Stripe +
+   any EU user makes published, accurate policies mandatory.)
 3. **End-to-end Playwright smoke test**: signup → Studio → render →
    mp4 served. Currently the only render-pipeline check is `pnpm run
 build`.

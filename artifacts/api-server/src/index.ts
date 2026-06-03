@@ -2,6 +2,7 @@ import { initSentry, setupSentryErrorHandler } from "./lib/sentry";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
+import { applyRenderJobsMigration } from "./lib/applyRenderJobsMigration";
 import { closeRenderQueue, startRenderWorker } from "./lib/renderQueue";
 import { recoverStuckRenders } from "./lib/recoverStuckRenders";
 import {
@@ -25,6 +26,24 @@ async function initBilling(): Promise<void> {
     await applyBillingMigration();
   } catch (err) {
     logger.warn({ err }, "Billing migration failed — payments may misbehave");
+  }
+}
+
+async function initRenderJobs(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    logger.warn("DATABASE_URL not set — skipping render-jobs migration");
+    return;
+  }
+
+  try {
+    await applyRenderJobsMigration();
+  } catch (err) {
+    // The render-jobs ledger row is created on every render; without the table
+    // each render 500s. Surface this loudly so a missed `db push` is obvious.
+    logger.warn(
+      { err },
+      "Render-jobs migration failed — renders may fail to start",
+    );
   }
 }
 
@@ -57,6 +76,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 await initBilling();
+await initRenderJobs();
 await initTemplates();
 
 // Boot the render worker before recovery so any jobs already persisted in Redis
@@ -88,12 +108,37 @@ const server = app.listen(port, (err) => {
 
 // Graceful shutdown: stop accepting connections, then drain the render worker
 // so an in-flight render finishes (or is requeued) before the process exits.
+//
+// `server.close` waits for ALL in-flight requests to finish, including a long
+// render or a held video-stream socket — which can outlast Railway's grace
+// window between SIGTERM and SIGKILL. A SIGKILL mid-shutdown leaves a project
+// stranded in "rendering" (only recovered on the next boot). So we arm a bounded
+// forced-exit timer alongside the graceful path: whichever fires first wins. The
+// timer is `.unref()`'d so it never keeps the process alive on its own when the
+// graceful close already completed.
+const FORCED_EXIT_MS = 25_000;
+let shuttingDown = false;
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
+    if (shuttingDown) return; // ignore a second signal during shutdown
+    shuttingDown = true;
     logger.info({ signal }, "Shutting down");
     stopLambdaProgressPoller();
+
+    const forceExit = setTimeout(() => {
+      logger.error(
+        { timeoutMs: FORCED_EXIT_MS },
+        "Graceful shutdown timed out — forcing exit",
+      );
+      process.exit(1);
+    }, FORCED_EXIT_MS);
+    forceExit.unref();
+
     server.close(() => {
-      void closeRenderQueue().finally(() => process.exit(0));
+      void closeRenderQueue().finally(() => {
+        clearTimeout(forceExit);
+        process.exit(0);
+      });
     });
   });
 }

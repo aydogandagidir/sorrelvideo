@@ -51,15 +51,23 @@ function PlanBadge() {
   }
 
   return (
-    <div className="px-4 pb-2">
+    <div className="px-4 pb-2 flex flex-wrap items-center gap-1.5">
       <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
         Free
         {billing.renderLimit != null && (
           <span className="ml-1 opacity-70">
-            · {billing.renderCount}/{billing.renderLimit}
+            · {billing.renderCount}/{billing.renderLimit} renders
           </span>
         )}
       </span>
+      {billing.aiLimit != null && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+          AI
+          <span className="ml-0.5 opacity-70">
+            {billing.aiCount}/{billing.aiLimit}
+          </span>
+        </span>
+      )}
     </div>
   );
 }

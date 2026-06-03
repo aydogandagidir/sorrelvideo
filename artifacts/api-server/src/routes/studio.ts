@@ -58,14 +58,17 @@ import {
   resolveSettings,
   assertRenderSettingsAllowed,
 } from "../services/renderSettingsService";
+import { buildCompositionHtml } from "../services/renderService";
 import {
   enqueueRender,
   isQueueEnabled,
   removeQueuedRender,
+  RenderAlreadyActiveError,
 } from "../lib/renderQueue";
 import {
   createRenderJob,
   markFailed,
+  markCancelled,
   requestCancel,
 } from "../services/renderJobsService";
 import {
@@ -305,11 +308,20 @@ router.get("/studio/projects/:id", async (req, res): Promise<void> => {
   const project = await loadOwnedProject(req, res);
   if (!project) return;
 
+  // Seed the workspace the first time it's opened. A studio-authored doc
+  // (compositionHtml set) opens verbatim; a fresh `studio` project gets the
+  // __timelines editor seed; ANY OTHER module (website-showcase, a registry
+  // template) keeps its content in compositionVars with compositionHtml=null —
+  // seed its vars-substituted REAL composition via buildCompositionHtml so
+  // editing/saving doesn't blank it (which would corrupt the project, since a
+  // saved compositionHtml then wins at render time and the original is lost).
   const seedHtml =
     typeof project.compositionHtml === "string" &&
     project.compositionHtml.length > 0
       ? project.compositionHtml
-      : readSeedComposition();
+      : project.module === "studio"
+        ? readSeedComposition()
+        : await buildCompositionHtml(project);
 
   try {
     await ensureWorkspace(project.userId, String(project.id), {
@@ -645,10 +657,15 @@ router.get("/studio/events", async (req, res): Promise<void> => {
 const TERMINAL_STATUSES = new Set(["ready", "failed", "cancelled"]);
 
 /**
- * Pull a `{ fps, quality, format, resolution }` partial off an untrusted JSON
- * body without `any`. Each field is read as `unknown` and forwarded to
- * `resolveSettings`, which coerces/validates it (unknown values fall back to the
- * defaults), so a malformed body degrades to the default render rather than 500.
+ * Pull a `{ fps, quality, format, resolution, transparent, watermark,
+ * transitions }` partial off an untrusted JSON body without `any` — the same
+ * shape `PATCH /projects/:id/render-settings` accepts, so a render started from
+ * the embedded studio honors every Pro lever (transparent / watermark removal /
+ * multi-transition) exactly like `POST /projects/:id/render`. Each field is read
+ * as `unknown` and forwarded to `resolveSettings`, which coerces/validates it
+ * (unknown values fall back to the defaults), so a malformed body degrades to the
+ * default render rather than 500; `assertRenderSettingsAllowed` then re-gates the
+ * resolved object so Pro-only knobs stay gated.
  */
 function settingsFromBody(body: unknown): Partial<RenderSettings> {
   if (typeof body !== "object" || body === null) return {};
@@ -664,6 +681,13 @@ function settingsFromBody(body: unknown): Partial<RenderSettings> {
     out.format = b.format as RenderSettings["format"];
   if (typeof b.resolution === "string")
     out.resolution = b.resolution as RenderSettings["resolution"];
+  if (typeof b.transparent === "boolean") out.transparent = b.transparent;
+  if (typeof b.watermark === "boolean") out.watermark = b.watermark;
+  // transitions is forwarded when it's an array (resolveSettings keeps it only
+  // for an array; the Pro gate then rejects >1 for Free). Mirrors the
+  // render-settings body shape rather than parsing each element here.
+  if (Array.isArray(b.transitions))
+    out.transitions = b.transitions as RenderSettings["transitions"];
   return out;
 }
 
@@ -784,6 +808,15 @@ router.post(
         .update(projectsTable)
         .set({ status: project.status })
         .where(eq(projectsTable.id, project.id));
+      // Transient: the previous render of this project is still finishing (its
+      // BullMQ job lock is held), so this attempt was never queued. Release the
+      // claim, cancel this never-run ledger row, and 409 so the client retries —
+      // never strand "rendering". (See routes/projects.ts for the same handling.)
+      if (err instanceof RenderAlreadyActiveError) {
+        await markCancelled(jobId).catch(() => undefined);
+        res.status(409).json({ error: "Render already in progress" });
+        return;
+      }
       await markFailed(
         jobId,
         err instanceof Error ? err.message : String(err),

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { db, projectsTable, DEFAULT_RENDER_SETTINGS } from "@workspace/db";
 import { captureWebsite } from "./websiteCaptureService";
+import { assertSafeCompositionVars } from "../lib/compositionVars";
 
 const SHOWCASE_MODULE = "website-showcase";
 // Bound the embedded screenshot so the data URI stored in compositionVars (and
@@ -40,6 +41,12 @@ export async function createWebsiteVideoProject(
       "capture.url": capture.url,
       "capture.title": capture.title,
     };
+
+    // Defense in depth: route this server-built map through the same injection
+    // gate the project write routes use. The capture is trusted (an image/png
+    // data URI), so this never throws in practice — it guards against a future
+    // change that lets attacker-controlled bytes into an `<img src>` key.
+    assertSafeCompositionVars(compositionVars);
 
     let hostname = capture.url;
     try {

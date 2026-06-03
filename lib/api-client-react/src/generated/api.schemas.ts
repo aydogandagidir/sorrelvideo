@@ -249,24 +249,11 @@ export interface ProjectInput {
   compositionVars?: ProjectInputCompositionVars;
 }
 
-export type ProjectUpdateStatus = typeof ProjectUpdateStatus[keyof typeof ProjectUpdateStatus];
-
-
-export const ProjectUpdateStatus = {
-  draft: 'draft',
-  rendering: 'rendering',
-  ready: 'ready',
-  failed: 'failed',
-} as const;
-
 export type ProjectUpdateCompositionVars = {[key: string]: string};
 
 export interface ProjectUpdate {
   name?: string;
   description?: string;
-  status?: ProjectUpdateStatus;
-  thumbnailUrl?: string;
-  videoUrl?: string;
   compositionVars?: ProjectUpdateCompositionVars;
 }
 
@@ -518,6 +505,19 @@ export interface UploadUrlResponse {
   /** Normalized object path (e.g. /objects/uploads/uuid). Store this in your database. */
   objectPath: string;
   metadata?: UploadUrlRequest;
+}
+
+export interface FinalizeUploadRequest {
+  /**
+     * The objectPath (or raw GCS upload URL) returned by request-url.
+     * @minLength 1
+     */
+  objectPath: string;
+}
+
+export interface FinalizeUploadResult {
+  /** Normalized object path now owned by the caller (e.g. /objects/uploads/uuid). */
+  objectPath: string;
 }
 
 export interface PlatformStats {

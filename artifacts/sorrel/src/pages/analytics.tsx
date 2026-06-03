@@ -117,6 +117,21 @@ export default function Analytics() {
     ? new Date(billing.renderResetAt).toLocaleDateString()
     : null;
 
+  // AI suggestion quota — Free users have a numeric limit, Pro is unlimited
+  // (aiLimit === null). Mirror the render card so usage is never invisible.
+  const aiCount = billing?.aiCount ?? 0;
+  const aiLimit = billing?.aiLimit ?? null;
+  const aiRemaining = aiLimit != null ? Math.max(aiLimit - aiCount, 0) : null;
+  const aiNearCap = aiRemaining != null && aiRemaining <= 2;
+
+  const aiUsageLabel =
+    aiLimit != null ? `${aiCount} / ${aiLimit}` : `${aiCount}`;
+  const aiHint = isPro
+    ? "Unlimited on the Pro plan"
+    : aiRemaining != null
+      ? `${aiRemaining} AI ${aiRemaining === 1 ? "draft" : "drafts"} left this month`
+      : "AI drafts used this month";
+
   // Single real datapoint (this period). The trend chart is a scaffold that
   // shows current usage against the plan limit until per-day analytics land.
   const chartData = [
@@ -168,9 +183,13 @@ export default function Analytics() {
               icon={Clapperboard}
             />
             <SummaryCard
-              title="AI suggestions"
-              value="—"
-              hint="Per-field AI usage analytics coming soon"
+              title="AI drafts used"
+              value={
+                <span className={aiNearCap ? "text-amber-500" : undefined}>
+                  {aiUsageLabel}
+                </span>
+              }
+              hint={aiHint}
               icon={Sparkles}
             />
             <SummaryCard
@@ -228,8 +247,8 @@ export default function Analytics() {
         <Info className="h-4 w-4" />
         <AlertTitle>More analytics on the way</AlertTitle>
         <AlertDescription>
-          Detailed metrics — per-day render history, AI usage breakdowns, and
-          watch-time — will appear here as the Analytics module matures.
+          Detailed metrics — per-day render history, per-field AI breakdowns,
+          and watch-time — will appear here as the Analytics module matures.
         </AlertDescription>
       </Alert>
     </Layout>

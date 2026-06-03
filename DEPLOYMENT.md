@@ -28,9 +28,14 @@ are automatic via GitHub Actions.
 4. In the api service settings, **Variables → Reference**: link
    `DATABASE_URL` from the Postgres service.
 5. Add a **Volume** to the api service mounted at **`/data`** (5 GB is plenty
-   for soft launch) and set env **`RENDERS_DIR=/data/renders`**. This persists
-   rendered mp4s across deploys. (The app otherwise writes them next to the
-   bundle at `/app/renders`, which is ephemeral.)
+   for soft launch) and set env **`RENDERS_DIR=/data/renders`** AND
+   **`STUDIO_WORKSPACE_DIR=/data/studio-workspaces`**. Both persist user output
+   across deploys: `RENDERS_DIR` the rendered mp4s, `STUDIO_WORKSPACE_DIR` the
+   compositions authored in the embedded Studio editor. (The app otherwise writes
+   them next to the bundle at `/app/renders` and `/app/studio-workspaces`, which
+   are ephemeral — every deploy auto-ships, so an unset `STUDIO_WORKSPACE_DIR`
+   silently wipes Studio content and re-seeds the blank template, looking like
+   data loss.)
 6. (Recommended for production) **+ New → Database → Redis**. In the api service
    **Variables → Reference**: link `REDIS_URL` from the Redis service. This moves
    renders onto a durable BullMQ queue + in-process worker that survives restarts.
@@ -86,13 +91,32 @@ are automatic via GitHub Actions.
 2. Copy the DSNs → `SENTRY_DSN` (api) and `VITE_SENTRY_DSN` (frontend).
 3. Optional: install the Sentry GitHub integration for release tracking.
 
-## 6. Better Stack (Logtail) — log sink
+> **Frontend DSN is a build-time var.** The SPA is bundled _inside the Docker
+> image_, and Vite inlines `import.meta.env.VITE_SENTRY_DSN` at build time. The
+> Dockerfile declares it (plus `VITE_SENTRY_TRACES_SAMPLE_RATE` and
+> `VITE_GIT_SHA`) as `ARG`s, and Railway automatically forwards matching
+> **service variables** into the Docker build. So setting `VITE_SENTRY_DSN` in
+> the Railway Variables tab (step 8) is enough — but a value pasted there only
+> takes effect on the **next build/deploy**, not a plain restart. If you leave
+> it blank the browser Sentry SDK silently no-ops and you get no frontend error
+> tracking. (`VITE_GIT_SHA` is set for you by `deploy.yml`; see step 12.)
+
+## 6. Logs → Better Stack (Logtail) via a Railway log drain
+
+The app writes structured JSON (Pino) to **stdout**; Railway captures it and
+shows it under **Deployments → Logs**. There is **no in-process Logtail
+transport** and **no `LOGTAIL_SOURCE_TOKEN` env var** — shipping logs off Railway
+is done with a native **log drain**, which avoids the fragile worker-thread
+bundling a Pino transport needs under esbuild.
 
 1. [Better Stack](https://betterstack.com) → **Telemetry → Sources →
-   Connect source → Node.js**. Name it `sorrel-api`.
-2. Copy the source token → `LOGTAIL_SOURCE_TOKEN`.
-3. (Optional) add a Heartbeats source pinging `/api/healthz` every 1
-   minute so you get an alert if Railway falls over.
+   Connect source → HTTP** (or "Railway" if listed). Name it `sorrel-api`.
+   Copy the source's **ingesting host + token / drain URL**.
+2. Railway → your project → **Settings → Log drains → Add** and paste that
+   HTTP drain endpoint. Railway streams all stdout logs there — no app change
+   and no redeploy needed.
+3. (Optional) add a Better Stack **Heartbeats** monitor pinging
+   `/api/healthz` every 1 minute so you get an alert if Railway falls over.
 
 ## 7. (Optional) OAuth providers
 
@@ -121,9 +145,13 @@ minimum:
 - `RESEND_API_KEY`, `EMAIL_FROM`
 - `GCS_SERVICE_ACCOUNT_KEY`, `GCS_PROJECT_ID`,
   `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR`
-- `SENTRY_DSN`, `VITE_SENTRY_DSN`, `LOGTAIL_SOURCE_TOKEN`
+- `SENTRY_DSN` (backend), `VITE_SENTRY_DSN` (frontend — **build-time**, see
+  step 5; takes effect on the next build, not a restart)
 - `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`)
 - `REDIS_URL` (recommended — durable render queue; omit to render inline)
+
+(Logs ship via a Railway **log drain**, not an env var — see step 6.
+`VITE_GIT_SHA` is set automatically by `deploy.yml`; no need to paste it.)
 
 Trigger a redeploy from the Railway UI. The build takes ~10 minutes the
 first time (Chromium download dominates).

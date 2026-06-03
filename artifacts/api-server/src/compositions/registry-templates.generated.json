@@ -12,7 +12,8 @@
       "transition",
       "shader"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/cinematic-zoom.png",
+    "thumbnailUrl": "/api/templates/thumbnails/cinematic-zoom.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/cinematic-zoom.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/cinematic-zoom"
   },
   {
@@ -32,7 +33,8 @@
       "apple",
       "apple-terminal"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-pro.png",
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-pro.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-pro.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/code-snippet-apple-terminal-pro"
   },
   {
@@ -49,8 +51,43 @@
       "chart",
       "statistics"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/data-chart.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/data-chart"
+    "thumbnailUrl": "/api/templates/thumbnails/data-chart.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/data-chart.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/data-chart",
+    "variables": [
+      {
+        "id": "title",
+        "type": "string",
+        "label": "Title",
+        "default": "Monthly Revenue vs. Conversion Rate"
+      },
+      {
+        "id": "subtitle",
+        "type": "string",
+        "label": "Subtitle",
+        "default": "Jan–Jun 2024, in thousands"
+      },
+      {
+        "id": "source",
+        "type": "string",
+        "label": "Source line",
+        "default": "Source: Internal analytics"
+      },
+      {
+        "id": "maxRevenue",
+        "type": "number",
+        "label": "Revenue axis max ($K)",
+        "default": 25,
+        "min": 1
+      },
+      {
+        "id": "maxConversion",
+        "type": "number",
+        "label": "Conversion axis max (%)",
+        "default": 5,
+        "min": 1
+      }
+    ]
   },
   {
     "slug": "glitch",
@@ -65,7 +102,8 @@
       "transition",
       "shader"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/glitch.png",
+    "thumbnailUrl": "/api/templates/thumbnails/glitch.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/glitch.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/glitch"
   },
   {
@@ -81,7 +119,8 @@
       "transition",
       "shader"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/light-leak.png",
+    "thumbnailUrl": "/api/templates/thumbnails/light-leak.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/light-leak.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/light-leak"
   },
   {
@@ -98,7 +137,8 @@
       "outro",
       "logo"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/logo-outro.png",
+    "thumbnailUrl": "/api/templates/thumbnails/logo-outro.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/logo-outro.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/logo-outro"
   },
   {
@@ -115,7 +155,8 @@
       "overlay",
       "reddit"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/reddit-post.png",
+    "thumbnailUrl": "/api/templates/thumbnails/reddit-post.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/reddit-post.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/reddit-post"
   },
   {
@@ -132,7 +173,8 @@
       "overlay",
       "spotify"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/spotify-card.png",
+    "thumbnailUrl": "/api/templates/thumbnails/spotify-card.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/spotify-card.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/spotify-card"
   },
   {
@@ -148,7 +190,8 @@
       "transition",
       "shader"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/swirl-vortex.png",
+    "thumbnailUrl": "/api/templates/thumbnails/swirl-vortex.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/swirl-vortex.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/swirl-vortex"
   },
   {
@@ -168,7 +211,8 @@
       "bubble",
       "cities"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/us-map-bubble.png",
+    "thumbnailUrl": "/api/templates/thumbnails/us-map-bubble.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/us-map-bubble.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/us-map-bubble"
   },
   {
@@ -187,7 +231,8 @@
       "world",
       "choropleth"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/world-map.png",
+    "thumbnailUrl": "/api/templates/thumbnails/world-map.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/world-map.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/world-map"
   },
   {
@@ -204,7 +249,8 @@
       "overlay",
       "twitter"
     ],
-    "thumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/x-post.png",
+    "thumbnailUrl": "/api/templates/thumbnails/x-post.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/x-post.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/x-post"
   }
 ]

@@ -60,7 +60,9 @@ beforeEach(() => {
   delete process.env.HYPERFRAMES_S3_BUCKET;
   h.executeRender.mockResolvedValue(undefined);
   h.queueAdd.mockResolvedValue(undefined);
-  h.queueRemove.mockResolvedValue(undefined);
+  // BullMQ's Queue.remove resolves a numeric code: 1 = removed (or never
+  // existed), 0 = the job is locked by a live worker and can't be removed.
+  h.queueRemove.mockResolvedValue(1);
   h.dispatchLambdaRender.mockResolvedValue(undefined);
   // Ledger row the lambda path reads for userId + config snapshot.
   h.getJobById.mockResolvedValue({
@@ -106,6 +108,39 @@ describe("enqueueRender", () => {
     // Must NOT be a bare number — BullMQ rejects purely-numeric custom job ids.
     expect(opts.jobId).toBe("render-42");
     expect(opts.jobId).not.toMatch(/^\d+$/);
+  });
+
+  it("throws RenderAlreadyActiveError (and never re-adds) when the prior job is still locked", async () => {
+    // The race: the previous render flipped the project out of "rendering"
+    // BEFORE its worker fn returned, so the route's atomic claim wins again
+    // while the old BullMQ job still holds its lock. remove() returns 0
+    // (locked) and a fresh add() with the same jobId would be silently
+    // dedup-dropped → project stuck "rendering". enqueueRender must instead
+    // surface the condition so the route releases the claim + 409s.
+    process.env.REDIS_URL = "redis://localhost:6379";
+    h.queueRemove.mockResolvedValueOnce(0); // job is locked / active
+    const { enqueueRender, RenderAlreadyActiveError } = await import(
+      "./renderQueue"
+    );
+
+    await expect(
+      enqueueRender(42, "studio", null, "rj-42b"),
+    ).rejects.toBeInstanceOf(RenderAlreadyActiveError);
+
+    // Critically: it did NOT silently drop a no-op add onto the queue.
+    expect(h.queueAdd).not.toHaveBeenCalled();
+  });
+
+  it("still enqueues when remove() resolves a falsy non-zero (job absent)", async () => {
+    // Defensive: remove() throwing is swallowed to 1, and any non-0 code means
+    // "nothing locked" → the add proceeds. Guards against a future regression
+    // where `!removed` (which would wrongly trip on undefined) replaces `=== 0`.
+    process.env.REDIS_URL = "redis://localhost:6379";
+    h.queueRemove.mockRejectedValueOnce(new Error("connection blip"));
+    const { enqueueRender } = await import("./renderQueue");
+
+    await enqueueRender(42, "studio", null, "rj-42c");
+    expect(h.queueAdd).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a 'pro' plan when RENDER_BACKEND is unset — still inline/bullmq", async () => {

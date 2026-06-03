@@ -30,6 +30,13 @@ const REF = "main";
 const RAW = (p) => `https://raw.githubusercontent.com/${REPO}/${REF}/${p}`;
 const SOURCE_URL = (slug) =>
   `https://github.com/${REPO}/tree/${REF}/registry/blocks/${slug}`;
+// Self-hosted poster path. Each template's gallery thumbnail is a first-frame
+// PNG rendered FROM ITS OWN composition (scripts/generate-thumbnails.mjs →
+// src/compositions/thumbnails/<slug>.png) and served by the api-server at this
+// static route (see app.ts). This replaces the registry's `static.heygen.ai`
+// CDN URL as the canonical `thumbnailUrl`; the CDN URL is retained per-template
+// as `cdnThumbnailUrl` (a documented fallback — never fetched at runtime).
+const THUMBNAIL_URL = (slug) => `/api/templates/thumbnails/${slug}.png`;
 
 const CWD = process.cwd(); // artifacts/api-server when run via pnpm exec
 const COMPOSITIONS_DIR = path.join(CWD, "src", "compositions");
@@ -40,11 +47,64 @@ const MANIFEST_PATH = path.join(
 const NOTICE_PATH = path.join(COMPOSITIONS_DIR, "REGISTRY-NOTICE.md");
 
 /**
+ * data-chart's NATIVE typed composition variables (Hyperframes
+ * `data-composition-variables`). These are the editorial scalars a user tweaks;
+ * each `default` is byte-identical to the block's hardcoded value, so a render
+ * with NO variables passed is unchanged. Declared on `<html>` (see the inject
+ * rule below) AND emitted into the manifest's `variables` field so a future
+ * Studio form can render the right control per `type`.
+ *
+ * NOTE on the chart series (months / revenueData / conversionData): the engine's
+ * typed-variable schema only supports scalar types (string|number|color|boolean
+ * |enum) — there is no array/number-list type. The series therefore are NOT
+ * declared here; instead the composition script reads them from getVariables()
+ * with the original arrays as code-side defaults, so they are still overridable
+ * at render time via `config.variables` (jsonb `compositionVars`) while the
+ * typed defaults above stay valid. See the inject rule for the script rewrite.
+ *
+ * @type {import("@hyperframes/core").CompositionVariable[]}
+ */
+const DATA_CHART_VARIABLES = [
+  {
+    id: "title",
+    type: "string",
+    label: "Title",
+    default: "Monthly Revenue vs. Conversion Rate",
+  },
+  {
+    id: "subtitle",
+    type: "string",
+    label: "Subtitle",
+    default: "Jan–Jun 2024, in thousands",
+  },
+  {
+    id: "source",
+    type: "string",
+    label: "Source line",
+    default: "Source: Internal analytics",
+  },
+  {
+    id: "maxRevenue",
+    type: "number",
+    label: "Revenue axis max ($K)",
+    default: 25,
+    min: 1,
+  },
+  {
+    id: "maxConversion",
+    type: "number",
+    label: "Conversion axis max (%)",
+    default: 5,
+    min: 1,
+  },
+];
+
+/**
  * Curated first batch. `category` + `isPremium` are Sorrel product decisions
  * (the registry has neither). name/description/duration/dimensions/tags/thumbnail
  * come from each block's registry-item.json. Slugs that turn out to need local
  * assets are skipped automatically (logged), so this list can be generous.
- * @type {{slug:string, category:string, isPremium:boolean}[]}
+ * @type {{slug:string, category:string, isPremium:boolean, inject?:{find:string|RegExp,replace:string}[], variables?:import("@hyperframes/core").CompositionVariable[]}[]}
  */
 const CURATION = [
   { slug: "apple-money-count", category: "Data", isPremium: false },
@@ -52,26 +112,110 @@ const CURATION = [
     slug: "data-chart",
     category: "Data",
     isPremium: false,
-    // Brand injection: the two NYT-style data series (grey bars, blue line)
-    // adopt the brand palette while the editorial cream background + grid stay.
+    // Native typed variables (title/subtitle/source/maxRevenue/maxConversion):
+    // declared on <html> AND surfaced in the manifest for a future Studio form.
+    variables: DATA_CHART_VARIABLES,
     inject: [
+      // Brand injection: the two NYT-style data series (grey bars, blue line)
+      // adopt the brand palette while the editorial cream background + grid stay.
       { find: "#5c5c5c", replace: "{{brand.primaryColor}}" },
       { find: "#326fa8", replace: "{{brand.accentColor}}" },
       { find: "#326FA8", replace: "{{brand.accentColor}}" },
+      // Declare the typed variables on the root <html> element. The engine's
+      // getVariables() reads these defaults from document.documentElement and
+      // merges window.__hfVariables (config.variables / `compositionVars`) over
+      // them, so a render with no variables uses the byte-identical defaults.
+      // Single-quoted attribute → the JSON's double quotes need no escaping; the
+      // declared defaults contain no single quotes.
+      {
+        find: '<html lang="en">',
+        replace: `<html lang="en" data-composition-variables='${JSON.stringify(
+          DATA_CHART_VARIABLES,
+        )}'>`,
+      },
+      // Rewrite the hardcoded data + axis literals to read getVariables(). Each
+      // read keeps the original literal as the fallback, so an unset variable is
+      // identical to today. window.__hyperframes.getVariables is the runtime
+      // global the engine installs (see @hyperframes/core runtime IIFE). title /
+      // subtitle / source overwrite their (still-present) static markup as the
+      // single source of truth; months/revenueData/conversionData are read here
+      // because the typed schema has no array type (see DATA_CHART_VARIABLES).
+      {
+        find: [
+          "          // Data",
+          '          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];',
+          "          const revenueData = [8, 12, 15, 11, 18, 22];",
+          "          const conversionData = [2.1, 2.8, 3.2, 2.9, 3.8, 4.2];",
+        ].join("\n"),
+        replace: [
+          "          // Variables (native Hyperframes typed-variable pipeline).",
+          "          // Defaults below match the original literals so a render with no",
+          "          // variables is byte-identical; config.variables overrides them.",
+          "          const vars =",
+          '            (window.__hyperframes && window.__hyperframes.getVariables()) || {};',
+          "",
+          "          const headlineEl = document.querySelector(",
+          "            '[data-composition-id=\"data-chart\"] .headline',",
+          "          );",
+          "          const subtitleEl = document.querySelector(",
+          "            '[data-composition-id=\"data-chart\"] .subtitle',",
+          "          );",
+          "          const sourceEl = document.querySelector(",
+          "            '[data-composition-id=\"data-chart\"] .source',",
+          "          );",
+          "          if (headlineEl && vars.title != null) headlineEl.textContent = vars.title;",
+          "          if (subtitleEl && vars.subtitle != null) subtitleEl.textContent = vars.subtitle;",
+          "          if (sourceEl && vars.source != null) sourceEl.textContent = vars.source;",
+          "",
+          "          // Data",
+          '          const months = vars.months ?? ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];',
+          "          const revenueData = vars.revenueData ?? [8, 12, 15, 11, 18, 22];",
+          "          const conversionData = vars.conversionData ?? [2.1, 2.8, 3.2, 2.9, 3.8, 4.2];",
+        ].join("\n"),
+      },
+      // Axis scales: read the typed number variables, default to the literals.
+      {
+        find: [
+          "          // Scales",
+          "          const maxRevenue = 25;",
+          "          const maxConversion = 5;",
+        ].join("\n"),
+        replace: [
+          "          // Scales (typed number variables; default to the originals).",
+          "          const maxRevenue = vars.maxRevenue ?? 25;",
+          "          const maxConversion = vars.maxConversion ?? 5;",
+        ].join("\n"),
+      },
     ],
   },
+  // NOTE: brand injection was evaluated for world-map + us-map-bubble and
+  // reverted — a choropleth's sequential color scale is a perceptual data
+  // encoding, and recoloring only the CSS legend (not the D3 fill scale) left the
+  // legend and map inconsistent. Data-viz palettes are kept as-authored.
   { slug: "world-map", category: "Data", isPremium: false },
   { slug: "us-map-bubble", category: "Data", isPremium: true },
   {
     slug: "logo-outro",
     category: "Branding",
     isPremium: false,
-    // Brand injection: recolor the assembly logo with the brand palette and make
-    // the brand NAME the hero wordmark — the outro becomes the USER's brand while
-    // keeping the signature piece-by-piece animation. Existing brand-kit fields
-    // only (colors + companyName) and no extra assets, so it renders for every
-    // user (STUDIO_FALLBACKS cover blanks at render; PREVIEW_FALLBACKS in the
-    // gallery preview). The Hyperframes compiler still inlines the GSAP CDN dep.
+    // Brand injection: show the USER'S real uploaded logo when brand.logoUrl is
+    // set, and otherwise fall back to the registry's abstract 5-piece shape
+    // (recolored with the brand palette). The brand NAME becomes the hero
+    // wordmark. Existing brand-kit fields only — no extra assets — so it renders
+    // for every user (STUDIO_FALLBACKS cover blanks at render: brand.logoUrl
+    // defaults to "" → the fallback shape; PREVIEW_FALLBACKS in the gallery
+    // preview). The Hyperframes compiler still inlines the GSAP CDN dep.
+    //
+    // The fallback is driven purely by CSS attribute selectors so a single
+    // composition handles both states with no JS branching:
+    //   - <img class="brand-logo" src="{{brand.logoUrl}}"> — `[src=""]` (the
+    //     empty default) is hidden, a set URL is shown (max ~420px, centered on
+    //     the SVG's spot).
+    //   - When the img has a non-empty src it hides the sibling .logo-container
+    //     (the abstract SVG), so only one mark shows at a time.
+    // brand.logoUrl is validated as a safe http(s) URL when the brand kit is
+    // saved (routes/brand.ts → isSafeLogoUrl), so it can't break out of the
+    // src="…" attribute at render time.
     inject: [
       { find: 'fill="#F24E1E"', replace: 'fill="{{brand.primaryColor}}"' },
       { find: 'fill="#A259FF"', replace: 'fill="{{brand.secondaryColor}}"' },
@@ -81,11 +225,59 @@ const CURATION = [
       { find: "Nothing great is made alone.", replace: "{{brand.companyName}}" },
       // Drop the placeholder vanity URL — no website field in the brand kit yet.
       { find: /<div class="url-pill">[\s\S]*?<\/div>/, replace: "" },
+      // Inject the real-logo <img> as a sibling BEFORE the abstract-shape SVG
+      // container (so the `~` sibling selector below can hide the SVG).
+      {
+        find: '<div class="logo-container">',
+        replace:
+          '<img class="brand-logo" src="{{brand.logoUrl}}" alt="" />\n        <div class="logo-container">',
+      },
+      // CSS for the real-logo img + the show/hide fallback, injected ahead of the
+      // existing .logo-piece rule (a unique anchor in the upstream <style>).
+      {
+        find: '[data-composition-id="logo-outro"] .logo-piece {',
+        replace: [
+          '[data-composition-id="logo-outro"] .brand-logo {',
+          "          position: absolute;",
+          "          left: 960px;", // canvas-centered (1920/2)
+          "          top: 500px;", // matches the SVG logo's vertical center
+          "          transform: translate(-50%, -50%);",
+          "          max-width: 420px;",
+          "          max-height: 420px;",
+          "          object-fit: contain;",
+          "          z-index: 2;",
+          "        }",
+          "",
+          "        /* Empty default (no logo uploaded) → fall back to the SVG shape. */",
+          '        [data-composition-id="logo-outro"] .brand-logo[src=""] {',
+          "          display: none;",
+          "        }",
+          "",
+          "        /* A real logo is set → hide the abstract-shape SVG container. */",
+          '        [data-composition-id="logo-outro"] .brand-logo:not([src=""]) ~ .logo-container {',
+          "          display: none;",
+          "        }",
+          "",
+          '        [data-composition-id="logo-outro"] .logo-piece {',
+        ].join("\n"),
+      },
     ],
   },
   { slug: "code-snippet-dark-modern", category: "Code", isPremium: false },
   { slug: "code-snippet-light-modern", category: "Code", isPremium: false },
-  { slug: "code-snippet-apple-terminal-pro", category: "Code", isPremium: true },
+  {
+    slug: "code-snippet-apple-terminal-pro",
+    category: "Code",
+    isPremium: true,
+    // The composition uses gsap's TextPlugin syntax (tl.set(el,{text:""})) to
+    // clear the line, but only gsap core is bundled, so every render logs
+    // "Missing plugin? TextPlugin". The typing itself is driven by direct
+    // textContent writes, so this set is a no-op — replace it with a plain DOM
+    // write to silence the log without loading the (heavier) plugin.
+    inject: [
+      { find: 'tl.set(typedEl, { text: "" }, 0);', replace: 'typedEl.textContent = "";' },
+    ],
+  },
   { slug: "x-post", category: "Social", isPremium: false },
   { slug: "reddit-post", category: "Social", isPremium: false },
   { slug: "instagram-follow", category: "Social", isPremium: false },
@@ -136,7 +328,7 @@ async function main() {
   const imported = [];
   const skipped = [];
 
-  for (const { slug, category, isPremium, inject } of CURATION) {
+  for (const { slug, category, isPremium, inject, variables } of CURATION) {
     try {
       const item = JSON.parse(
         await fetchText(RAW(`registry/blocks/${slug}/registry-item.json`)),
@@ -188,8 +380,16 @@ async function main() {
         width: dims.width ?? 1920,
         height: dims.height ?? 1080,
         tags: Array.isArray(item.tags) ? item.tags : [],
-        thumbnailUrl: item.preview?.poster ?? item.preview?.video ?? "",
+        // Self-hosted poster (rendered from this composition); the upstream CDN
+        // URL is kept alongside as a documented, never-fetched fallback.
+        thumbnailUrl: THUMBNAIL_URL(slug),
+        cdnThumbnailUrl: item.preview?.poster ?? item.preview?.video ?? "",
         source: SOURCE_URL(slug),
+        // Native typed-variable declarations (omitted unless the template
+        // declares any — keeps existing manifest rows byte-identical). Mirrors
+        // the `data-composition-variables` baked into the HTML; consumed by the
+        // typed loader (registryTemplates.ts) for a future Studio form.
+        ...(variables && variables.length ? { variables } : {}),
       });
       console.log(`[import] ✓ ${slug} (${imported.at(-1).width}x${imported.at(-1).height}, ${imported.at(-1).duration}s)`);
     } catch (err) {

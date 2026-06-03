@@ -190,13 +190,24 @@ export default function Brand() {
                           onChange={handleChange}
                           placeholder="https://example.com/logo.png"
                         />
+                        {/*
+                          Direct file upload is not wired yet (no logo-upload
+                          endpoint). Until it lands, paste a hosted image URL
+                          above. The button is visibly disabled rather than
+                          inert so it doesn't read as a working control.
+                        */}
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="w-full"
+                          disabled
+                          title="Direct upload is coming soon — paste a logo URL above for now"
                         >
                           <Upload className="mr-2 h-4 w-4" /> Upload Custom Logo
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            (soon)
+                          </span>
                         </Button>
                       </div>
                     </div>

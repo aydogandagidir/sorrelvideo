@@ -28,6 +28,8 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/pg-core";
+import { usersTable } from "./auth";
+import { projectsTable } from "./projects";
 
 export type RenderQuality = "draft" | "standard" | "high";
 export type RenderFormat = "mp4" | "webm" | "mov" | "png-sequence";
@@ -97,8 +99,17 @@ export const renderJobsTable = pgTable(
     id: varchar("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    projectId: integer("project_id").notNull(),
-    userId: text("user_id").notNull(),
+    // FKs give the ledger referential integrity + retention: deleting a project
+    // (or its owning user) cascades away its render-job rows, so the table can't
+    // accumulate orphans scanned on every distributed-quota check / boot recovery.
+    // projectId integer → projects.id (serial/integer); userId text → users.id
+    // (varchar — text↔varchar is FK-comparable in Postgres).
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projectsTable.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
     /** Which executor ran the job: inline | bullmq | lambda. */
     backend: varchar("backend").notNull().default("inline"),
     /** Backend-specific id (e.g. a BullMQ job id or Lambda request id). */
@@ -127,7 +138,20 @@ export const renderJobsTable = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => [index("IDX_render_jobs_project").on(table.projectId)],
+  (table) => [
+    index("IDX_render_jobs_project").on(table.projectId),
+    // Backs the per-user distributed-spend scan `countLambdaJobsSince`
+    // (`WHERE user_id = ? AND backend = ? AND created_at >= ?`). Column order
+    // matches the predicate: the two equalities first, the range last.
+    index("IDX_render_jobs_user_backend_created").on(
+      table.userId,
+      table.backend,
+      table.createdAt,
+    ),
+    // Backs the in-flight-lambda scan `getActiveLambdaJobs` and boot recovery
+    // (`WHERE backend = ? AND status = ?`).
+    index("IDX_render_jobs_backend_status").on(table.backend, table.status),
+  ],
 );
 
 /**

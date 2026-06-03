@@ -1,41 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { db, stripeSubscriptionsTable, usersTable } from "@workspace/db";
+import { db, usersTable } from "@workspace/db";
 import {
   FREE_AI_LIMIT,
   FREE_RENDER_LIMIT,
   checkAndIncrementAiCount,
   checkAndIncrementRenderCount,
+  decrementRenderCount,
   getBillingInfo,
 } from "./billingService";
-import { truncateAll } from "../test/integration";
+import { createFreeUser, createProUser, truncateAll } from "../test/integration";
 import { INTEGRATION_AVAILABLE } from "../test/setup";
-
-async function createFreeUser(): Promise<string> {
-  const [row] = await db
-    .insert(usersTable)
-    .values({ email: `free-${Date.now()}-${Math.random()}@test.local` })
-    .returning();
-  return row.id;
-}
-
-async function createProUser(): Promise<string> {
-  const customerId = `cus_test_${Math.random().toString(36).slice(2)}`;
-  const [row] = await db
-    .insert(usersTable)
-    .values({
-      email: `pro-${Date.now()}-${Math.random()}@test.local`,
-      stripeCustomerId: customerId,
-    })
-    .returning();
-  await db.insert(stripeSubscriptionsTable).values({
-    id: `sub_${customerId}`,
-    customerId,
-    status: "active",
-    cancelAtPeriodEnd: false,
-  });
-  return row.id;
-}
 
 beforeEach(async () => {
   await truncateAll();
@@ -148,5 +123,120 @@ describe.runIf(INTEGRATION_AVAILABLE)("getBillingInfo", () => {
     expect(info.plan).toBe("pro");
     expect(info.renderLimit).toBeNull();
     expect(info.aiLimit).toBeNull();
+  });
+
+  it("month-boundary reset under getBillingInfo never clobbers a concurrent increment", async () => {
+    // Reproduce the month-rollover race: a non-zero count carried from the prior
+    // window with an ALREADY-PAST reset_at. The OLD getBillingInfo did an
+    // UNLOCKED `render_count = 0` write that could land AFTER a concurrent
+    // increment committed, dropping a just-charged render back to 0 (free-usage
+    // leak). Now the reset takes the same row lock, so the two serialize and the
+    // net result is deterministic: reset-then-increment leaves exactly 1.
+    const userId = await createFreeUser();
+    await db
+      .update(usersTable)
+      .set({ renderCount: 2, renderResetAt: new Date(Date.now() - 60_000) })
+      .where(eq(usersTable.id, userId));
+
+    await Promise.all([
+      checkAndIncrementRenderCount(userId),
+      getBillingInfo(userId),
+    ]);
+
+    const [updated] = await db
+      .select({ renderCount: usersTable.renderCount })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    // Never 0 (the regression) — the rolled-over window resets once, then the
+    // increment lands on top of it.
+    expect(updated.renderCount).toBe(1);
+  });
+});
+
+describe.runIf(INTEGRATION_AVAILABLE)("decrementRenderCount — refund", () => {
+  it("refunds one render charged in the current window", async () => {
+    const userId = await createFreeUser();
+    // Two increments set render_reset_at to a FUTURE start-of-next-month, i.e.
+    // the current window — so a refund applies.
+    await checkAndIncrementRenderCount(userId);
+    await checkAndIncrementRenderCount(userId);
+
+    await decrementRenderCount(userId);
+
+    const [updated] = await db
+      .select({ renderCount: usersTable.renderCount })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    expect(updated.renderCount).toBe(1);
+  });
+
+  it("floors at 0 and never goes negative on an over-refund", async () => {
+    const userId = await createFreeUser();
+    await checkAndIncrementRenderCount(userId); // count = 1, current window
+
+    await decrementRenderCount(userId); // → 0
+    await decrementRenderCount(userId); // stays 0 (nothing to refund)
+
+    const [updated] = await db
+      .select({ renderCount: usersTable.renderCount })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    expect(updated.renderCount).toBe(0);
+  });
+
+  it("does not refund a charge from a rolled-over (expired) window", async () => {
+    // A count carried from a PAST window must not be decremented — the next read
+    // zeroes it anyway, and refunding would steal from next month's allowance.
+    const userId = await createFreeUser();
+    await db
+      .update(usersTable)
+      .set({ renderCount: 2, renderResetAt: new Date(Date.now() - 60_000) })
+      .where(eq(usersTable.id, userId));
+
+    await decrementRenderCount(userId);
+
+    const [updated] = await db
+      .select({ renderCount: usersTable.renderCount })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    expect(updated.renderCount).toBe(2);
+  });
+
+  it("restores a quota slot so a failed render can be retried", async () => {
+    // End-to-end of the refund's purpose: a Free user at the 3-render cap whose
+    // render failed (→ refund) can charge one more, instead of being locked out.
+    const userId = await createFreeUser();
+    await checkAndIncrementRenderCount(userId);
+    await checkAndIncrementRenderCount(userId);
+    await checkAndIncrementRenderCount(userId); // at FREE_RENDER_LIMIT
+
+    await expect(checkAndIncrementRenderCount(userId)).rejects.toMatchObject({
+      reason: "upgrade_required",
+    });
+
+    // Simulate the failed render giving the slot back.
+    await decrementRenderCount(userId);
+
+    // The retry now succeeds.
+    await expect(checkAndIncrementRenderCount(userId)).resolves.toBeUndefined();
+
+    const [updated] = await db
+      .select({ renderCount: usersTable.renderCount })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    expect(updated.renderCount).toBe(FREE_RENDER_LIMIT);
+  });
+
+  it("is a harmless no-op for a pro user (never charged)", async () => {
+    const userId = await createProUser();
+    await checkAndIncrementRenderCount(userId); // pro: count stays 0
+
+    await decrementRenderCount(userId);
+
+    const [updated] = await db
+      .select({ renderCount: usersTable.renderCount })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    expect(updated.renderCount).toBe(0);
   });
 });

@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { type Request, type Response } from "express";
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2";
 import { db, sessionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export const SESSION_COOKIE = "sid";
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -72,6 +72,20 @@ export async function updateSession(
 
 export async function deleteSession(sid: string): Promise<void> {
   await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
+}
+
+/**
+ * Revoke every session belonging to a user. Called on password reset so a
+ * pre-existing attacker session can't outlive the credential change (otherwise
+ * it would survive up to the 7-day TTL). `userId` is stored inside the `sess`
+ * jsonb (see SessionData), so we match on the JSON field — backed by
+ * `IDX_session_user`. Returns the number of sessions deleted.
+ */
+export async function deleteSessionsForUser(userId: string): Promise<number> {
+  const result = await db
+    .delete(sessionsTable)
+    .where(sql`${sessionsTable.sess}->>'userId' = ${userId}`);
+  return result.rowCount ?? 0;
 }
 
 export async function clearSession(res: Response, sid?: string): Promise<void> {

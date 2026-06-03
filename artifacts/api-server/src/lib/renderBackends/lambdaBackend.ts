@@ -29,7 +29,10 @@ import {
   type RenderSettings,
 } from "@workspace/db";
 import { logger } from "../logger";
-import { buildCompositionHtml } from "../../services/renderService";
+import {
+  buildCompositionHtml,
+  injectWatermark,
+} from "../../services/renderService";
 import { toEngineConfig } from "../../services/renderSettingsService";
 import {
   getActiveLambdaJobs,
@@ -168,12 +171,16 @@ export async function dispatchLambdaRender(
     throw new LambdaDispatchError(`Project ${projectId} not found`);
   }
 
-  const html = await buildCompositionHtml({
+  const baseHtml = await buildCompositionHtml({
     id: project.id,
     userId,
     module: project.module || module,
     compositionVars: project.compositionVars,
   });
+  // Burn in the watermark on the same terms as the inline/bullmq path so the
+  // monetization lever is backend-agnostic (always on for Free, removable on
+  // Pro). Keeps "the rendered HTML matches what the inline path would produce".
+  const html = settings.watermark ? injectWatermark(baseHtml) : baseHtml;
 
   // The engine config (fps rational, format, resolution preset). entryFile is
   // irrelevant for the Lambda transport (we send the HTML inline), so pass a
