@@ -5,6 +5,7 @@
 // build time, so there is no runtime file read. Both renderService (composition
 // map) and the platform-template seed read from here, making the manifest the
 // single source of truth.
+import type { CompositionVariable } from "@hyperframes/core";
 import type { RenderResolution } from "@workspace/db";
 import manifest from "../compositions/registry-templates.generated.json";
 
@@ -35,6 +36,17 @@ export interface RegistryTemplate {
   cdnThumbnailUrl?: string;
   /** Upstream registry block URL, for attribution. */
   source: string;
+  /**
+   * Native Hyperframes typed-variable declarations (`CompositionVariable[]`),
+   * mirroring the `data-composition-variables` JSON baked into the composition's
+   * `<html>`. Present only for templates that expose editable content this way
+   * (currently `data-chart`); undefined for the rest. TYPE-ONLY surface for now
+   * — a future Studio form reads each entry's `type`/`label`/`default` to render
+   * the right control. The render path doesn't consume this (it forwards
+   * `compositionVars` to `config.variables`, which the engine merges over the
+   * HTML-declared defaults); this is purely the manifest's typed view of them.
+   */
+  variables?: CompositionVariable[];
 }
 
 export const REGISTRY_TEMPLATES: RegistryTemplate[] =

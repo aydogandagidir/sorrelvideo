@@ -47,11 +47,64 @@ const MANIFEST_PATH = path.join(
 const NOTICE_PATH = path.join(COMPOSITIONS_DIR, "REGISTRY-NOTICE.md");
 
 /**
+ * data-chart's NATIVE typed composition variables (Hyperframes
+ * `data-composition-variables`). These are the editorial scalars a user tweaks;
+ * each `default` is byte-identical to the block's hardcoded value, so a render
+ * with NO variables passed is unchanged. Declared on `<html>` (see the inject
+ * rule below) AND emitted into the manifest's `variables` field so a future
+ * Studio form can render the right control per `type`.
+ *
+ * NOTE on the chart series (months / revenueData / conversionData): the engine's
+ * typed-variable schema only supports scalar types (string|number|color|boolean
+ * |enum) — there is no array/number-list type. The series therefore are NOT
+ * declared here; instead the composition script reads them from getVariables()
+ * with the original arrays as code-side defaults, so they are still overridable
+ * at render time via `config.variables` (jsonb `compositionVars`) while the
+ * typed defaults above stay valid. See the inject rule for the script rewrite.
+ *
+ * @type {import("@hyperframes/core").CompositionVariable[]}
+ */
+const DATA_CHART_VARIABLES = [
+  {
+    id: "title",
+    type: "string",
+    label: "Title",
+    default: "Monthly Revenue vs. Conversion Rate",
+  },
+  {
+    id: "subtitle",
+    type: "string",
+    label: "Subtitle",
+    default: "Jan–Jun 2024, in thousands",
+  },
+  {
+    id: "source",
+    type: "string",
+    label: "Source line",
+    default: "Source: Internal analytics",
+  },
+  {
+    id: "maxRevenue",
+    type: "number",
+    label: "Revenue axis max ($K)",
+    default: 25,
+    min: 1,
+  },
+  {
+    id: "maxConversion",
+    type: "number",
+    label: "Conversion axis max (%)",
+    default: 5,
+    min: 1,
+  },
+];
+
+/**
  * Curated first batch. `category` + `isPremium` are Sorrel product decisions
  * (the registry has neither). name/description/duration/dimensions/tags/thumbnail
  * come from each block's registry-item.json. Slugs that turn out to need local
  * assets are skipped automatically (logged), so this list can be generous.
- * @type {{slug:string, category:string, isPremium:boolean}[]}
+ * @type {{slug:string, category:string, isPremium:boolean, inject?:{find:string|RegExp,replace:string}[], variables?:import("@hyperframes/core").CompositionVariable[]}[]}
  */
 const CURATION = [
   { slug: "apple-money-count", category: "Data", isPremium: false },
@@ -59,12 +112,80 @@ const CURATION = [
     slug: "data-chart",
     category: "Data",
     isPremium: false,
-    // Brand injection: the two NYT-style data series (grey bars, blue line)
-    // adopt the brand palette while the editorial cream background + grid stay.
+    // Native typed variables (title/subtitle/source/maxRevenue/maxConversion):
+    // declared on <html> AND surfaced in the manifest for a future Studio form.
+    variables: DATA_CHART_VARIABLES,
     inject: [
+      // Brand injection: the two NYT-style data series (grey bars, blue line)
+      // adopt the brand palette while the editorial cream background + grid stay.
       { find: "#5c5c5c", replace: "{{brand.primaryColor}}" },
       { find: "#326fa8", replace: "{{brand.accentColor}}" },
       { find: "#326FA8", replace: "{{brand.accentColor}}" },
+      // Declare the typed variables on the root <html> element. The engine's
+      // getVariables() reads these defaults from document.documentElement and
+      // merges window.__hfVariables (config.variables / `compositionVars`) over
+      // them, so a render with no variables uses the byte-identical defaults.
+      // Single-quoted attribute → the JSON's double quotes need no escaping; the
+      // declared defaults contain no single quotes.
+      {
+        find: '<html lang="en">',
+        replace: `<html lang="en" data-composition-variables='${JSON.stringify(
+          DATA_CHART_VARIABLES,
+        )}'>`,
+      },
+      // Rewrite the hardcoded data + axis literals to read getVariables(). Each
+      // read keeps the original literal as the fallback, so an unset variable is
+      // identical to today. window.__hyperframes.getVariables is the runtime
+      // global the engine installs (see @hyperframes/core runtime IIFE). title /
+      // subtitle / source overwrite their (still-present) static markup as the
+      // single source of truth; months/revenueData/conversionData are read here
+      // because the typed schema has no array type (see DATA_CHART_VARIABLES).
+      {
+        find: [
+          "          // Data",
+          '          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];',
+          "          const revenueData = [8, 12, 15, 11, 18, 22];",
+          "          const conversionData = [2.1, 2.8, 3.2, 2.9, 3.8, 4.2];",
+        ].join("\n"),
+        replace: [
+          "          // Variables (native Hyperframes typed-variable pipeline).",
+          "          // Defaults below match the original literals so a render with no",
+          "          // variables is byte-identical; config.variables overrides them.",
+          "          const vars =",
+          '            (window.__hyperframes && window.__hyperframes.getVariables()) || {};',
+          "",
+          "          const headlineEl = document.querySelector(",
+          "            '[data-composition-id=\"data-chart\"] .headline',",
+          "          );",
+          "          const subtitleEl = document.querySelector(",
+          "            '[data-composition-id=\"data-chart\"] .subtitle',",
+          "          );",
+          "          const sourceEl = document.querySelector(",
+          "            '[data-composition-id=\"data-chart\"] .source',",
+          "          );",
+          "          if (headlineEl && vars.title != null) headlineEl.textContent = vars.title;",
+          "          if (subtitleEl && vars.subtitle != null) subtitleEl.textContent = vars.subtitle;",
+          "          if (sourceEl && vars.source != null) sourceEl.textContent = vars.source;",
+          "",
+          "          // Data",
+          '          const months = vars.months ?? ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];',
+          "          const revenueData = vars.revenueData ?? [8, 12, 15, 11, 18, 22];",
+          "          const conversionData = vars.conversionData ?? [2.1, 2.8, 3.2, 2.9, 3.8, 4.2];",
+        ].join("\n"),
+      },
+      // Axis scales: read the typed number variables, default to the literals.
+      {
+        find: [
+          "          // Scales",
+          "          const maxRevenue = 25;",
+          "          const maxConversion = 5;",
+        ].join("\n"),
+        replace: [
+          "          // Scales (typed number variables; default to the originals).",
+          "          const maxRevenue = vars.maxRevenue ?? 25;",
+          "          const maxConversion = vars.maxConversion ?? 5;",
+        ].join("\n"),
+      },
     ],
   },
   // NOTE: brand injection was evaluated for world-map + us-map-bubble and
@@ -207,7 +328,7 @@ async function main() {
   const imported = [];
   const skipped = [];
 
-  for (const { slug, category, isPremium, inject } of CURATION) {
+  for (const { slug, category, isPremium, inject, variables } of CURATION) {
     try {
       const item = JSON.parse(
         await fetchText(RAW(`registry/blocks/${slug}/registry-item.json`)),
@@ -264,6 +385,11 @@ async function main() {
         thumbnailUrl: THUMBNAIL_URL(slug),
         cdnThumbnailUrl: item.preview?.poster ?? item.preview?.video ?? "",
         source: SOURCE_URL(slug),
+        // Native typed-variable declarations (omitted unless the template
+        // declares any — keeps existing manifest rows byte-identical). Mirrors
+        // the `data-composition-variables` baked into the HTML; consumed by the
+        // typed loader (registryTemplates.ts) for a future Studio form.
+        ...(variables && variables.length ? { variables } : {}),
       });
       console.log(`[import] ✓ ${slug} (${imported.at(-1).width}x${imported.at(-1).height}, ${imported.at(-1).duration}s)`);
     } catch (err) {

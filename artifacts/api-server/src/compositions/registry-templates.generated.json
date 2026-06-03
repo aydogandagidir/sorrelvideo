@@ -53,7 +53,41 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/data-chart.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/data-chart.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/data-chart"
+    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/data-chart",
+    "variables": [
+      {
+        "id": "title",
+        "type": "string",
+        "label": "Title",
+        "default": "Monthly Revenue vs. Conversion Rate"
+      },
+      {
+        "id": "subtitle",
+        "type": "string",
+        "label": "Subtitle",
+        "default": "Jan–Jun 2024, in thousands"
+      },
+      {
+        "id": "source",
+        "type": "string",
+        "label": "Source line",
+        "default": "Source: Internal analytics"
+      },
+      {
+        "id": "maxRevenue",
+        "type": "number",
+        "label": "Revenue axis max ($K)",
+        "default": 25,
+        "min": 1
+      },
+      {
+        "id": "maxConversion",
+        "type": "number",
+        "label": "Conversion axis max (%)",
+        "default": 5,
+        "min": 1
+      }
+    ]
   },
   {
     "slug": "glitch",

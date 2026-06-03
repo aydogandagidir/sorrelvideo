@@ -6,7 +6,7 @@
   REGISTRY-NOTICE.md for the full attribution + license.
 -->
 <!doctype html>
-<html lang="en">
+<html lang="en" data-composition-variables='[{"id":"title","type":"string","label":"Title","default":"Monthly Revenue vs. Conversion Rate"},{"id":"subtitle","type":"string","label":"Subtitle","default":"Jan–Jun 2024, in thousands"},{"id":"source","type":"string","label":"Source line","default":"Source: Internal analytics"},{"id":"maxRevenue","type":"number","label":"Revenue axis max ($K)","default":25,"min":1},{"id":"maxConversion","type":"number","label":"Conversion axis max (%)","default":5,"min":1}]'>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1920, height=1080" />
@@ -217,10 +217,29 @@
           const svg = document.querySelector('[data-composition-id="data-chart"] .chart-svg');
           const tl = gsap.timeline({ paused: true });
 
+          // Variables (native Hyperframes typed-variable pipeline).
+          // Defaults below match the original literals so a render with no
+          // variables is byte-identical; config.variables overrides them.
+          const vars =
+            (window.__hyperframes && window.__hyperframes.getVariables()) || {};
+
+          const headlineEl = document.querySelector(
+            '[data-composition-id="data-chart"] .headline',
+          );
+          const subtitleEl = document.querySelector(
+            '[data-composition-id="data-chart"] .subtitle',
+          );
+          const sourceEl = document.querySelector(
+            '[data-composition-id="data-chart"] .source',
+          );
+          if (headlineEl && vars.title != null) headlineEl.textContent = vars.title;
+          if (subtitleEl && vars.subtitle != null) subtitleEl.textContent = vars.subtitle;
+          if (sourceEl && vars.source != null) sourceEl.textContent = vars.source;
+
           // Data
-          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-          const revenueData = [8, 12, 15, 11, 18, 22];
-          const conversionData = [2.1, 2.8, 3.2, 2.9, 3.8, 4.2];
+          const months = vars.months ?? ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+          const revenueData = vars.revenueData ?? [8, 12, 15, 11, 18, 22];
+          const conversionData = vars.conversionData ?? [2.1, 2.8, 3.2, 2.9, 3.8, 4.2];
 
           // Chart Dimensions
           const chartWidth = 1400;
@@ -230,9 +249,9 @@
           const barWidth = 80;
           const spacing = (chartWidth - barWidth * months.length) / (months.length + 1);
 
-          // Scales
-          const maxRevenue = 25;
-          const maxConversion = 5;
+          // Scales (typed number variables; default to the originals).
+          const maxRevenue = vars.maxRevenue ?? 25;
+          const maxConversion = vars.maxConversion ?? 5;
 
           const getBarY = (val) => startY - (val / maxRevenue) * chartHeight;
           const getLineY = (val) => startY - (val / maxConversion) * chartHeight;
