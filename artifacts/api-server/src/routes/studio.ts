@@ -58,6 +58,7 @@ import {
   resolveSettings,
   assertRenderSettingsAllowed,
 } from "../services/renderSettingsService";
+import { buildCompositionHtml } from "../services/renderService";
 import {
   enqueueRender,
   isQueueEnabled,
@@ -305,11 +306,20 @@ router.get("/studio/projects/:id", async (req, res): Promise<void> => {
   const project = await loadOwnedProject(req, res);
   if (!project) return;
 
+  // Seed the workspace the first time it's opened. A studio-authored doc
+  // (compositionHtml set) opens verbatim; a fresh `studio` project gets the
+  // __timelines editor seed; ANY OTHER module (website-showcase, a registry
+  // template) keeps its content in compositionVars with compositionHtml=null —
+  // seed its vars-substituted REAL composition via buildCompositionHtml so
+  // editing/saving doesn't blank it (which would corrupt the project, since a
+  // saved compositionHtml then wins at render time and the original is lost).
   const seedHtml =
     typeof project.compositionHtml === "string" &&
     project.compositionHtml.length > 0
       ? project.compositionHtml
-      : readSeedComposition();
+      : project.module === "studio"
+        ? readSeedComposition()
+        : await buildCompositionHtml(project);
 
   try {
     await ensureWorkspace(project.userId, String(project.id), {
