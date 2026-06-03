@@ -6,6 +6,7 @@ import {
   UpdateBrandKitBody,
   UpdateBrandKitResponse,
 } from "@workspace/api-zod";
+import { isSafeLogoUrl } from "../lib/logoUrl";
 
 const router: IRouter = Router();
 
@@ -49,6 +50,17 @@ router.put("/brand", async (req, res): Promise<void> => {
   const parsed = UpdateBrandKitBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  // The logoUrl is injected verbatim into an HTML `src="…"` attribute at render
+  // time (logo-outro), and brand.* substitution intentionally does not escape
+  // quotes (CSS font-family relies on that). Reject anything that isn't a clean
+  // http(s) URL here so it can't break out of the attribute later.
+  if (!isSafeLogoUrl(parsed.data.logoUrl)) {
+    res.status(400).json({
+      error: "logoUrl must be a valid http(s) URL",
+    });
     return;
   }
 

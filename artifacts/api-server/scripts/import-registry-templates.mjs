@@ -70,12 +70,24 @@ const CURATION = [
     slug: "logo-outro",
     category: "Branding",
     isPremium: false,
-    // Brand injection: recolor the assembly logo with the brand palette and make
-    // the brand NAME the hero wordmark — the outro becomes the USER's brand while
-    // keeping the signature piece-by-piece animation. Existing brand-kit fields
-    // only (colors + companyName) and no extra assets, so it renders for every
-    // user (STUDIO_FALLBACKS cover blanks at render; PREVIEW_FALLBACKS in the
-    // gallery preview). The Hyperframes compiler still inlines the GSAP CDN dep.
+    // Brand injection: show the USER'S real uploaded logo when brand.logoUrl is
+    // set, and otherwise fall back to the registry's abstract 5-piece shape
+    // (recolored with the brand palette). The brand NAME becomes the hero
+    // wordmark. Existing brand-kit fields only — no extra assets — so it renders
+    // for every user (STUDIO_FALLBACKS cover blanks at render: brand.logoUrl
+    // defaults to "" → the fallback shape; PREVIEW_FALLBACKS in the gallery
+    // preview). The Hyperframes compiler still inlines the GSAP CDN dep.
+    //
+    // The fallback is driven purely by CSS attribute selectors so a single
+    // composition handles both states with no JS branching:
+    //   - <img class="brand-logo" src="{{brand.logoUrl}}"> — `[src=""]` (the
+    //     empty default) is hidden, a set URL is shown (max ~420px, centered on
+    //     the SVG's spot).
+    //   - When the img has a non-empty src it hides the sibling .logo-container
+    //     (the abstract SVG), so only one mark shows at a time.
+    // brand.logoUrl is validated as a safe http(s) URL when the brand kit is
+    // saved (routes/brand.ts → isSafeLogoUrl), so it can't break out of the
+    // src="…" attribute at render time.
     inject: [
       { find: 'fill="#F24E1E"', replace: 'fill="{{brand.primaryColor}}"' },
       { find: 'fill="#A259FF"', replace: 'fill="{{brand.secondaryColor}}"' },
@@ -85,6 +97,42 @@ const CURATION = [
       { find: "Nothing great is made alone.", replace: "{{brand.companyName}}" },
       // Drop the placeholder vanity URL — no website field in the brand kit yet.
       { find: /<div class="url-pill">[\s\S]*?<\/div>/, replace: "" },
+      // Inject the real-logo <img> as a sibling BEFORE the abstract-shape SVG
+      // container (so the `~` sibling selector below can hide the SVG).
+      {
+        find: '<div class="logo-container">',
+        replace:
+          '<img class="brand-logo" src="{{brand.logoUrl}}" alt="" />\n        <div class="logo-container">',
+      },
+      // CSS for the real-logo img + the show/hide fallback, injected ahead of the
+      // existing .logo-piece rule (a unique anchor in the upstream <style>).
+      {
+        find: '[data-composition-id="logo-outro"] .logo-piece {',
+        replace: [
+          '[data-composition-id="logo-outro"] .brand-logo {',
+          "          position: absolute;",
+          "          left: 960px;", // canvas-centered (1920/2)
+          "          top: 500px;", // matches the SVG logo's vertical center
+          "          transform: translate(-50%, -50%);",
+          "          max-width: 420px;",
+          "          max-height: 420px;",
+          "          object-fit: contain;",
+          "          z-index: 2;",
+          "        }",
+          "",
+          "        /* Empty default (no logo uploaded) → fall back to the SVG shape. */",
+          '        [data-composition-id="logo-outro"] .brand-logo[src=""] {',
+          "          display: none;",
+          "        }",
+          "",
+          "        /* A real logo is set → hide the abstract-shape SVG container. */",
+          '        [data-composition-id="logo-outro"] .brand-logo:not([src=""]) ~ .logo-container {',
+          "          display: none;",
+          "        }",
+          "",
+          '        [data-composition-id="logo-outro"] .logo-piece {',
+        ].join("\n"),
+      },
     ],
   },
   { slug: "code-snippet-dark-modern", category: "Code", isPremium: false },

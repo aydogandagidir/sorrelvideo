@@ -48,6 +48,7 @@
         <div class="logo-glow"></div>
 
         <!-- Logo Container -->
+        <img class="brand-logo" src="{{brand.logoUrl}}" alt="" />
         <div class="logo-container">
           <svg viewBox="0 0 160 240" width="160" height="240" class="logo-svg">
             <!-- Replace these paths with your own logo SVG -->
@@ -98,6 +99,27 @@
           width: 160px;
           height: 240px;
           z-index: 2;
+        }
+
+        [data-composition-id="logo-outro"] .brand-logo {
+          position: absolute;
+          left: 960px;
+          top: 500px;
+          transform: translate(-50%, -50%);
+          max-width: 420px;
+          max-height: 420px;
+          object-fit: contain;
+          z-index: 2;
+        }
+
+        /* Empty default (no logo uploaded) → fall back to the SVG shape. */
+        [data-composition-id="logo-outro"] .brand-logo[src=""] {
+          display: none;
+        }
+
+        /* A real logo is set → hide the abstract-shape SVG container. */
+        [data-composition-id="logo-outro"] .brand-logo:not([src=""]) ~ .logo-container {
+          display: none;
         }
 
         [data-composition-id="logo-outro"] .logo-piece {
