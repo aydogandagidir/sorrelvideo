@@ -68,6 +68,9 @@ describe.runIf(INTEGRATION_AVAILABLE)(
         headline: "Ship faster",
         bodyText: "Branded video in minutes.",
         ctaText: "Start now",
+        // The provider contract (SuggestResult) always carries usage; the route
+        // logs result.usage.* on the success path, so the mock must supply it.
+        usage: { inputTokens: 120, outputTokens: 30 },
       });
 
       const res = await request(app)
