@@ -189,6 +189,24 @@ export default function Pricing() {
           <p className="text-center text-sm text-muted-foreground mt-8">
             No credit card required for the free plan. Cancel anytime.
           </p>
+          <p className="text-center text-xs text-muted-foreground mt-2">
+            Subscriptions are billed through Stripe. By subscribing you agree to
+            our{" "}
+            <Link
+              href="/terms"
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/privacy"
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </div>
       </main>
 
@@ -198,6 +216,14 @@ export default function Pricing() {
             <Video className="h-5 w-5 text-primary" />
             <span>Sorrel</span>
           </div>
+          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              Privacy
+            </Link>
+          </nav>
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Sorrel Platform. Built on Hyperframes.
           </p>

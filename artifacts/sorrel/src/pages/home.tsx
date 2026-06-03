@@ -194,6 +194,14 @@ export default function Home() {
             <Video className="h-5 w-5 text-primary" />
             <span>Sorrel</span>
           </div>
+          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              Privacy
+            </Link>
+          </nav>
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Sorrel Platform. Built on Hyperframes.
           </p>
