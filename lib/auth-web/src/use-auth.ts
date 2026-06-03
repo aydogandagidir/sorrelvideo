@@ -19,8 +19,13 @@ interface AuthState {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  /** Navigate to the frontend /login page (e.g. for protected route gates). */
-  login: () => void;
+  /**
+   * Navigate to the frontend /login page (e.g. for protected route gates),
+   * preserving where to return after a successful sign-in. Pass an explicit
+   * local path, or omit it to capture the current location. Non-local targets
+   * are ignored (open-redirect guard).
+   */
+  login: (returnTo?: string) => void;
   /** Submit credentials to the password login endpoint. */
   loginWithPassword: (input: LoginInput) => Promise<AuthUser>;
   /** Submit a signup payload and create a new account + session. */
@@ -78,8 +83,21 @@ export function useAuth(): AuthState {
     };
   }, [refresh]);
 
-  const login = useCallback(() => {
-    window.location.href = "/login";
+  const login = useCallback((returnTo?: string) => {
+    const target =
+      returnTo ??
+      `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    // Only forward genuine same-origin paths; never reflect an absolute URL or
+    // protocol-relative ("//host") target into returnTo (open-redirect guard).
+    const safe =
+      target.startsWith("/") && !target.startsWith("//") ? target : null;
+    // Avoid bouncing /login → /login (would lose the real returnTo on the
+    // second hop) and skip a redundant returnTo=/dashboard (login's default).
+    const redirect =
+      safe && safe !== "/dashboard" && !safe.startsWith("/login")
+        ? `/login?returnTo=${encodeURIComponent(safe)}`
+        : "/login";
+    window.location.href = redirect;
   }, []);
 
   const loginWithPassword = useCallback(

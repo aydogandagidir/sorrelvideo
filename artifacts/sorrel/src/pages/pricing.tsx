@@ -41,8 +41,9 @@ function PricingCard({
 
   const handleUpgrade = async () => {
     if (!isAuthenticated) {
-      // Redirect to login; after login they'll land back at /pricing
-      login();
+      // Redirect to login; after login they land back here at /pricing so the
+      // user can resume checkout in one more click.
+      login("/pricing");
       return;
     }
     if (!priceId) return;

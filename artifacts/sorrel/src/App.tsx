@@ -1,5 +1,5 @@
 import { type ComponentType } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -44,6 +44,7 @@ function ProtectedRoute({
   component: ComponentType;
 }) {
   const { isAuthenticated, isLoading, login } = useAuth();
+  const [location] = useLocation();
 
   if (isLoading) {
     return (
@@ -56,7 +57,8 @@ function ProtectedRoute({
   }
 
   if (!isAuthenticated) {
-    login();
+    // Preserve the attempted deep link so login bounces back here afterward.
+    login(location);
     return null;
   }
 
