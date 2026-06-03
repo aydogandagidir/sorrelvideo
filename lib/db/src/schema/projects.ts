@@ -8,11 +8,19 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./auth";
 import type { RenderSettings } from "./render";
 
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().default(""),
+  // FK → users.id (varchar). text↔varchar is FK-comparable in Postgres. ON
+  // DELETE CASCADE so deleting a user removes their projects (and, transitively
+  // via render_jobs' own FK, their render-job rows). The .default("") is kept
+  // for legacy/back-compat inserts that predate the column being required.
+  userId: text("user_id")
+    .notNull()
+    .default("")
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("draft"),

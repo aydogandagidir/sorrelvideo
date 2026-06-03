@@ -1,10 +1,17 @@
 import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./auth";
 
 export const brandKitTable = pgTable("brand_kit", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().default(""),
+  // FK → users.id (varchar). text↔varchar is FK-comparable in Postgres. The
+  // owning user going away deletes their brand kit (ON DELETE CASCADE). Keep
+  // the .default("") for legacy inserts that predate the column being required.
+  userId: text("user_id")
+    .notNull()
+    .default("")
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").notNull().default("#6366f1"),
   secondaryColor: text("secondary_color").notNull().default("#8b5cf6"),

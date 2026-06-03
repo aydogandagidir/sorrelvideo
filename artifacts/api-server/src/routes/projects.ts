@@ -244,6 +244,13 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  // Deleting the project also prunes its render_jobs ledger rows: the
+  // render_jobs.project_id → projects.id FK is ON DELETE CASCADE (see
+  // lib/db/src/schema/render.ts), so the DB removes them in the same statement.
+  // This keeps the ledger from accumulating orphans (it is scanned on every
+  // distributed-quota check and boot recovery). NOTE: the cascade only exists
+  // once the new FK is applied via `pnpm --filter @workspace/db run push`
+  // (manual on prod); until then deletes leave render_jobs rows behind.
   await db.delete(projectsTable).where(eq(projectsTable.id, params.data.id));
 
   res.sendStatus(204);
