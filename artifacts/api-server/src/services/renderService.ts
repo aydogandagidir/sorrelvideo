@@ -185,6 +185,42 @@ export function renderCompositionTemplate(
   );
 }
 
+/**
+ * A static "Made with Sorrel" watermark badge. Burned into the composition HTML
+ * just before `</body>` when render settings have `watermark: true` (always true
+ * for Free — the monetization lever — and removable on Pro). It is the
+ * REVENUE-CRITICAL gate: a Free render with no badge is unmonetized.
+ *
+ * Design constraints (kept deliberately simple so the overlay is deterministic
+ * and self-contained — no external asset/CDN, no per-frame variation):
+ *  - `position: fixed` bottom-right, small, `pointer-events: none`.
+ *  - Very high `z-index` so a composition's own stacking can't bury it.
+ *  - Web-safe inline font stack + inline styles only, so it renders identically
+ *    in the headless Chrome that rasterizes frames with no font/asset loading.
+ *  - A subtle translucent dark pill keeps the white text legible over both light
+ *    and dark compositions; the whole badge is semi-transparent so it doesn't
+ *    dominate the frame.
+ *  - Survives alpha output: the engine's transparent-background CSS only zeroes
+ *    `html,body,[data-composition-id]` backgrounds, which this badge is not.
+ *
+ * `data-sorrel-watermark` marks the node so the absence/presence is trivially
+ * assertable (tests + the visual check) without depending on the copy.
+ */
+const WATERMARK_HTML = `<div data-sorrel-watermark="true" aria-hidden="true" style="position:fixed;right:16px;bottom:16px;z-index:2147483647;pointer-events:none;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9999px;background:rgba(15,23,42,0.55);color:rgba(255,255,255,0.92);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:18px;line-height:1;font-weight:600;letter-spacing:0.01em;opacity:0.85;text-shadow:0 1px 2px rgba(0,0,0,0.35);">Made with Sorrel</div>`;
+
+/**
+ * Inject the watermark badge immediately before the LAST `</body>` so it paints
+ * on top of the composition. Case-insensitive match. If a composition somehow
+ * has no closing body tag (none do today — verified), the badge is appended so
+ * the watermark is never silently dropped. Pure; callers decide whether to call
+ * it based on resolved settings.
+ */
+export function injectWatermark(html: string): string {
+  const idx = html.toLowerCase().lastIndexOf("</body>");
+  if (idx === -1) return html + WATERMARK_HTML;
+  return html.slice(0, idx) + WATERMARK_HTML + html.slice(idx);
+}
+
 interface BrandKitSnapshot {
   companyName: string | null;
   primaryColor: string | null;
@@ -287,15 +323,25 @@ export async function buildCompositionHtml(project: {
 /**
  * Materialize a per-render composition file with Studio variables already
  * substituted. Returns the directory + filename to feed Hyperframes.
+ *
+ * When `watermark` is true (resolved render settings; always true for Free) the
+ * "Made with Sorrel" badge is burned into the HTML before it's written, so the
+ * engine rasterizes it into every frame. The merge → substitution → watermark
+ * order matters: the watermark is appended AFTER the template merge so it is
+ * never substituted/escaped and always wins the stacking context.
  */
-async function prepareCompositionFor(project: {
-  id: number;
-  userId: string;
-  module: string;
-  compositionVars: Record<string, string> | null;
-  compositionHtml?: string | null;
-}): Promise<{ dir: string; file: string }> {
-  const rendered = await buildCompositionHtml(project);
+async function prepareCompositionFor(
+  project: {
+    id: number;
+    userId: string;
+    module: string;
+    compositionVars: Record<string, string> | null;
+    compositionHtml?: string | null;
+  },
+  options: { watermark: boolean } = { watermark: true },
+): Promise<{ dir: string; file: string }> {
+  let rendered = await buildCompositionHtml(project);
+  if (options.watermark) rendered = injectWatermark(rendered);
 
   const dir = path.join(RENDERS_DIR, String(project.id));
   fs.mkdirSync(dir, { recursive: true });
@@ -346,12 +392,19 @@ export async function executeRender(
     if (!project)
       throw new Error(`Project ${projectId} disappeared mid-render`);
 
-    const { dir, file } = await prepareCompositionFor(project);
-
     // Resolve the per-project settings (null → DEFAULT_RENDER_SETTINGS) and map
     // them to the engine's RenderConfig. The Free/Pro gate already ran at the
-    // route layer; here we just honor the persisted, validated config.
+    // route layer; here we just honor the persisted, validated config. Resolved
+    // BEFORE the composition is materialized because `watermark` decides whether
+    // the badge is burned into the per-project composition.html.
     const settings = resolveSettings(project.renderSettings);
+
+    // Burn the watermark into composition.html when settings say so (always for
+    // Free — the monetization lever; removable on Pro).
+    const { dir, file } = await prepareCompositionFor(project, {
+      watermark: settings.watermark,
+    });
+
     const format = settings.format;
     // Format drives the artifact path: mp4 → output.mp4 (unchanged default),
     // webm/mov → output.<ext> (file), png-sequence → frames/ (directory).

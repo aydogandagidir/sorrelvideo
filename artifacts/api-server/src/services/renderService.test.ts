@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderCompositionTemplate, resolveEntryFile } from "./renderService";
+import {
+  injectWatermark,
+  renderCompositionTemplate,
+  resolveEntryFile,
+} from "./renderService";
 
 describe("renderCompositionTemplate", () => {
   it("substitutes simple {{key}} placeholders", () => {
@@ -57,6 +61,65 @@ describe("renderCompositionTemplate", () => {
     });
     expect(out).not.toContain("<script>");
     expect(out).toContain("&lt;script&gt;");
+  });
+});
+
+describe("injectWatermark", () => {
+  const doc = "<html><body><h1>Hi</h1></body></html>";
+
+  it("injects the badge immediately before </body>", () => {
+    const out = injectWatermark(doc);
+    expect(out).toContain('data-sorrel-watermark="true"');
+    expect(out).toContain("Made with Sorrel");
+    // Badge sits inside the body, right before the closing tag.
+    expect(out.indexOf("data-sorrel-watermark")).toBeLessThan(
+      out.indexOf("</body>"),
+    );
+    expect(out.indexOf("<h1>Hi</h1>")).toBeLessThan(
+      out.indexOf("data-sorrel-watermark"),
+    );
+  });
+
+  it("is a no-op marker absent until injected (absence is detectable)", () => {
+    expect(doc).not.toContain("data-sorrel-watermark");
+  });
+
+  it("uses pointer-events:none and a high z-index so it can't be interacted with or buried", () => {
+    const out = injectWatermark(doc);
+    expect(out).toContain("pointer-events:none");
+    expect(out).toContain("z-index:2147483647");
+    expect(out).toContain("position:fixed");
+  });
+
+  it("uses only inline styles — no external asset/CDN reference", () => {
+    const out = injectWatermark(doc);
+    expect(out).not.toMatch(/<link\b/i);
+    expect(out).not.toMatch(/src=/i);
+    expect(out).not.toMatch(/https?:\/\//i);
+  });
+
+  it("matches the LAST </body> case-insensitively", () => {
+    const upper = "<HTML><BODY>x</BODY></HTML>";
+    const out = injectWatermark(upper);
+    expect(out).toContain("data-sorrel-watermark");
+    expect(out.indexOf("data-sorrel-watermark")).toBeLessThan(
+      out.toLowerCase().indexOf("</body>"),
+    );
+  });
+
+  it("appends (never drops) the badge when there is no closing body tag", () => {
+    const out = injectWatermark("<div>no body tag</div>");
+    expect(out).toContain("data-sorrel-watermark");
+    // Original content stays first; the badge is appended after it.
+    expect(out.indexOf("no body tag")).toBeLessThan(
+      out.indexOf("data-sorrel-watermark"),
+    );
+    expect(out).toMatch(/data-sorrel-watermark[^]*<\/div>$/);
+  });
+
+  it("injects exactly one badge", () => {
+    const out = injectWatermark(doc);
+    expect(out.match(/data-sorrel-watermark/g)).toHaveLength(1);
   });
 });
 

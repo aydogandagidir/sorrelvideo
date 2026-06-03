@@ -5,6 +5,7 @@ import {
   assertRenderSettingsAllowed,
   resolveDimensions,
   toEngineConfig,
+  formatSupportsAlpha,
   RenderSettingsUpgradeError,
 } from "./renderSettingsService";
 
@@ -115,6 +116,59 @@ describe("toEngineConfig", () => {
     expect(cfg.fps).toEqual({ num: 30, den: 1 });
     expect(cfg.quality).toBe("draft");
     expect(cfg.format).toBe("mp4");
+  });
+
+  it("does NOT emit a `transparent` field — alpha is format-derived by the engine", () => {
+    // The producer derives alpha from `format` (webm/mov/png-sequence); there is
+    // no RenderConfig.transparent knob. A transparent webm still maps cleanly.
+    const cfg = toEngineConfig(proSettings, "composition.html");
+    expect("transparent" in cfg).toBe(false);
+    expect(cfg.format).toBe("webm");
+  });
+
+  it("forwards outputResolution for opaque mp4 (legacy behavior preserved)", () => {
+    const cfg = toEngineConfig(
+      resolveSettings({ format: "mp4", resolution: "landscape" }),
+      "composition.html",
+    );
+    expect(cfg.outputResolution).toBe("landscape");
+  });
+
+  it("OMITS outputResolution for alpha formats (engine forbids DPR + alpha)", () => {
+    // resolveDeviceScaleFactor throws on outputResolution + alpha output, so a
+    // transparent webm/mov/png-sequence render must NOT carry the preset or it
+    // hard-fails. Alpha renders at composition resolution.
+    for (const format of ["webm", "mov", "png-sequence"] as const) {
+      const cfg = toEngineConfig(
+        resolveSettings({ transparent: true, format, resolution: "portrait-4k" }),
+        "composition.html",
+      );
+      expect(cfg.format).toBe(format);
+      expect("outputResolution" in cfg).toBe(false);
+    }
+  });
+
+  it("throws on the incoherent transparent+mp4 combo (never silently ships opaque)", () => {
+    const incoherent = resolveSettings({ transparent: true, format: "mp4" });
+    expect(() => toEngineConfig(incoherent, "composition.html")).toThrow(
+      /alpha-capable format/i,
+    );
+  });
+
+  it("allows transparent on each alpha-capable format", () => {
+    for (const format of ["webm", "mov", "png-sequence"] as const) {
+      const s = resolveSettings({ transparent: true, format });
+      expect(() => toEngineConfig(s, "composition.html")).not.toThrow();
+    }
+  });
+});
+
+describe("formatSupportsAlpha", () => {
+  it("is false only for mp4", () => {
+    expect(formatSupportsAlpha("mp4")).toBe(false);
+    expect(formatSupportsAlpha("webm")).toBe(true);
+    expect(formatSupportsAlpha("mov")).toBe(true);
+    expect(formatSupportsAlpha("png-sequence")).toBe(true);
   });
 });
 

@@ -128,6 +128,17 @@ export function assertRenderSettingsAllowed(
   }
 }
 
+/**
+ * Whether a container format can carry a true alpha channel. mp4 is always
+ * opaque (H.264/H.265); webm (VP9 yuva420p), mov (ProRes 4444), and
+ * png-sequence (RGBA) all carry alpha. Mirrors the producer's
+ * `needsAlpha = webm | mov | png-sequence` and the frontend's
+ * `formatSupportsAlpha`.
+ */
+export function formatSupportsAlpha(format: RenderFormat): boolean {
+  return format !== "mp4";
+}
+
 /** Pixel dimensions for a resolution preset (from the engine's CANVAS_DIMENSIONS). */
 export function resolveDimensions(resolution: RenderResolution): {
   width: number;
@@ -141,16 +152,49 @@ export function resolveDimensions(resolution: RenderResolution): {
  * that replaces the previously hardcoded `{ fps: {num:30,den:1} as Fps,
  * quality: "draft", entryFile }`. `fps` is the exact rational the engine wants;
  * `outputResolution` reuses the shared CanvasResolution names.
+ *
+ * TRANSPARENT BACKGROUND is *format-derived*, not a separate config field. The
+ * producer (verified against 0.6.6) computes `needsAlpha = webm | mov |
+ * png-sequence` and, for those formats, auto-injects transparent-background CSS
+ * (`initTransparentBackground`) + forces screenshot capture — there is NO
+ * `RenderConfig.transparent` knob to set. So `settings.transparent` is realized
+ * purely by the chosen `format`, and the two are kept coherent upstream:
+ *   - the Free/Pro gate (`assertRenderSettingsAllowed`) makes any non-mp4 format
+ *     AND `transparent` Pro-only, and
+ *   - the editor (`render-settings-form.tsx`) forces `transparent → false`
+ *     whenever the format can't carry alpha (mp4),
+ * so `transparent: true` always implies an alpha-capable format here. We assert
+ * that invariant defensively rather than silently shipping an mp4 the user
+ * thinks is transparent. (The Lambda backend, a *different* transport, does take
+ * an explicit `transparent` boolean — see `lambdaBackend.ts`; that is its own
+ * contract and unrelated to this inline/bullmq engine config.)
+ *
+ * `outputResolution` IS OMITTED FOR ALPHA FORMATS. The engine's
+ * `resolveDeviceScaleFactor` THROWS when `outputResolution` is combined with
+ * alpha output ("the alpha screenshot path does not yet apply deviceScaleFactor")
+ * — so passing the resolution preset on a webm/mov/png-sequence render would
+ * hard-fail the very transparent render the user asked for. Alpha output is
+ * therefore produced at the composition's authored dimensions (the engine's
+ * documented guidance: "Render alpha at composition resolution and upscale
+ * separately"). For opaque mp4 the preset is forwarded unchanged, so the default
+ * (mp4 / portrait) render is byte-for-byte as before.
  */
 export function toEngineConfig(
   settings: RenderSettings,
   entryFile: string,
 ): RenderConfig {
+  const alpha = formatSupportsAlpha(settings.format);
+  if (settings.transparent && !alpha) {
+    throw new Error(
+      `Transparent background requires an alpha-capable format (webm/mov/png-sequence), got "${settings.format}"`,
+    );
+  }
   return {
     fps: { num: settings.fps, den: 1 },
     quality: settings.quality,
     format: settings.format,
     entryFile,
-    outputResolution: settings.resolution,
+    // Alpha output forbids a deviceScaleFactor override; omit it there.
+    ...(alpha ? {} : { outputResolution: settings.resolution }),
   };
 }
