@@ -18,9 +18,20 @@ import type { Express } from "express";
  * `Access-Control-Allow-Origin` header (the browser still blocks the cross-origin
  * read) and crucially must NOT throw.
  *
- * `/api/healthz` is used as the probe because it is DB-free and unauthenticated,
- * so these assertions isolate the CORS layer (which runs before the router).
+ * `/api/healthz` is used as the probe because it is unauthenticated and runs
+ * before the router, so these assertions isolate the CORS layer. The readiness
+ * probe now pings Postgres, so we stub `@workspace/db`'s pool to a passing
+ * `SELECT 1` — keeping this suite DB-free and focused purely on CORS.
  */
+vi.mock("@workspace/db", async () => {
+  const actual =
+    await vi.importActual<typeof import("@workspace/db")>("@workspace/db");
+  return {
+    ...actual,
+    pool: { query: vi.fn().mockResolvedValue({ rows: [{ "?column?": 1 }] }) },
+  };
+});
+
 describe("production CORS origin policy", () => {
   let app: Express;
 
