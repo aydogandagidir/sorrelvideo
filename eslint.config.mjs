@@ -112,7 +112,7 @@ export default tseslint.config(
   {
     files: [
       "artifacts/api-server/**/*.{ts,mts,js,mjs}",
-      "scripts/**/*.{ts,mts}",
+      "scripts/**/*.{ts,mts,js,mjs}",
       "lib/db/**/*.{ts,mts}",
       "lib/api-spec/**/*.{ts,mts}",
       "**/drizzle.config.ts",

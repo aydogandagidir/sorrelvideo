@@ -71,6 +71,35 @@ RUN pnpm run typecheck \
 RUN mkdir -p core \
     && cp -rL artifacts/api-server/node_modules/@hyperframes/core/dist core/dist
 
+# The render engine needs Chrome's HeadlessExperimental.beginFrame (deterministic,
+# frame-accurate capture). Debian's apt `chromium` is `--headless=new` and DROPPED
+# that CDP domain, so the engine's probe rejects → it falls back to slow screenshot
+# mode and renders TIME OUT (observed on Railway). chrome-headless-shell is the only
+# headless build that still implements beginFrame; puppeteer@24.43.1 pins its
+# revision (148.x — no drift).
+#
+# Why we unzip by hand instead of `puppeteer browsers install`: puppeteer's
+# npm-postinstall (deps stage) DOWNLOADS the chrome-headless-shell zip into
+# /root/.cache/puppeteer but FAILS to extract the executable here (Debian slim —
+# only ABOUT + LICENSE land, the ~188 MB binary never extracts). The wrapper
+# `install` then sees that stub folder, declares "already installed" and no-ops;
+# `--path` isn't exposed by the wrapper and the low-level `@puppeteer/browsers`
+# bin isn't on PATH. The downloaded .zip itself is intact (118 MB, verified), so
+# we extract it ourselves into /opt/hf-cache — version-agnostic (glob), no
+# network, none of puppeteer's cache-resolution guesswork. find+test fails the
+# build LOUD here if the zip is ever absent (e.g. an upstream PUPPETEER_SKIP_-
+# DOWNLOAD) instead of silently degrading to screenshot mode at runtime.
+RUN set -eux; \
+    apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*; \
+    ZIP="$(find /root/.cache/puppeteer/chrome-headless-shell -name '*chrome-headless-shell-linux64.zip' | head -n1)"; \
+    test -n "$ZIP"; \
+    mkdir -p /opt/hf-cache; \
+    unzip -q -o "$ZIP" -d /opt/hf-cache; \
+    SHELL_BIN="$(find /opt/hf-cache -type f -name chrome-headless-shell | head -n1)"; \
+    test -n "$SHELL_BIN"; \
+    chmod +x "$SHELL_BIN"; \
+    echo "chrome-headless-shell extracted to: $SHELL_BIN"
+
 # ---------- Stage 4: runtime ----------
 # Slim image with Chromium system deps + production node_modules. Puppeteer's
 # cached Chromium binary travels along with node_modules so the renderer can
@@ -81,12 +110,13 @@ ENV NODE_ENV=production \
     BASE_PATH=/ \
     PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
-    # Both the render engine (puppeteer-core) and the website→video capture
-    # (full puppeteer) need an explicit Chromium binary: we install the system
-    # chromium package below and point both at it, instead of relying on
-    # puppeteer's version-stamped download cache (which isn't copied into this
-    # runtime stage — only node_modules is).
-    PRODUCER_HEADLESS_SHELL_PATH=/usr/bin/chromium \
+    # Two different Chrome needs, two different binaries:
+    #  • website→video capture (full puppeteer, untrusted pages) → the system
+    #    `chromium` installed below (sandboxed; no beginFrame needed).
+    #  • the RENDER engine → chrome-headless-shell, set as
+    #    PRODUCER_HEADLESS_SHELL_PATH *after* the cache copy below, because apt
+    #    chromium (--headless=new) lacks HeadlessExperimental.beginFrame and the
+    #    engine would silently fall back to slow screenshot mode.
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_DOWNLOAD=true
 
@@ -129,6 +159,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
+
+# chrome-headless-shell (beginFrame-capable) extracted in the build stage into
+# /opt/hf-cache (unzipped from puppeteer's cached zip) → wire it to the render
+# engine. find+symlink to a STABLE path avoids hardcoding the version-stamped dir
+# (survives puppeteer bumps); the build fails loudly (test -n) if the binary is
+# somehow absent — strictly better than today's silent runtime screenshot-fallback.
+COPY --from=build /opt/hf-cache /opt/hf-cache
+RUN set -eux; \
+    SHELL_BIN="$(find /opt/hf-cache -type f -name chrome-headless-shell | head -n1)"; \
+    test -n "$SHELL_BIN"; \
+    chmod +x "$SHELL_BIN"; \
+    ln -sf "$SHELL_BIN" /usr/local/bin/chrome-headless-shell
+ENV PRODUCER_HEADLESS_SHELL_PATH=/usr/local/bin/chrome-headless-shell
 
 # Preserve the EXACT monorepo layout so pnpm's relative symlinks keep working.
 # The esbuild bundle externalizes native deps (@node-rs/argon2, puppeteer,
