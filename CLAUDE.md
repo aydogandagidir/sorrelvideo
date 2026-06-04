@@ -327,14 +327,28 @@ screenshot → outro CTA).
 - `websiteCaptureLimiter` (5 / 15 min) — Chrome capture is expensive. `SsrfError`
   → 400, `WebsiteCaptureError` → 502.
 
-**Chrome binary**: `captureWebsite` uses the full `puppeteer` package, whose
-downloaded Chrome lands in `~/.cache/puppeteer` — which the Docker runtime image
-does NOT copy (only `node_modules`). So it resolves `executablePath` from
-`CAPTURE_CHROME_PATH ?? PUPPETEER_EXECUTABLE_PATH ?? PRODUCER_HEADLESS_SHELL_PATH`
-(the image sets the latter two to `/usr/bin/chromium`), falling back to
-`undefined` (puppeteer's cache) for local dev. Without this the capture 502s in
-prod while normal renders still work — they go through the engine, which already
-reads `PRODUCER_HEADLESS_SHELL_PATH`.
+**Chrome binary** — two distinct binaries by design (the Dockerfile ships both):
+
+- The **render engine** needs Chrome's `HeadlessExperimental.beginFrame`
+  (deterministic, frame-accurate capture). Debian's apt `chromium` is
+  `--headless=new` and DROPPED that CDP domain, so the engine's probe rejects →
+  it silently falls back to slow screenshot mode and renders **TIME OUT** on
+  Railway. The fix ships **`chrome-headless-shell`** (the only headless build that
+  still implements beginFrame — pinned by `puppeteer@24.43.1` to 148.x) and sets
+  `PRODUCER_HEADLESS_SHELL_PATH=/usr/local/bin/chrome-headless-shell`. Gotcha:
+  puppeteer's postinstall downloads the shell **zip** into `~/.cache/puppeteer`
+  but FAILS to extract the executable on Debian slim (only `ABOUT` + `LICENSE`
+  land), and the wrapper `puppeteer browsers install` then no-ops on that stub
+  folder — so the Dockerfile **unzips the intact cached zip itself** into
+  `/opt/hf-cache` and symlinks it. `scripts/verify-beginframe.mjs` probes the
+  capability inside the image (PASS = beginFrame engages, FAIL = screenshot
+  fallback) — run it after any Chrome/puppeteer bump.
+- The **website→video capture** (`captureWebsite`, full `puppeteer`, untrusted
+  pages) instead wants a sandboxed Chrome. It resolves `executablePath` from
+  `CAPTURE_CHROME_PATH ?? PUPPETEER_EXECUTABLE_PATH ?? PRODUCER_HEADLESS_SHELL_PATH`;
+  the image sets `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` (the apt package) so
+  capture picks that, falling back to `undefined` (puppeteer's own cache) for local
+  dev. Without it the capture 502s in prod while normal renders still work.
 
 **`CAPTURE_NO_SANDBOX`**: Chrome's sandbox is ON by default (untrusted pages).
 Set `=true` ONLY on container hosts that can't start a sandboxed Chrome (root /
