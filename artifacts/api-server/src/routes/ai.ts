@@ -67,6 +67,22 @@ router.post(
       return;
     }
 
+    // Surface prompt-cache effectiveness. cacheReadInputTokens > 0 means the
+    // stable system/brand prefix was served from cache (~10% of input cost);
+    // cacheCreationInputTokens is the one-time write that seeds a breakpoint.
+    // Both are undefined for providers/models where caching did not engage.
+    req.log.info(
+      {
+        provider: provider.name,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        cacheCreationInputTokens: result.usage.cacheCreationInputTokens,
+        cacheReadInputTokens: result.usage.cacheReadInputTokens,
+        cacheHit: (result.usage.cacheReadInputTokens ?? 0) > 0,
+      },
+      "AI suggest generated",
+    );
+
     // Charge quota only AFTER a successful generation — a provider 502 must not
     // burn a Free user's monthly unit for a result they never got (mirrors the
     // render path not consuming quota on failure). Abuse is already bounded by
