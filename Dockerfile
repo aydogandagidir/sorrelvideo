@@ -29,8 +29,11 @@ COPY lib/auth-web/package.json lib/auth-web/
 COPY lib/object-storage-web/package.json lib/object-storage-web/
 COPY lib/ai/package.json lib/ai/
 COPY scripts/package.json scripts/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+# NOTE: no BuildKit `--mount=type=cache` here — Railway's Metal builder rejects
+# cache mounts whose `id` lacks its per-service prefix ("missing the cacheKey
+# prefix"). The pnpm store cache is only a build-speed optimization, so we drop
+# it for a portable Dockerfile that builds on Railway, local Docker, and CI alike.
+RUN pnpm install --frozen-lockfile
 
 # ---------- Stage 3: build ----------
 # Run typecheck (catches surprises before deploy) and build every package.
