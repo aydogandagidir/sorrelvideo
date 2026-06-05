@@ -438,12 +438,66 @@ export interface AiSuggestRequest {
   prompt: string;
 }
 
-export interface WebsiteToVideoRequest {
+/**
+ * A region to FEATURE, as 0–1 fractions of the captured screenshot (x/y = top-left, w/h = size). Clamped server-side; w/h are floored so a tiny selection can't zoom to infinity.
+ */
+export interface CropRegion {
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  x: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  y: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  w: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  h: number;
+}
+
+export interface WebsiteToVideoPreviewRequest {
   /**
      * The public website URL to capture (http/https only).
      * @maxLength 2048
      */
   url: string;
+}
+
+export interface WebsiteToVideoPreviewResponse {
+  /** Pass back to POST /website-to-video with a `crop` to render. */
+  previewId: string;
+  /** The captured screenshot as a data URI (for the crop UI). */
+  image: string;
+  /** Screenshot width in px (the crop fractions are relative to this). */
+  width: number;
+  /** Screenshot height in px. */
+  height: number;
+}
+
+/**
+ * Provide either `url` (capture fresh — the one-shot flow) or `previewId` (from POST /website-to-video/preview — the crop flow). Exactly one.
+ */
+export interface WebsiteToVideoRequest {
+  /**
+     * The public website URL to capture (http/https only).
+     * @maxLength 2048
+     */
+  url?: string;
+  /**
+     * Id from a prior /website-to-video/preview call. When set, that already-captured screenshot is reused and `crop` features a region.
+     * @maxLength 128
+     */
+  previewId?: string;
+  crop?: CropRegion;
   /**
      * Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.
      * @minimum 3

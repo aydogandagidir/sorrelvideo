@@ -56,6 +56,8 @@ import type {
   TemplateInput,
   UploadUrlRequest,
   UploadUrlResponse,
+  WebsiteToVideoPreviewRequest,
+  WebsiteToVideoPreviewResponse,
   WebsiteToVideoRequest
 } from './api.schemas';
 
@@ -3053,6 +3055,77 @@ export const useLintComposition = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getLintCompositionMutationOptions(options));
+    }
+
+export const getWebsiteToVideoPreviewUrl = () => {
+
+
+
+
+  return `/api/website-to-video/preview`
+}
+
+/**
+ * @summary Capture a website screenshot for the crop UI (step 1 of the crop flow)
+ */
+export const websiteToVideoPreview = async (websiteToVideoPreviewRequest: WebsiteToVideoPreviewRequest, options?: RequestInit): Promise<WebsiteToVideoPreviewResponse> => {
+
+  return customFetch<WebsiteToVideoPreviewResponse>(getWebsiteToVideoPreviewUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      websiteToVideoPreviewRequest,)
+  }
+);}
+
+
+
+
+export const getWebsiteToVideoPreviewMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof websiteToVideoPreview>>, TError,{data: BodyType<WebsiteToVideoPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof websiteToVideoPreview>>, TError,{data: BodyType<WebsiteToVideoPreviewRequest>}, TContext> => {
+
+const mutationKey = ['websiteToVideoPreview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof websiteToVideoPreview>>, {data: BodyType<WebsiteToVideoPreviewRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  websiteToVideoPreview(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type WebsiteToVideoPreviewMutationResult = NonNullable<Awaited<ReturnType<typeof websiteToVideoPreview>>>
+    export type WebsiteToVideoPreviewMutationBody = BodyType<WebsiteToVideoPreviewRequest>
+    export type WebsiteToVideoPreviewMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Capture a website screenshot for the crop UI (step 1 of the crop flow)
+ */
+export const useWebsiteToVideoPreview = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof websiteToVideoPreview>>, TError,{data: BodyType<WebsiteToVideoPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof websiteToVideoPreview>>,
+        TError,
+        {data: BodyType<WebsiteToVideoPreviewRequest>},
+        TContext
+      > => {
+      return useMutation(getWebsiteToVideoPreviewMutationOptions(options));
     }
 
 export const getWebsiteToVideoUrl = () => {
