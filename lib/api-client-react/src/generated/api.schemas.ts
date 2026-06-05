@@ -444,6 +444,12 @@ export interface WebsiteToVideoRequest {
      * @maxLength 2048
      */
   url: string;
+  /**
+     * Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.
+     * @minimum 3
+     * @maximum 60
+     */
+  duration?: number;
 }
 
 export interface AiSuggestResult {

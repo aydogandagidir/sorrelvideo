@@ -14,8 +14,13 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Globe, Loader2, Sparkles } from "lucide-react";
 
+// Preset video lengths (seconds). The backend clamps to 3–60; these are the
+// quick picks. The page scroll stretches to fill, so longer = more leisurely.
+const DURATIONS = [5, 10, 15, 30] as const;
+
 export default function WebsiteToVideo(): React.JSX.Element {
   const [url, setUrl] = useState("");
+  const [duration, setDuration] = useState<number>(10);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -38,7 +43,7 @@ export default function WebsiteToVideo(): React.JSX.Element {
     if (!trimmed || createVideo.isPending) return;
     // Be forgiving: accept "example.com" and default it to https://.
     const full = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    createVideo.mutate({ data: { url: full } });
+    createVideo.mutate({ data: { url: full, duration } });
   }
 
   return (
@@ -93,6 +98,31 @@ export default function WebsiteToVideo(): React.JSX.Element {
                   )}
                 </Button>
               </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">Video length</span>
+                <div className="flex gap-2">
+                  {DURATIONS.map((d) => (
+                    <Button
+                      key={d}
+                      type="button"
+                      variant={duration === d ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setDuration(d)}
+                      disabled={createVideo.isPending}
+                      className="flex-1"
+                      aria-pressed={duration === d}
+                    >
+                      {d}s
+                    </Button>
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Intro &amp; outro stay fixed; the page scroll fills the rest —
+                  longer means a slower, calmer scroll.
+                </span>
+              </div>
+
               {createVideo.isPending && (
                 <p className="text-sm text-muted-foreground">
                   Loading the site and capturing a screenshot — this takes a few

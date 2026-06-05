@@ -95,6 +95,11 @@ const STUDIO_FALLBACKS = {
   "user.bodyText":
     "Sorrel turns a template, your brand kit, and a few sentences into branded video — ready to ship.",
   "user.ctaText": "Try it free",
+  // website-showcase reads {{duration}} (data-duration + the GSAP timeline). New
+  // captures always set it from the user's choice; this default keeps a legacy
+  // website-showcase project (created before duration was selectable) rendering at
+  // its original 9s instead of leaving the placeholder unresolved.
+  duration: "9",
 } as const;
 
 /** Resolve the HTML composition filename for a given module slug. */
