@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, projectsTable, renderJobsTable } from "@workspace/db";
 import { logger } from "./logger";
 import { hasPendingJob, isQueueEnabled } from "./renderQueue";
+import { decrementRenderCount } from "../services/billingService";
 
 /**
  * Reconcile projects left in "rendering" after a restart.
@@ -17,10 +18,10 @@ import { hasPendingJob, isQueueEnabled } from "./renderQueue";
 export async function recoverStuckRenders(): Promise<void> {
   if (!process.env.DATABASE_URL) return;
 
-  let stuck: { id: number }[];
+  let stuck: { id: number; userId: string }[];
   try {
     stuck = await db
-      .select({ id: projectsTable.id })
+      .select({ id: projectsTable.id, userId: projectsTable.userId })
       .from(projectsTable)
       .where(eq(projectsTable.status, "rendering"));
   } catch (err) {
@@ -36,16 +37,33 @@ export async function recoverStuckRenders(): Promise<void> {
   const lambdaProjectIds = await activeLambdaProjectIds();
 
   let reset = 0;
-  for (const { id } of stuck) {
+  for (const { id, userId } of stuck) {
     if (lambdaProjectIds.has(id)) continue;
     if (queueOn && (await hasPendingJob(id))) continue;
-    await db
+    const updated = await db
       .update(projectsTable)
       .set({ status: "failed", renderError: "Render interrupted by a restart" })
       .where(
         and(eq(projectsTable.id, id), eq(projectsTable.status, "rendering")),
-      );
+      )
+      .returning({ id: projectsTable.id });
+    if (updated.length === 0) continue;
     reset++;
+    // A crash/restart killed the render process before executeRender's catch
+    // could run its decrementRenderCount refund, so the user was charged for a
+    // render that produced nothing. Reconcile that here. `.returning()` makes
+    // the refund fire only when THIS call actually flipped the row (idempotent
+    // against a concurrent reset / a re-run). Best-effort + window-aware
+    // (decrementRenderCount only refunds a charge in the current quota window),
+    // so a refund failure must never abort recovery.
+    try {
+      await decrementRenderCount(userId);
+    } catch (err) {
+      logger.warn(
+        { err, projectId: id },
+        "Quota refund on stuck-render recovery failed",
+      );
+    }
   }
 
   if (reset > 0) logger.info({ reset }, "Reset stuck renders to failed");
