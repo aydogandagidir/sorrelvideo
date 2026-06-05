@@ -811,10 +811,14 @@ export const LintCompositionResponse = zod.object({
  */
 export const websiteToVideoBodyUrlMax = 2048;
 
+export const websiteToVideoBodyDurationMin = 3;
+export const websiteToVideoBodyDurationMax = 60;
+
 
 
 export const WebsiteToVideoBody = zod.object({
-  "url": zod.string().max(websiteToVideoBodyUrlMax).describe('The public website URL to capture (http\/https only).')
+  "url": zod.string().max(websiteToVideoBodyUrlMax).describe('The public website URL to capture (http\/https only).'),
+  "duration": zod.number().min(websiteToVideoBodyDurationMin).max(websiteToVideoBodyDurationMax).optional().describe('Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro\/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.')
 })
 
 

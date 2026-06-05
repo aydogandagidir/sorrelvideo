@@ -11,6 +11,24 @@ const SHOWCASE_MODULE = "website-showcase";
 // + a couple of sections to scroll through.
 const SHOWCASE_MAX_CAPTURE_HEIGHT = 2800;
 
+// Video length is user-selectable. Coerce to a whole number of seconds in a sane
+// range BEFORE it becomes a compositionVar: it lands in the composition's
+// `data-duration` and a `parseFloat("{{duration}}")` JS literal, and
+// renderCompositionTemplate does NOT escape quotes — so a clamped *number* is the
+// only safe thing to substitute. 3s floor keeps the fixed intro/outro from
+// colliding; 60s ceiling bounds render cost.
+const SHOWCASE_DEFAULT_DURATION = 9;
+const SHOWCASE_MIN_DURATION = 3;
+const SHOWCASE_MAX_DURATION = 60;
+
+function clampDuration(raw: number | undefined): number {
+  if (raw === undefined || !Number.isFinite(raw)) return SHOWCASE_DEFAULT_DURATION;
+  return Math.min(
+    SHOWCASE_MAX_DURATION,
+    Math.max(SHOWCASE_MIN_DURATION, Math.round(raw)),
+  );
+}
+
 /**
  * website→video: screenshot a user-supplied URL (SSRF-guarded by captureWebsite)
  * and create a draft project from the branded `website-showcase` composition. The
@@ -24,7 +42,9 @@ const SHOWCASE_MAX_CAPTURE_HEIGHT = 2800;
 export async function createWebsiteVideoProject(
   userId: string,
   rawUrl: string,
+  opts?: { duration?: number },
 ): Promise<typeof projectsTable.$inferSelect> {
+  const duration = clampDuration(opts?.duration);
   // Capture into a throwaway temp dir — the PNG is embedded as a data URI, never kept.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sorrel-capture-"));
   try {
@@ -40,6 +60,9 @@ export async function createWebsiteVideoProject(
       "capture.height": String(capture.height),
       "capture.url": capture.url,
       "capture.title": capture.title,
+      // Safe: a clamped integer stringifies to digits only — no quote / JS-break
+      // risk even though it lands in `data-duration` + a parseFloat("…") literal.
+      duration: String(duration),
     };
 
     // Defense in depth: route this server-built map through the same injection

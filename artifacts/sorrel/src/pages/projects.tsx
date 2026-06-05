@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Film, Play, Trash2, Clock, Plus, Loader2, Clapperboard, AlertTriangle } from "lucide-react";
+import { AlertCircle, Film, Play, Trash2, Clock, Plus, Loader2, Clapperboard, AlertTriangle, Download, Share2 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
@@ -160,6 +161,42 @@ function ProjectCard({
   };
 
   const videoSrc = project.videoUrl ?? `/api/projects/${project.id}/video`;
+  const { toast } = useToast();
+  const downloadName = `${
+    (project.name || "video")
+      .replace(/[^a-z0-9-_]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "video"
+  }.mp4`;
+
+  // Share the rendered video. Prefer the Web Share API with the actual file so a
+  // PRIVATE (owner-only) render can be shared without a public link; fall back to
+  // copying the project link. The fetch carries the session cookie (same-origin).
+  const handleShare = async () => {
+    if (typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
+      try {
+        const res = await fetch(videoSrc, { credentials: "include" });
+        if (res.ok) {
+          const blob = await res.blob();
+          const file = new File([blob], downloadName, { type: "video/mp4" });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: project.name || "Sorrel video" });
+            return;
+          }
+        }
+      } catch (err) {
+        // User dismissed the share sheet — not an error, don't fall through.
+        if (err instanceof Error && err.name === "AbortError") return;
+      }
+    }
+    const link = `${window.location.origin}/projects?focus=${project.id}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Link copied", description: "Project link copied to your clipboard." });
+    } catch {
+      toast({ title: "Sharing isn't supported here", description: link });
+    }
+  };
 
   return (
     <Card
@@ -352,12 +389,25 @@ function ProjectCard({
       {/* Video player dialog */}
       <Dialog open={showVideo} onOpenChange={setShowVideo}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black">
+          <DialogTitle className="sr-only">{project.name || "Video"}</DialogTitle>
           <video
             src={videoSrc}
             controls
             autoPlay
             className="w-full max-h-[70vh] rounded-lg"
           />
+          <div className="flex items-center justify-end gap-2 px-4 pb-4 pt-1">
+            <Button asChild variant="secondary" size="sm">
+              <a href={videoSrc} download={downloadName}>
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </a>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleShare}>
+              <Share2 className="mr-2 h-4 w-4" />
+              Share
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -32,7 +32,7 @@
       data-width="1920"
       data-height="1080"
       data-start="0"
-      data-duration="9"
+      data-duration="{{duration}}"
     >
       <div class="stage">
         <!-- Browser window mockup containing the captured screenshot -->
@@ -208,6 +208,16 @@
           const viewportH = 748;
           const scroll = Math.max(0, scaledHeight - viewportH);
 
+          // User-chosen total duration (seconds). Substituted server-side as a
+          // clamped number, so it is always a safe numeric literal. The intro
+          // (reveal) and outro are fixed-length; the page SCROLL stretches to
+          // fill whatever is left — a longer video simply scrolls more slowly.
+          const total = parseFloat("{{duration}}") || 9;
+          const INTRO_END = 3.3; // intro hold + wipe + browser reveal complete
+          const OUTRO_LEN = 1.3; // outro animations occupy the final stretch
+          const scrollDuration = Math.max(0.3, total - INTRO_END - OUTRO_LEN);
+          const outroBase = INTRO_END + scrollDuration; // = total - OUTRO_LEN
+
           const tl = gsap.timeline({ paused: true });
 
           // 1. Intro card holds, then wipes up to reveal the browser.
@@ -225,29 +235,30 @@
             2.2,
           );
 
-          // 3. Screenshot scrolls top → bottom to showcase the page.
+          // 3. Screenshot scrolls top → bottom to showcase the page (fills the
+          //    middle; its length is what scales with the chosen duration).
           tl.fromTo(
             root + " .shot",
             { y: 0 },
-            { y: -scroll, duration: 4.4, ease: "none" },
-            3.3,
+            { y: -scroll, duration: scrollDuration, ease: "none" },
+            INTRO_END,
           );
 
-          // 4. Outro: darken + title/URL fade up.
+          // 4. Outro: darken + title/URL fade up, anchored to the final seconds.
           tl.to(
             root + " .outro",
             { background: "rgba(7,7,11,0.82)", duration: 0.7, ease: "power2.out" },
-            7.7,
+            outroBase,
           );
           tl.to(
             root + " .outro-title",
             { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" },
-            7.9,
+            outroBase + 0.2,
           );
           tl.to(
             root + " .outro-pill",
             { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
-            8.2,
+            outroBase + 0.5,
           );
 
           window.__timelines = window.__timelines || {};

@@ -37,6 +37,7 @@ router.post(
       const project = await createWebsiteVideoProject(
         req.user.id,
         normalizeWebsiteUrl(parsed.data.url),
+        { duration: parsed.data.duration ?? undefined },
       );
       res.status(201).json(GetProjectResponse.parse(serializeDates(project)));
     } catch (err) {
