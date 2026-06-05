@@ -161,6 +161,40 @@ describe("toEngineConfig", () => {
       expect(() => toEngineConfig(s, "composition.html")).not.toThrow();
     }
   });
+
+  it("caps workers at 2 by default (one render must not OOM a small box)", () => {
+    const prev = process.env.RENDER_WORKERS;
+    delete process.env.RENDER_WORKERS;
+    try {
+      expect(
+        toEngineConfig(DEFAULT_RENDER_SETTINGS, "composition.html").workers,
+      ).toBe(2);
+    } finally {
+      if (prev === undefined) delete process.env.RENDER_WORKERS;
+      else process.env.RENDER_WORKERS = prev;
+    }
+  });
+
+  it("honors a valid RENDER_WORKERS override and ignores junk/non-positive", () => {
+    const prev = process.env.RENDER_WORKERS;
+    try {
+      process.env.RENDER_WORKERS = "5";
+      expect(
+        toEngineConfig(DEFAULT_RENDER_SETTINGS, "composition.html").workers,
+      ).toBe(5);
+      process.env.RENDER_WORKERS = "0";
+      expect(
+        toEngineConfig(DEFAULT_RENDER_SETTINGS, "composition.html").workers,
+      ).toBe(2);
+      process.env.RENDER_WORKERS = "not-a-number";
+      expect(
+        toEngineConfig(DEFAULT_RENDER_SETTINGS, "composition.html").workers,
+      ).toBe(2);
+    } finally {
+      if (prev === undefined) delete process.env.RENDER_WORKERS;
+      else process.env.RENDER_WORKERS = prev;
+    }
+  });
 });
 
 describe("formatSupportsAlpha", () => {
