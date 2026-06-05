@@ -178,7 +178,25 @@ export function resolveDimensions(resolution: RenderResolution): {
  * documented guidance: "Render alpha at composition resolution and upscale
  * separately"). For opaque mp4 the preset is forwarded unchanged, so the default
  * (mp4 / portrait) render is byte-for-byte as before.
+ *
+ * `workers` is capped (env `RENDER_WORKERS`, default 2). The producer otherwise
+ * auto-calibrates the worker count to the host CPU count — observed as 6 on
+ * Railway — and each worker drives its own headless-Chrome context. Six of them
+ * OOM-crash a small container (Railway Free/Hobby) the instant a render starts,
+ * which surfaces to the user as "Render interrupted by a restart", a swscaler
+ * encode failure under memory pressure, or a 502 while the box is pinned. A low,
+ * env-tunable default keeps a single render from taking the whole instance down;
+ * raise `RENDER_WORKERS` on a larger box for faster renders.
  */
+const DEFAULT_RENDER_WORKERS = 2;
+
+function resolveRenderWorkers(): number {
+  const raw = Number(process.env.RENDER_WORKERS);
+  return Number.isFinite(raw) && raw >= 1
+    ? Math.floor(raw)
+    : DEFAULT_RENDER_WORKERS;
+}
+
 export function toEngineConfig(
   settings: RenderSettings,
   entryFile: string,
@@ -194,6 +212,8 @@ export function toEngineConfig(
     quality: settings.quality,
     format: settings.format,
     entryFile,
+    // Cap parallel render workers so one render can't OOM-crash a small box.
+    workers: resolveRenderWorkers(),
     // Alpha output forbids a deviceScaleFactor override; omit it there.
     ...(alpha ? {} : { outputResolution: settings.resolution }),
   };
