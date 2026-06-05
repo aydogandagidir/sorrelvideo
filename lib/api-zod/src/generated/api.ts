@@ -807,9 +807,35 @@ export const LintCompositionResponse = zod.object({
 
 
 /**
+ * @summary Capture a website screenshot for the crop UI (step 1 of the crop flow)
+ */
+export const websiteToVideoPreviewBodyUrlMax = 2048;
+
+
+
+export const WebsiteToVideoPreviewBody = zod.object({
+  "url": zod.string().max(websiteToVideoPreviewBodyUrlMax).describe('The public website URL to capture (http\/https only).')
+})
+
+
+/**
  * @summary Capture a website and create a branded showcase video project
  */
 export const websiteToVideoBodyUrlMax = 2048;
+
+export const websiteToVideoBodyPreviewIdMax = 128;
+
+export const websiteToVideoBodyCropXMin = 0;
+export const websiteToVideoBodyCropXMax = 1;
+
+export const websiteToVideoBodyCropYMin = 0;
+export const websiteToVideoBodyCropYMax = 1;
+
+export const websiteToVideoBodyCropWMin = 0;
+export const websiteToVideoBodyCropWMax = 1;
+
+export const websiteToVideoBodyCropHMin = 0;
+export const websiteToVideoBodyCropHMax = 1;
 
 export const websiteToVideoBodyDurationMin = 3;
 export const websiteToVideoBodyDurationMax = 60;
@@ -817,8 +843,15 @@ export const websiteToVideoBodyDurationMax = 60;
 
 
 export const WebsiteToVideoBody = zod.object({
-  "url": zod.string().max(websiteToVideoBodyUrlMax).describe('The public website URL to capture (http\/https only).'),
+  "url": zod.string().max(websiteToVideoBodyUrlMax).optional().describe('The public website URL to capture (http\/https only).'),
+  "previewId": zod.string().max(websiteToVideoBodyPreviewIdMax).optional().describe('Id from a prior \/website-to-video\/preview call. When set, that already-captured screenshot is reused and `crop` features a region.'),
+  "crop": zod.object({
+  "x": zod.number().min(websiteToVideoBodyCropXMin).max(websiteToVideoBodyCropXMax),
+  "y": zod.number().min(websiteToVideoBodyCropYMin).max(websiteToVideoBodyCropYMax),
+  "w": zod.number().min(websiteToVideoBodyCropWMin).max(websiteToVideoBodyCropWMax),
+  "h": zod.number().min(websiteToVideoBodyCropHMin).max(websiteToVideoBodyCropHMax)
+}).optional().describe('A region to FEATURE, as 0–1 fractions of the captured screenshot (x\/y = top-left, w\/h = size). Clamped server-side; w\/h are floored so a tiny selection can\'t zoom to infinity.'),
   "duration": zod.number().min(websiteToVideoBodyDurationMin).max(websiteToVideoBodyDurationMax).optional().describe('Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro\/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.')
-})
+}).describe('Provide either `url` (capture fresh — the one-shot flow) or `previewId` (from POST \/website-to-video\/preview — the crop flow). Exactly one.')
 
 

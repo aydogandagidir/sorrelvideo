@@ -201,12 +201,33 @@
         (function () {
           const root = '[data-composition-id="website-showcase"]';
           const captureHeight = parseInt("{{capture.height}}", 10) || 800;
-          // The shot is drawn at 1300px wide (scaled from the 1280px capture),
-          // so its on-screen height scales by the same factor. Scroll the part
-          // that overflows the 748px viewport.
-          const scaledHeight = captureHeight * (1300 / 1280);
+          // Optional crop: the user can drag-select a region of the captured
+          // page to FEATURE. Values are 0–1 fractions of the capture; the default
+          // (whole page) reproduces the original full-page scroll byte-for-byte.
+          const clamp01 = (v) => Math.min(1, Math.max(0, v));
+          const cropX = clamp01(parseFloat("{{capture.cropX}}") || 0);
+          const cropY = clamp01(parseFloat("{{capture.cropY}}") || 0);
+          // Floor width/height so a tiny selection can't divide-by-zero / zoom to ∞.
+          const cropW = Math.min(1, Math.max(0.05, parseFloat("{{capture.cropW}}") || 1));
+          const cropH = Math.min(1, Math.max(0.05, parseFloat("{{capture.cropH}}") || 1));
+
+          const viewportW = 1300;
           const viewportH = 748;
-          const scroll = Math.max(0, scaledHeight - viewportH);
+          // Zoom so the crop's WIDTH fills the viewport; keep the image's aspect.
+          const dispW = viewportW / cropW;
+          const dispH = captureHeight * (dispW / 1280);
+          const cropLeft = cropX * dispW;
+          const cropTop = cropY * dispH;
+          const cropRegionH = cropH * dispH;
+          // Scroll only within the cropped region (clamped to the image bounds).
+          const scrollStart = cropTop;
+          const scroll = Math.max(
+            scrollStart,
+            Math.min(dispH - viewportH, cropTop + cropRegionH - viewportH),
+          );
+
+          // Size + horizontally position the shot for the crop (no-op at 0/0/1/1).
+          gsap.set(root + " .shot", { width: dispW, x: -cropLeft });
 
           // User-chosen total duration (seconds). Substituted server-side as a
           // clamped number, so it is always a safe numeric literal. The intro
@@ -239,7 +260,7 @@
           //    middle; its length is what scales with the chosen duration).
           tl.fromTo(
             root + " .shot",
-            { y: 0 },
+            { y: -scrollStart },
             { y: -scroll, duration: scrollDuration, ease: "none" },
             INTRO_END,
           );

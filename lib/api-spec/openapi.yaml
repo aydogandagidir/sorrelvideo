@@ -953,6 +953,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /website-to-video/preview:
+    post:
+      operationId: websiteToVideoPreview
+      tags: [projects]
+      summary: Capture a website screenshot for the crop UI (step 1 of the crop flow)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebsiteToVideoPreviewRequest"
+      responses:
+        "201":
+          description: The captured screenshot + a previewId to render with a crop.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebsiteToVideoPreviewResponse"
+        "400":
+          description: The URL is invalid or not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too many capture requests; back off.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: The site couldn't be loaded or captured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /website-to-video:
     post:
       operationId: websiteToVideo
@@ -1463,7 +1506,20 @@ components:
           minLength: 3
           maxLength: 500
 
-    WebsiteToVideoRequest:
+    CropRegion:
+      type: object
+      description: >-
+        A region to FEATURE, as 0–1 fractions of the captured screenshot
+        (x/y = top-left, w/h = size). Clamped server-side; w/h are floored so a
+        tiny selection can't zoom to infinity.
+      required: [x, y, w, h]
+      properties:
+        x: { type: number, minimum: 0, maximum: 1 }
+        y: { type: number, minimum: 0, maximum: 1 }
+        w: { type: number, minimum: 0, maximum: 1 }
+        h: { type: number, minimum: 0, maximum: 1 }
+
+    WebsiteToVideoPreviewRequest:
       type: object
       required: [url]
       properties:
@@ -1471,6 +1527,42 @@ components:
           type: string
           description: The public website URL to capture (http/https only).
           maxLength: 2048
+
+    WebsiteToVideoPreviewResponse:
+      type: object
+      required: [previewId, image, width, height]
+      properties:
+        previewId:
+          type: string
+          description: Pass back to POST /website-to-video with a `crop` to render.
+        image:
+          type: string
+          description: The captured screenshot as a data URI (for the crop UI).
+        width:
+          type: integer
+          description: Screenshot width in px (the crop fractions are relative to this).
+        height:
+          type: integer
+          description: Screenshot height in px.
+
+    WebsiteToVideoRequest:
+      type: object
+      description: >-
+        Provide either `url` (capture fresh — the one-shot flow) or `previewId`
+        (from POST /website-to-video/preview — the crop flow). Exactly one.
+      properties:
+        url:
+          type: string
+          description: The public website URL to capture (http/https only).
+          maxLength: 2048
+        previewId:
+          type: string
+          description: >-
+            Id from a prior /website-to-video/preview call. When set, that
+            already-captured screenshot is reused and `crop` features a region.
+          maxLength: 128
+        crop:
+          $ref: "#/components/schemas/CropRegion"
         duration:
           type: integer
           description: >-
