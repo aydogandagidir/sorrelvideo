@@ -53,6 +53,53 @@ describe.runIf(INTEGRATION_AVAILABLE)("recoverStuckRenders (inline mode)", () =>
       .where(eq(projectsTable.id, draftId));
     expect(row.status).toBe("draft");
   });
+
+  it("refunds the render quota for a recovered orphan (a crash skips the normal refund)", async () => {
+    // The render was charged at claim time; an OOM/restart killed the process
+    // before executeRender's catch could run decrementRenderCount. Recovery must
+    // give that Free render back. renderResetAt is in the FUTURE (startOfNextMonth
+    // semantics) so the window is still current and the window-aware refund fires
+    // — isNewMonth() is `now >= resetAt`, so a past/now resetAt reads as expired.
+    const userId = await createUser();
+    await db
+      .update(usersTable)
+      .set({
+        renderCount: 2,
+        renderResetAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+      })
+      .where(eq(usersTable.id, userId));
+    const stuckId = await createProject(userId, "rendering");
+
+    await recoverStuckRenders();
+
+    const [proj] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, stuckId));
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    expect(proj.status).toBe("failed");
+    expect(user.renderCount).toBe(1); // 2 → 1: exactly one orphan refunded
+  });
+
+  it("does NOT drive the quota negative when there's nothing to refund (floored at 0)", async () => {
+    const userId = await createUser(); // renderCount defaults to 0
+    await db
+      .update(usersTable)
+      .set({ renderResetAt: new Date(Date.now() + 30 * 24 * 3600 * 1000) })
+      .where(eq(usersTable.id, userId));
+    await createProject(userId, "rendering");
+
+    await recoverStuckRenders();
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    expect(user.renderCount).toBe(0);
+  });
 });
 
 describe.runIf(INTEGRATION_AVAILABLE)("atomic render claim", () => {
