@@ -4,6 +4,7 @@ import { websiteCaptureLimiter } from "../middlewares/rateLimit";
 import { createWebsiteVideoProject } from "../services/websiteToVideoService";
 import { SsrfError } from "../lib/ssrfGuard";
 import { WebsiteCaptureError } from "../services/websiteCaptureService";
+import { normalizeWebsiteUrl } from "../lib/websiteUrl";
 
 const router: IRouter = Router();
 
@@ -30,9 +31,12 @@ router.post(
     }
 
     try {
+      // Users routinely paste a bare host ("bluedev.dev"); default the scheme to
+      // https:// so it isn't rejected as "Invalid URL". assertSafeUrl (inside
+      // captureWebsite) still validates the result, so SSRF protection is intact.
       const project = await createWebsiteVideoProject(
         req.user.id,
-        parsed.data.url,
+        normalizeWebsiteUrl(parsed.data.url),
       );
       res.status(201).json(GetProjectResponse.parse(serializeDates(project)));
     } catch (err) {
