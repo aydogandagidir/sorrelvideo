@@ -69,3 +69,4 @@ export * from './uploadUrlResponse';
 export * from './websiteToVideoPreviewRequest';
 export * from './websiteToVideoPreviewResponse';
 export * from './websiteToVideoRequest';
+export * from './websiteToVideoRequestSection';

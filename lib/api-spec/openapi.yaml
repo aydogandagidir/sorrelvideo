@@ -1563,6 +1563,16 @@ components:
           maxLength: 128
         crop:
           $ref: "#/components/schemas/CropRegion"
+        selector:
+          type: string
+          description: >-
+            A CSS selector ("by element" mode) — the capture resolves the matching
+            element's box and features it. Requires `url`.
+          maxLength: 400
+        section:
+          type: string
+          enum: [hero]
+          description: A preset section — "hero" features the first screen. Requires `url`.
         duration:
           type: integer
           description: >-

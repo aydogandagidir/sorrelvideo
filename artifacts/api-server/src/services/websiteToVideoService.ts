@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import { db, projectsTable, DEFAULT_RENDER_SETTINGS } from "@workspace/db";
-import { captureWebsite, WebsiteCaptureError } from "./websiteCaptureService";
+import {
+  captureWebsite,
+  WebsiteCaptureError,
+  type PageSection,
+} from "./websiteCaptureService";
 import { assertSafeCompositionVars } from "../lib/compositionVars";
+import { buildCropVars, heroCrop, type CropRegion } from "../lib/websiteCrop";
 import {
   savePreview,
   consumePreview,
@@ -34,35 +39,6 @@ function clampDuration(raw: number | undefined): number {
     SHOWCASE_MAX_DURATION,
     Math.max(SHOWCASE_MIN_DURATION, Math.round(raw)),
   );
-}
-
-function clamp01(v: number): number {
-  return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0;
-}
-
-/** A drag-selected region to feature, as 0–1 fractions of the capture. */
-export interface CropRegion {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/**
- * Crop fractions → safe composition vars. Each is `String(a 0–1 number)`, i.e.
- * digits + a dot only, so it's injection-proof even though it lands in
- * `parseFloat("{{capture.cropX}}")` literals (renderCompositionTemplate doesn't
- * escape quotes). The 5% width/height floors mirror the composition so a stray 0
- * can't divide-by-zero / zoom to infinity.
- */
-function buildCropVars(crop: CropRegion | undefined): Record<string, string> {
-  if (!crop) return {};
-  return {
-    "capture.cropX": String(clamp01(crop.x)),
-    "capture.cropY": String(clamp01(crop.y)),
-    "capture.cropW": String(Math.max(0.05, clamp01(crop.w))),
-    "capture.cropH": String(Math.max(0.05, clamp01(crop.h))),
-  };
 }
 
 /**
@@ -106,12 +82,26 @@ interface ResolvedCapture {
   url: string;
   title: string;
   cleanupDir: string;
+  /** Set when a CSS `selector` matched during capture — the region to feature. */
+  selectorCrop?: CropRegion;
+  /** Set when `extractSections` — candidate sections for AI matching. */
+  sections?: PageSection[];
 }
 
-/** Resolve the capture from a stored preview (crop flow) or a fresh URL capture. */
+/**
+ * Resolve the capture from a stored preview (the drag-crop flow) or a fresh URL
+ * capture. For a fresh capture, `selector` / `extractSections` are threaded to
+ * captureWebsite so the element box / section list comes back with it (the crop
+ * for the by-element + AI modes is derived during the single capture).
+ */
 async function resolveCapture(
   userId: string,
-  opts: { url?: string; previewId?: string },
+  opts: {
+    url?: string;
+    previewId?: string;
+    selector?: string;
+    extractSections?: boolean;
+  },
 ): Promise<ResolvedCapture> {
   if (opts.previewId) {
     const preview = consumePreview(opts.previewId, userId);
@@ -133,6 +123,8 @@ async function resolveCapture(
     try {
       const capture = await captureWebsite(opts.url, dir, {
         maxHeight: SHOWCASE_MAX_CAPTURE_HEIGHT,
+        selector: opts.selector,
+        extractSections: opts.extractSections,
       });
       return {
         screenshotPath: capture.screenshotPath,
@@ -140,6 +132,8 @@ async function resolveCapture(
         url: capture.url,
         title: capture.title,
         cleanupDir: dir,
+        selectorCrop: capture.selectorCrop,
+        sections: capture.sections,
       };
     } catch (err) {
       disposePreview({ dir });
@@ -164,16 +158,28 @@ export async function createWebsiteVideoProject(
   opts: {
     url?: string;
     previewId?: string;
-    crop?: CropRegion;
     duration?: number;
+    // "Which section" — at most one determines the crop; none = whole page:
+    crop?: CropRegion; // an explicit drag-selected region (with previewId)
+    selector?: string; // a CSS element ("by element")
+    section?: "hero"; // a preset — the first screen
   },
 ): Promise<typeof projectsTable.$inferSelect> {
   const duration = clampDuration(opts.duration);
-  const cap = await resolveCapture(userId, opts);
+  const cap = await resolveCapture(userId, {
+    url: opts.url,
+    previewId: opts.previewId,
+    selector: opts.selector,
+  });
   try {
     const dataUri =
       "data:image/png;base64," +
       fs.readFileSync(cap.screenshotPath).toString("base64");
+
+    // Resolve the region to feature from the chosen mode. Whole page → no crop.
+    let crop = opts.crop;
+    if (!crop && opts.selector) crop = cap.selectorCrop;
+    if (!crop && opts.section === "hero") crop = heroCrop(cap.height);
 
     const compositionVars: Record<string, string> = {
       "capture.image": dataUri,
@@ -181,7 +187,7 @@ export async function createWebsiteVideoProject(
       "capture.url": cap.url,
       "capture.title": cap.title,
       duration: String(duration),
-      ...buildCropVars(opts.crop),
+      ...buildCropVars(crop),
     };
 
     // Defense in depth: route this server-built map through the same injection
