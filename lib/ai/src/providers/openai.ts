@@ -1,9 +1,17 @@
 import OpenAI from "openai";
-import { buildSystemPrompt, buildUserPrompt } from "../prompt";
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  BRAND_EXTRACT_SYSTEM,
+  buildBrandExtractUserText,
+} from "../prompt";
 import {
   SuggestOutputSchema,
+  ExtractBrandOutputSchema,
   type SuggestInput,
   type SuggestResult,
+  type ExtractBrandInput,
+  type ExtractBrandResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -31,6 +39,25 @@ const SUGGEST_RESPONSE_SCHEMA = {
     headline: { type: "string" },
     bodyText: { type: "string" },
     ctaText: { type: "string" },
+  },
+} as const;
+
+const EXTRACT_BRAND_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "companyName",
+    "primaryColor",
+    "secondaryColor",
+    "accentColor",
+    "fontFamily",
+  ],
+  properties: {
+    companyName: { type: ["string", "null"] },
+    primaryColor: { type: "string" },
+    secondaryColor: { type: "string" },
+    accentColor: { type: ["string", "null"] },
+    fontFamily: { type: ["string", "null"] },
   },
 } as const;
 
@@ -76,6 +103,58 @@ export const openaiProvider: AiProvider = {
         // OpenAI caches prompt prefixes >1024 tokens AUTOMATICALLY (no
         // cache_control knob), reporting reuse here. Surfaced for parity with
         // Anthropic's cache_read; there is no separate cache-creation charge.
+        cacheReadInputTokens:
+          response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
+      },
+    };
+  },
+
+  async extractBrand(input: ExtractBrandInput): Promise<ExtractBrandResult> {
+    const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+
+    const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+      { type: "text", text: buildBrandExtractUserText(input.signals) },
+    ];
+    if (input.screenshot) {
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${input.screenshot.mediaType};base64,${input.screenshot.base64}`,
+        },
+      });
+    }
+
+    const response = await getClient().chat.completions.create({
+      model,
+      max_tokens: input.maxTokens ?? 300,
+      messages: [
+        { role: "system", content: BRAND_EXTRACT_SYSTEM },
+        { role: "user", content: userContent },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "extract_brand",
+          strict: true,
+          schema: EXTRACT_BRAND_RESPONSE_SCHEMA,
+        },
+      },
+    });
+
+    const choice = response.choices[0];
+    const text = choice?.message?.content?.trim();
+    if (!text) {
+      throw new Error("OpenAI returned no message content");
+    }
+
+    const parsedJson: unknown = JSON.parse(text);
+    const output = ExtractBrandOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
         cacheReadInputTokens:
           response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
       },

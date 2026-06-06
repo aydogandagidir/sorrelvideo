@@ -8,6 +8,11 @@
 import type { BrandKitInputBrandVoice } from './brandKitInputBrandVoice';
 
 export interface BrandKitInput {
+  /** @maxLength 80 */
+  name?: string;
+  isDefault?: boolean;
+  /** @maxLength 2048 */
+  sourceUrl?: string;
   logoUrl?: string;
   primaryColor?: string;
   secondaryColor?: string;

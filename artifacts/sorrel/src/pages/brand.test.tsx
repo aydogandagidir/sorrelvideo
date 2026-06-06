@@ -1,14 +1,13 @@
 /**
- * Brand Kit page — two behaviors matter: the form HYDRATES from the loaded
- * brand kit (companyName, colors, voice all reflect server values), and SAVE
- * issues a PUT /api/brand carrying the edited payload. The save handler also
- * has a small but real branch: an unset brandVoice is omitted from the body
- * (the backend rejects the empty-string placeholder), so we assert both the
- * "omitted when empty" and "included when chosen" shapes.
+ * Brand Kit page — now multi-kit. Three behaviors matter: the kit list HYDRATES
+ * the editor from the default kit (listed first), "Detect" prefills the form
+ * from POST /brand-kits/extract and switches to a NEW draft, and Save routes to
+ * POST /brand-kits (new draft) vs PATCH /brand-kits/:id (existing kit).
  *
- * `useGetBrandKit` / `useUpdateBrandKit` are generated Orval hooks (customFetch
- * → PUT), so we use the real-Response fetch mock and read the captured request
- * body to verify what was sent.
+ * The hooks are generated Orval hooks (customFetch), so we use the real-Response
+ * fetch mock and read captured request bodies. NOTE: the mock matches URLs by
+ * substring, and "/api/brand-kits" contains "/api/brand" — so every rule uses an
+ * ANCHORED regex (+ method) to avoid cross-matching.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
@@ -27,18 +26,22 @@ afterEach(() => {
   fetchMock = undefined;
 });
 
-const AUTH_ROUTE: ApiFetchRoute = {
-  url: "/api/auth/user",
-  json: { user: null },
+const AUTH_ROUTE: ApiFetchRoute = { url: "/api/auth/user", json: { user: null } };
+const BILLING_ROUTE: ApiFetchRoute = {
+  url: "/api/billing/me",
+  status: 500,
+  json: {},
 };
-const BILLING_ROUTE: ApiFetchRoute = { url: "/api/billing/me", status: 500, json: {} };
 
 function brandKit(over: Record<string, unknown> = {}) {
   return {
     id: 1,
+    name: "Acme",
+    isDefault: true,
+    sourceUrl: null,
     logoUrl: null,
     primaryColor: "#112233",
-    secondaryColor: "#ffffff",
+    secondaryColor: "#445566",
     accentColor: "#ff0000",
     fontFamily: "Inter",
     companyName: "Acme Rockets",
@@ -49,107 +52,106 @@ function brandKit(over: Record<string, unknown> = {}) {
   };
 }
 
-/** The body sent on the most recent PUT /api/brand call, parsed from JSON. */
-function lastBrandPutBody(): Record<string, unknown> | undefined {
+const LIST_ROUTE: ApiFetchRoute = {
+  url: /\/api\/brand-kits$/,
+  method: "GET",
+  json: [brandKit(), brandKit({ id: 2, name: "Side project", isDefault: false })],
+};
+
+/** Body of the most recent request matching method + an anchored URL regex. */
+function lastBody(method: string, urlRe: RegExp): Record<string, unknown> | undefined {
   const calls = fetchMock?.mock.mock.calls ?? [];
   for (let i = calls.length - 1; i >= 0; i--) {
     const [input, init] = calls[i] as [RequestInfo | URL, RequestInit?];
     const url = typeof input === "string" ? input : (input as Request).url;
-    const method = (init?.method ?? "GET").toUpperCase();
-    if (method === "PUT" && /\/api\/brand$/.test(url)) {
+    const m = (init?.method ?? "GET").toUpperCase();
+    if (m === method.toUpperCase() && urlRe.test(url)) {
       return init?.body ? JSON.parse(init.body as string) : {};
     }
   }
   return undefined;
 }
 
-describe("Brand Kit — hydration", () => {
-  it("populates the form from the loaded brand kit", async () => {
+describe("Brand Kit — multi-kit", () => {
+  it("lists kits and hydrates the editor from the default kit", async () => {
+    fetchMock = installApiFetchMock([AUTH_ROUTE, BILLING_ROUTE, LIST_ROUTE]);
+    renderWithProviders(<Brand />);
+
+    const nameInput = await waitFor(() => screen.getByLabelText(/company name/i));
+    expect(nameInput).toHaveValue("Acme Rockets");
+    // Both kits show as switcher chips (exact names — "Delete Acme" is a separate
+    // button, so a loose /Acme/ would match two elements).
+    expect(screen.getByRole("button", { name: "Acme" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Side project" }),
+    ).toBeInTheDocument();
+  });
+
+  it("detects a brand from a URL then creates a new kit", async () => {
+    const user = userEvent.setup();
     fetchMock = installApiFetchMock([
       AUTH_ROUTE,
       BILLING_ROUTE,
       {
-        url: "/api/brand",
-        method: "GET",
-        json: brandKit({ companyName: "Acme Rockets", brandVoice: "bold" }),
+        url: /\/api\/brand-kits\/extract$/,
+        method: "POST",
+        json: {
+          companyName: "Nebula Inc",
+          primaryColor: "#abcdef",
+          secondaryColor: "#102030",
+          accentColor: "#ffaa00",
+          fontFamily: "Poppins",
+          logoUrl: null,
+          sourceUrl: "https://nebula.test",
+        },
       },
+      { url: /\/api\/brand-kits$/, method: "POST", json: brandKit({ id: 9, companyName: "Nebula Inc" }) },
+      LIST_ROUTE,
     ]);
-
     renderWithProviders(<Brand />);
 
-    // The company-name input reflects the server value once loaded.
-    const nameInput = await waitFor(() =>
-      screen.getByLabelText(/company name/i),
+    const detectInput = await waitFor(() =>
+      screen.getByLabelText(/website url to detect/i),
     );
-    expect(nameInput).toHaveValue("Acme Rockets");
-    // The brand-voice select is set to the stored enum.
-    expect(screen.getByLabelText(/brand voice/i)).toHaveValue("bold");
-    // Live preview echoes the company name (rendered text node).
-    expect(screen.getAllByText("Acme Rockets").length).toBeGreaterThan(0);
-  });
-});
+    await user.type(detectInput, "nebula.test");
+    await user.click(screen.getByRole("button", { name: /^detect$/i }));
 
-describe("Brand Kit — save", () => {
-  it("PUTs the edited values, omitting brandVoice when none is chosen", async () => {
-    const user = userEvent.setup();
-    fetchMock = installApiFetchMock([
-      AUTH_ROUTE,
-      BILLING_ROUTE,
-      // brandVoice null → the select stays on the empty placeholder.
-      { url: "/api/brand", method: "GET", json: brandKit({ brandVoice: null }) },
-      { url: "/api/brand", method: "PUT", json: brandKit() },
-    ]);
-
-    renderWithProviders(<Brand />);
-
-    const nameInput = await waitFor(() =>
-      screen.getByLabelText(/company name/i),
+    // The detected company name lands in the form.
+    await waitFor(() =>
+      expect(screen.getByLabelText(/company name/i)).toHaveValue("Nebula Inc"),
     );
-    await user.clear(nameInput);
-    await user.type(nameInput, "Nebula Inc");
 
-    await user.click(screen.getByRole("button", { name: /save brand kit/i }));
-
-    await waitFor(() => expect(lastBrandPutBody()).toBeDefined());
-    const body = lastBrandPutBody();
+    // Saving the draft POSTs to /brand-kits with the detected values.
+    await user.click(screen.getByRole("button", { name: /create brand kit/i }));
+    await waitFor(() =>
+      expect(lastBody("POST", /\/api\/brand-kits$/)).toBeDefined(),
+    );
+    const body = lastBody("POST", /\/api\/brand-kits$/);
     expect(body?.companyName).toBe("Nebula Inc");
-    // The empty-string placeholder is NOT forwarded as brandVoice.
-    expect(body).not.toHaveProperty("brandVoice");
-    // Other fields ride along.
-    expect(body?.primaryColor).toBe("#112233");
+    expect(body?.primaryColor).toBe("#abcdef");
+    expect(body?.sourceUrl).toBe("https://nebula.test");
   });
 
-  it("includes brandVoice in the payload once a tone is selected", async () => {
+  it("saves edits to an existing kit via PATCH", async () => {
     const user = userEvent.setup();
     fetchMock = installApiFetchMock([
       AUTH_ROUTE,
       BILLING_ROUTE,
-      { url: "/api/brand", method: "GET", json: brandKit({ brandVoice: null }) },
-      { url: "/api/brand", method: "PUT", json: brandKit({ brandVoice: "playful" }) },
+      { url: /\/api\/brand-kits\/\d+$/, method: "PATCH", json: brandKit() },
+      LIST_ROUTE,
     ]);
-
     renderWithProviders(<Brand />);
 
-    const voiceSelect = await waitFor(() => screen.getByLabelText(/brand voice/i));
-    await user.selectOptions(voiceSelect, "playful");
-
+    const nameInput = await waitFor(() => screen.getByLabelText(/company name/i));
+    await user.clear(nameInput);
+    await user.type(nameInput, "Acme Galaxy");
     await user.click(screen.getByRole("button", { name: /save brand kit/i }));
-
-    await waitFor(() => expect(lastBrandPutBody()).toBeDefined());
-    expect(lastBrandPutBody()?.brandVoice).toBe("playful");
-  });
-
-  it("surfaces a destructive alert if the brand kit fails to load", async () => {
-    fetchMock = installApiFetchMock([
-      AUTH_ROUTE,
-      BILLING_ROUTE,
-      { url: "/api/brand", method: "GET", status: 500, json: {} },
-    ]);
-
-    renderWithProviders(<Brand />);
 
     await waitFor(() =>
-      expect(screen.getByText(/failed to load brand kit/i)).toBeInTheDocument(),
+      expect(lastBody("PATCH", /\/api\/brand-kits\/\d+$/)).toBeDefined(),
+    );
+    expect(lastBody("PATCH", /\/api\/brand-kits\/\d+$/)?.companyName).toBe(
+      "Acme Galaxy",
     );
   });
 });

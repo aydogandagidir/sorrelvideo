@@ -211,6 +211,11 @@ export interface Project {
   module: string;
   /** @nullable */
   templateId?: number | null;
+  /**
+     * The brand kit this project renders with. Null → the user's default.
+     * @nullable
+     */
+  brandKitId?: number | null;
   /** @nullable */
   thumbnailUrl?: string | null;
   /** @nullable */
@@ -349,6 +354,10 @@ export const BrandKitBrandVoice = {
 
 export interface BrandKit {
   id: number;
+  name: string;
+  isDefault: boolean;
+  /** @nullable */
+  sourceUrl?: string | null;
   /** @nullable */
   logoUrl?: string | null;
   primaryColor: string;
@@ -376,6 +385,11 @@ export const BrandKitInputBrandVoice = {
 } as const;
 
 export interface BrandKitInput {
+  /** @maxLength 80 */
+  name?: string;
+  isDefault?: boolean;
+  /** @maxLength 2048 */
+  sourceUrl?: string;
   logoUrl?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -385,6 +399,31 @@ export interface BrandKitInput {
   brandVoice?: BrandKitInputBrandVoice;
   /** @maxLength 500 */
   voiceDescription?: string;
+}
+
+export interface ExtractBrandRequest {
+  /**
+     * The public website URL to detect a brand from (http/https only).
+     * @maxLength 2048
+     */
+  url: string;
+}
+
+/**
+ * A brand kit detected from a website (review then POST /brand-kits).
+ */
+export interface ExtractedBrand {
+  /** @nullable */
+  companyName?: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  /** @nullable */
+  accentColor?: string | null;
+  /** @nullable */
+  fontFamily?: string | null;
+  /** @nullable */
+  logoUrl?: string | null;
+  sourceUrl: string;
 }
 
 export type ModuleStatus = typeof ModuleStatus[keyof typeof ModuleStatus];
@@ -515,8 +554,12 @@ export interface WebsiteToVideoRequest {
   selector?: string;
   /** A preset section — "hero" features the first screen. Requires `url`. */
   section?: WebsiteToVideoRequestSection;
+  /** Brand kit to render the showcase with. Omit to use your configured default kit, or — if you have none — to auto-create one detected from the site. */
+  brandKitId?: number;
+  /** Force detecting a fresh brand kit from this site (and saving it), ignoring any existing default. Overridden by an explicit brandKitId. */
+  autoBrand?: boolean;
   /**
-     * Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.
+     * Video length in seconds. Clamped server-side to 3–60. OMIT for an automatic length scaled to the captured page height (a calm, complete scroll); a tall page therefore gets a longer video instead of racing. The intro/outro are fixed-length; the page scroll fills the rest.
      * @minimum 3
      * @maximum 60
      */

@@ -1,9 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { SYSTEM_CORE, buildBrandContext, buildUserPrompt } from "../prompt";
+import {
+  SYSTEM_CORE,
+  buildBrandContext,
+  buildUserPrompt,
+  BRAND_EXTRACT_SYSTEM,
+  buildBrandExtractUserText,
+} from "../prompt";
 import {
   SuggestOutputSchema,
+  ExtractBrandOutputSchema,
   type SuggestInput,
   type SuggestResult,
+  type ExtractBrandInput,
+  type ExtractBrandResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -98,6 +107,65 @@ export const anthropicProvider: AiProvider = {
         // Surfaced so the caller can log cache effectiveness. `cache_read > 0`
         // means the stable prefix was served from cache (~10% of input cost);
         // `cache_creation > 0` is the one-time write that seeds it.
+        cacheCreationInputTokens:
+          response.usage.cache_creation_input_tokens ?? undefined,
+        cacheReadInputTokens:
+          response.usage.cache_read_input_tokens ?? undefined,
+      },
+    };
+  },
+
+  async extractBrand(input: ExtractBrandInput): Promise<ExtractBrandResult> {
+    const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
+
+    const userContent: Anthropic.ContentBlockParam[] = [
+      { type: "text", text: buildBrandExtractUserText(input.signals) },
+    ];
+    if (input.screenshot) {
+      userContent.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: input.screenshot.mediaType,
+          data: input.screenshot.base64,
+        },
+      });
+    }
+
+    const response = await getClient().messages.create({
+      model,
+      max_tokens: input.maxTokens ?? 300,
+      system: [
+        {
+          type: "text",
+          text: BRAND_EXTRACT_SYSTEM,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [{ role: "user", content: userContent }],
+    });
+
+    const text = response.content
+      .filter(
+        (block): block is Extract<typeof block, { type: "text" }> =>
+          block.type === "text",
+      )
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
+
+    if (!text) {
+      throw new Error("Anthropic returned no text content");
+    }
+
+    const parsedJson: unknown = JSON.parse(extractJsonObject(text));
+    const output = ExtractBrandOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
         cacheCreationInputTokens:
           response.usage.cache_creation_input_tokens ?? undefined,
         cacheReadInputTokens:

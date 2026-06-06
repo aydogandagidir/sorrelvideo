@@ -6,11 +6,21 @@ export {
   BrandVoiceSchema,
   SuggestInputSchema,
   SuggestOutputSchema,
+  ExtractBrandInputSchema,
+  ExtractBrandOutputSchema,
+  ExtractBrandSignalsSchema,
+  BrandScreenshotSchema,
   type BrandVoice,
   type SuggestInput,
   type SuggestOutput,
   type SuggestResult,
   type SuggestUsage,
+  type ExtractBrandInput,
+  type ExtractBrandOutput,
+  type ExtractBrandResult,
+  type ExtractBrandSignals,
+  type BrandSignalColor,
+  type BrandScreenshot,
 } from "./schema";
 export { buildSystemPrompt, buildUserPrompt } from "./prompt";
 export type { AiProvider };

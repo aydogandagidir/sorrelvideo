@@ -729,11 +729,16 @@ router.get("/projects/:id/composition", async (req, res): Promise<void> => {
     };
   }
 
+  // NOTE: compositionHtml is deliberately NOT passed — this route must re-merge
+  // the template so the `?vars=` live-edit overrides take effect (passing a
+  // saved doc would return it verbatim). brandKitId IS passed so the preview
+  // uses the project's pinned kit (or the user's default), matching the render.
   const html = await buildCompositionHtml({
     id: project.id,
     userId: project.userId,
     module: project.module,
     compositionVars: mergedVars,
+    brandKitId: project.brandKitId,
   });
 
   // Preview must reflect live edits, never a cached copy.

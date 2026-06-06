@@ -9,6 +9,10 @@ import type { BrandKitBrandVoice } from './brandKitBrandVoice';
 
 export interface BrandKit {
   id: number;
+  name: string;
+  isDefault: boolean;
+  /** @nullable */
+  sourceUrl?: string | null;
   /** @nullable */
   logoUrl?: string | null;
   primaryColor: string;

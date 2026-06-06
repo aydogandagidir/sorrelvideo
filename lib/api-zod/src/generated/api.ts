@@ -257,6 +257,7 @@ export const ListProjectsResponseItem = zod.object({
   "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
   "module": zod.string(),
   "templateId": zod.number().nullish(),
+  "brandKitId": zod.number().nullish().describe('The brand kit this project renders with. Null → the user\'s default.'),
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
@@ -315,6 +316,7 @@ export const GetProjectResponse = zod.object({
   "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
   "module": zod.string(),
   "templateId": zod.number().nullish(),
+  "brandKitId": zod.number().nullish().describe('The brand kit this project renders with. Null → the user\'s default.'),
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
@@ -366,6 +368,7 @@ export const UpdateProjectResponse = zod.object({
   "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
   "module": zod.string(),
   "templateId": zod.number().nullish(),
+  "brandKitId": zod.number().nullish().describe('The brand kit this project renders with. Null → the user\'s default.'),
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
@@ -427,6 +430,7 @@ export const CancelProjectRenderResponse = zod.object({
   "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
   "module": zod.string(),
   "templateId": zod.number().nullish(),
+  "brandKitId": zod.number().nullish().describe('The brand kit this project renders with. Null → the user\'s default.'),
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
@@ -513,6 +517,7 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
   "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
   "module": zod.string(),
   "templateId": zod.number().nullish(),
+  "brandKitId": zod.number().nullish().describe('The brand kit this project renders with. Null → the user\'s default.'),
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
@@ -544,6 +549,9 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
  */
 export const GetBrandKitResponse = zod.object({
   "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "sourceUrl": zod.string().nullish(),
   "logoUrl": zod.string().nullish(),
   "primaryColor": zod.string(),
   "secondaryColor": zod.string(),
@@ -557,13 +565,20 @@ export const GetBrandKitResponse = zod.object({
 
 
 /**
- * @summary Update the brand kit
+ * @summary Update the default brand kit (back-compat singleton accessor)
  */
+export const updateBrandKitBodyNameMax = 80;
+
+export const updateBrandKitBodySourceUrlMax = 2048;
+
 export const updateBrandKitBodyVoiceDescriptionMax = 500;
 
 
 
 export const UpdateBrandKitBody = zod.object({
+  "name": zod.string().max(updateBrandKitBodyNameMax).optional(),
+  "isDefault": zod.boolean().optional(),
+  "sourceUrl": zod.string().max(updateBrandKitBodySourceUrlMax).optional(),
   "logoUrl": zod.string().optional(),
   "primaryColor": zod.string().optional(),
   "secondaryColor": zod.string().optional(),
@@ -576,6 +591,9 @@ export const UpdateBrandKitBody = zod.object({
 
 export const UpdateBrandKitResponse = zod.object({
   "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "sourceUrl": zod.string().nullish(),
   "logoUrl": zod.string().nullish(),
   "primaryColor": zod.string(),
   "secondaryColor": zod.string(),
@@ -585,6 +603,153 @@ export const UpdateBrandKitResponse = zod.object({
   "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
   "voiceDescription": zod.string().nullish(),
   "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List the user's brand kits (default first)
+ */
+export const ListBrandKitsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "sourceUrl": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string(),
+  "secondaryColor": zod.string(),
+  "accentColor": zod.string().nullish(),
+  "fontFamily": zod.string(),
+  "companyName": zod.string().nullish(),
+  "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
+  "voiceDescription": zod.string().nullish(),
+  "updatedAt": zod.string()
+})
+export const ListBrandKitsResponse = zod.array(ListBrandKitsResponseItem)
+
+
+/**
+ * @summary Create a brand kit
+ */
+export const createBrandKitBodyNameMax = 80;
+
+export const createBrandKitBodySourceUrlMax = 2048;
+
+export const createBrandKitBodyVoiceDescriptionMax = 500;
+
+
+
+export const CreateBrandKitBody = zod.object({
+  "name": zod.string().max(createBrandKitBodyNameMax).optional(),
+  "isDefault": zod.boolean().optional(),
+  "sourceUrl": zod.string().max(createBrandKitBodySourceUrlMax).optional(),
+  "logoUrl": zod.string().optional(),
+  "primaryColor": zod.string().optional(),
+  "secondaryColor": zod.string().optional(),
+  "accentColor": zod.string().optional(),
+  "fontFamily": zod.string().optional(),
+  "companyName": zod.string().optional(),
+  "brandVoice": zod.enum(['professional', 'playful', 'bold', 'minimal']).optional(),
+  "voiceDescription": zod.string().max(createBrandKitBodyVoiceDescriptionMax).optional()
+})
+
+
+/**
+ * @summary Detect a brand kit from a website URL (does not save it)
+ */
+export const extractBrandBodyUrlMax = 2048;
+
+
+
+export const ExtractBrandBody = zod.object({
+  "url": zod.string().max(extractBrandBodyUrlMax).describe('The public website URL to detect a brand from (http\/https only).')
+})
+
+export const ExtractBrandResponse = zod.object({
+  "companyName": zod.string().nullish(),
+  "primaryColor": zod.string(),
+  "secondaryColor": zod.string(),
+  "accentColor": zod.string().nullish(),
+  "fontFamily": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "sourceUrl": zod.string()
+}).describe('A brand kit detected from a website (review then POST \/brand-kits).')
+
+
+/**
+ * @summary Get a brand kit by id
+ */
+export const GetBrandKitByIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBrandKitByIdResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "sourceUrl": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string(),
+  "secondaryColor": zod.string(),
+  "accentColor": zod.string().nullish(),
+  "fontFamily": zod.string(),
+  "companyName": zod.string().nullish(),
+  "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
+  "voiceDescription": zod.string().nullish(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update a brand kit by id
+ */
+export const UpdateBrandKitByIdParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateBrandKitByIdBodyNameMax = 80;
+
+export const updateBrandKitByIdBodySourceUrlMax = 2048;
+
+export const updateBrandKitByIdBodyVoiceDescriptionMax = 500;
+
+
+
+export const UpdateBrandKitByIdBody = zod.object({
+  "name": zod.string().max(updateBrandKitByIdBodyNameMax).optional(),
+  "isDefault": zod.boolean().optional(),
+  "sourceUrl": zod.string().max(updateBrandKitByIdBodySourceUrlMax).optional(),
+  "logoUrl": zod.string().optional(),
+  "primaryColor": zod.string().optional(),
+  "secondaryColor": zod.string().optional(),
+  "accentColor": zod.string().optional(),
+  "fontFamily": zod.string().optional(),
+  "companyName": zod.string().optional(),
+  "brandVoice": zod.enum(['professional', 'playful', 'bold', 'minimal']).optional(),
+  "voiceDescription": zod.string().max(updateBrandKitByIdBodyVoiceDescriptionMax).optional()
+})
+
+export const UpdateBrandKitByIdResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "sourceUrl": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string(),
+  "secondaryColor": zod.string(),
+  "accentColor": zod.string().nullish(),
+  "fontFamily": zod.string(),
+  "companyName": zod.string().nullish(),
+  "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
+  "voiceDescription": zod.string().nullish(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a brand kit by id
+ */
+export const DeleteBrandKitParams = zod.object({
+  "id": zod.coerce.number()
 })
 
 
@@ -762,6 +927,7 @@ export const GetStatsResponse = zod.object({
   "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
   "module": zod.string(),
   "templateId": zod.number().nullish(),
+  "brandKitId": zod.number().nullish().describe('The brand kit this project renders with. Null → the user\'s default.'),
   "thumbnailUrl": zod.string().nullish(),
   "videoUrl": zod.string().nullish(),
   "duration": zod.number().nullish(),
@@ -855,7 +1021,9 @@ export const WebsiteToVideoBody = zod.object({
 }).optional().describe('A region to FEATURE, as 0–1 fractions of the captured screenshot (x\/y = top-left, w\/h = size). Clamped server-side; w\/h are floored so a tiny selection can\'t zoom to infinity.'),
   "selector": zod.string().max(websiteToVideoBodySelectorMax).optional().describe('A CSS selector (\"by element\" mode) — the capture resolves the matching element\'s box and features it. Requires `url`.'),
   "section": zod.enum(['hero']).optional().describe('A preset section — \"hero\" features the first screen. Requires `url`.'),
-  "duration": zod.number().min(websiteToVideoBodyDurationMin).max(websiteToVideoBodyDurationMax).optional().describe('Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro\/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.')
+  "brandKitId": zod.number().optional().describe('Brand kit to render the showcase with. Omit to use your configured default kit, or — if you have none — to auto-create one detected from the site.'),
+  "autoBrand": zod.boolean().optional().describe('Force detecting a fresh brand kit from this site (and saving it), ignoring any existing default. Overridden by an explicit brandKitId.'),
+  "duration": zod.number().min(websiteToVideoBodyDurationMin).max(websiteToVideoBodyDurationMax).optional().describe('Video length in seconds. Clamped server-side to 3–60. OMIT for an automatic length scaled to the captured page height (a calm, complete scroll); a tall page therefore gets a longer video instead of racing. The intro\/outro are fixed-length; the page scroll fills the rest.')
 }).describe('Provide either `url` (capture fresh — the one-shot flow) or `previewId` (from POST \/website-to-video\/preview — the crop flow). Exactly one.')
 
 

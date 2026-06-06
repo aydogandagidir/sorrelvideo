@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
-import { useWebsiteToVideo } from "@workspace/api-client-react";
+import {
+  useWebsiteToVideo,
+  useListBrandKits,
+} from "@workspace/api-client-react";
 import {
   Card,
   CardContent,
@@ -14,15 +17,22 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Globe, Loader2, Sparkles } from "lucide-react";
 
-// Preset video lengths (seconds). The backend clamps to 3–60; these are the
-// quick picks. The page scroll stretches to fill, so longer = more leisurely.
-const DURATIONS = [5, 10, 15, 30] as const;
+// Preset video lengths (seconds) + "Auto". Auto omits duration so the backend
+// scales the length to the captured page height — a calm, COMPLETE scroll
+// through the whole site (the fix for "too short / shows it too briefly").
+type DurationChoice = "auto" | number;
+const DURATIONS: DurationChoice[] = ["auto", 10, 20, 30, 45];
 
 export default function WebsiteToVideo(): React.JSX.Element {
   const [url, setUrl] = useState("");
-  const [duration, setDuration] = useState<number>(10);
+  const [duration, setDuration] = useState<DurationChoice>("auto");
+  // "" = automatic (reuse a configured default, else detect); "detect" = always
+  // detect fresh; a number = a specific kit id.
+  const [brandChoice, setBrandChoice] = useState<"" | "detect" | number>("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: kits } = useListBrandKits();
 
   const createVideo = useWebsiteToVideo({
     mutation: {
@@ -43,7 +53,17 @@ export default function WebsiteToVideo(): React.JSX.Element {
     if (!trimmed || createVideo.isPending) return;
     // Be forgiving: accept "example.com" and default it to https://.
     const full = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    createVideo.mutate({ data: { url: full, duration } });
+    createVideo.mutate({
+      data: {
+        url: full,
+        ...(duration !== "auto" ? { duration } : {}),
+        ...(brandChoice === "detect"
+          ? { autoBrand: true }
+          : typeof brandChoice === "number"
+            ? { brandKitId: brandChoice }
+            : {}),
+      },
+    });
   }
 
   return (
@@ -104,7 +124,7 @@ export default function WebsiteToVideo(): React.JSX.Element {
                 <div className="flex gap-2">
                   {DURATIONS.map((d) => (
                     <Button
-                      key={d}
+                      key={String(d)}
                       type="button"
                       variant={duration === d ? "default" : "outline"}
                       size="sm"
@@ -113,13 +133,42 @@ export default function WebsiteToVideo(): React.JSX.Element {
                       className="flex-1"
                       aria-pressed={duration === d}
                     >
-                      {d}s
+                      {d === "auto" ? "Auto" : `${d}s`}
                     </Button>
                   ))}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  Intro &amp; outro stay fixed; the page scroll fills the rest —
-                  longer means a slower, calmer scroll.
+                  Auto scales the length to the page so the whole site scrolls
+                  through calmly. Pick a fixed length to override.
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">Brand</span>
+                <select
+                  value={String(brandChoice)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setBrandChoice(
+                      v === "" || v === "detect" ? (v as "" | "detect") : Number(v),
+                    );
+                  }}
+                  disabled={createVideo.isPending}
+                  aria-label="Brand kit"
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Automatic — use my brand, else detect</option>
+                  <option value="detect">Detect this site&apos;s brand (new kit)</option>
+                  {kits?.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      Use “{k.name}”{k.isDefault ? " (default)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">
+                  {kits && kits.length > 0
+                    ? "Automatic uses your default brand kit, or detects one from the site if you have none."
+                    : "No brand kit yet — we’ll detect one from your site and save it to your Brand Kit."}
                 </span>
               </div>
 

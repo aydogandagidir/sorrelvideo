@@ -24,6 +24,8 @@ export * from './checkoutResponse';
 export * from './consumeEmailVerificationParams';
 export * from './cropRegion';
 export * from './errorEnvelope';
+export * from './extractBrandRequest';
+export * from './extractedBrand';
 export * from './finalizeUploadRequest';
 export * from './finalizeUploadResult';
 export * from './forgotPasswordRequest';

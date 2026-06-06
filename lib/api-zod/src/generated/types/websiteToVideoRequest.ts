@@ -30,8 +30,12 @@ export interface WebsiteToVideoRequest {
   selector?: string;
   /** A preset section — "hero" features the first screen. Requires `url`. */
   section?: WebsiteToVideoRequestSection;
+  /** Brand kit to render the showcase with. Omit to use your configured default kit, or — if you have none — to auto-create one detected from the site. */
+  brandKitId?: number;
+  /** Force detecting a fresh brand kit from this site (and saving it), ignoring any existing default. Overridden by an explicit brandKitId. */
+  autoBrand?: boolean;
   /**
-     * Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.
+     * Video length in seconds. Clamped server-side to 3–60. OMIT for an automatic length scaled to the captured page height (a calm, complete scroll); a tall page therefore gets a longer video instead of racing. The intro/outro are fixed-length; the page scroll fills the rest.
      * @minimum 3
      * @maximum 60
      */

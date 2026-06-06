@@ -621,7 +621,7 @@ paths:
     put:
       operationId: updateBrandKit
       tags: [brand]
-      summary: Update the brand kit
+      summary: Update the default brand kit (back-compat singleton accessor)
       requestBody:
         required: true
         content:
@@ -635,6 +635,152 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BrandKit"
+
+  /brand-kits:
+    get:
+      operationId: listBrandKits
+      tags: [brand]
+      summary: List the user's brand kits (default first)
+      responses:
+        "200":
+          description: Brand kits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BrandKit"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createBrandKit
+      tags: [brand]
+      summary: Create a brand kit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandKitInput"
+      responses:
+        "201":
+          description: The created brand kit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKit"
+        "400":
+          description: Invalid brand kit fields
+        "401":
+          description: Unauthorized
+
+  /brand-kits/extract:
+    post:
+      operationId: extractBrand
+      tags: [brand]
+      summary: Detect a brand kit from a website URL (does not save it)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractBrandRequest"
+      responses:
+        "200":
+          description: The detected brand (review, then POST /brand-kits to save).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractedBrand"
+        "400":
+          description: The URL is invalid or not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized
+        "429":
+          description: Too many capture requests; back off.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: The site could not be loaded or captured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /brand-kits/{id}:
+    get:
+      operationId: getBrandKitById
+      tags: [brand]
+      summary: Get a brand kit by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Brand kit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKit"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    patch:
+      operationId: updateBrandKitById
+      tags: [brand]
+      summary: Update a brand kit by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandKitInput"
+      responses:
+        "200":
+          description: Updated brand kit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKit"
+        "400":
+          description: Invalid brand kit fields
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteBrandKit
+      tags: [brand]
+      summary: Delete a brand kit by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
 
   /modules:
     get:
@@ -1237,6 +1383,9 @@ components:
           type: string
         templateId:
           type: ["integer", "null"]
+        brandKitId:
+          description: The brand kit this project renders with. Null → the user's default.
+          type: ["integer", "null"]
         thumbnailUrl:
           type: ["string", "null"]
         videoUrl:
@@ -1407,10 +1556,17 @@ components:
 
     BrandKit:
       type: object
-      required: [id, primaryColor, secondaryColor, fontFamily, updatedAt]
+      required:
+        [id, name, isDefault, primaryColor, secondaryColor, fontFamily, updatedAt]
       properties:
         id:
           type: integer
+        name:
+          type: string
+        isDefault:
+          type: boolean
+        sourceUrl:
+          type: ["string", "null"]
         logoUrl:
           type: ["string", "null"]
         primaryColor:
@@ -1434,6 +1590,14 @@ components:
     BrandKitInput:
       type: object
       properties:
+        name:
+          type: string
+          maxLength: 80
+        isDefault:
+          type: boolean
+        sourceUrl:
+          type: string
+          maxLength: 2048
         logoUrl:
           type: string
         primaryColor:
@@ -1452,6 +1616,35 @@ components:
         voiceDescription:
           type: string
           maxLength: 500
+
+    ExtractBrandRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: The public website URL to detect a brand from (http/https only).
+          maxLength: 2048
+
+    ExtractedBrand:
+      type: object
+      description: A brand kit detected from a website (review then POST /brand-kits).
+      required: [primaryColor, secondaryColor, sourceUrl]
+      properties:
+        companyName:
+          type: ["string", "null"]
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        accentColor:
+          type: ["string", "null"]
+        fontFamily:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        sourceUrl:
+          type: string
 
     Module:
       type: object
@@ -1573,12 +1766,24 @@ components:
           type: string
           enum: [hero]
           description: A preset section — "hero" features the first screen. Requires `url`.
+        brandKitId:
+          type: integer
+          description: >-
+            Brand kit to render the showcase with. Omit to use your configured
+            default kit, or — if you have none — to auto-create one detected from
+            the site.
+        autoBrand:
+          type: boolean
+          description: >-
+            Force detecting a fresh brand kit from this site (and saving it),
+            ignoring any existing default. Overridden by an explicit brandKitId.
         duration:
           type: integer
           description: >-
-            Video length in seconds. Clamped server-side to 3–60; defaults to 9.
-            The intro/outro are fixed-length and the page scroll stretches to fill
-            the rest, so a longer value simply scrolls the page more slowly.
+            Video length in seconds. Clamped server-side to 3–60. OMIT for an
+            automatic length scaled to the captured page height (a calm, complete
+            scroll); a tall page therefore gets a longer video instead of racing.
+            The intro/outro are fixed-length; the page scroll fills the rest.
           minimum: 3
           maximum: 60
 
