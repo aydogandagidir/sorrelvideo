@@ -3,12 +3,21 @@ import fs from "node:fs";
 import puppeteer from "puppeteer";
 import { assertSafeUrl, SsrfError } from "../lib/ssrfGuard";
 import { logger } from "../lib/logger";
+import { bboxToCrop, type CropRegion } from "../lib/websiteCrop";
 
 export class WebsiteCaptureError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "WebsiteCaptureError";
   }
+}
+
+/** A candidate page section for the AI "describe the part you want" mode. */
+export interface PageSection {
+  /** Heading / text snippet shown to the LLM to match the user's description. */
+  label: string;
+  /** The section's region as a 0–1 crop of the capture. */
+  crop: CropRegion;
 }
 
 export interface WebsiteCapture {
@@ -18,6 +27,10 @@ export interface WebsiteCapture {
   screenshotPath: string;
   width: number;
   height: number;
+  /** Set when `opts.selector` matched an element — the region to feature. */
+  selectorCrop?: CropRegion;
+  /** Set when `opts.extractSections` — candidate sections for AI matching. */
+  sections?: PageSection[];
 }
 
 const VIEWPORT = { width: 1280, height: 800 } as const;
@@ -37,7 +50,7 @@ const MAX_CAPTURE_HEIGHT = 6000;
 export async function captureWebsite(
   rawUrl: string,
   outDir: string,
-  opts?: { maxHeight?: number },
+  opts?: { maxHeight?: number; selector?: string; extractSections?: boolean },
 ): Promise<WebsiteCapture> {
   // SSRF guard first — throws SsrfError before any network/browser work.
   const url = await assertSafeUrl(rawUrl);
@@ -127,6 +140,67 @@ export async function captureWebsite(
     });
     fs.writeFileSync(screenshotPath, buf);
 
+    // Optional: resolve a CSS-selector region (the "by element" mode). The page
+    // isn't scrolled, so boundingBox() is the element's absolute page position.
+    let selectorCrop: CropRegion | undefined;
+    if (opts?.selector) {
+      const handle = await page.$(opts.selector).catch(() => null);
+      const box = handle ? await handle.boundingBox().catch(() => null) : null;
+      if (!box) {
+        throw new WebsiteCaptureError(
+          `No element on the page matches "${opts.selector}".`,
+        );
+      }
+      selectorCrop = bboxToCrop(box, VIEWPORT.width, captureHeight);
+    }
+
+    // Optional: collect candidate sections for the AI "describe it" mode — a
+    // heading/text label + the block's box, mapped to a crop. Best-effort.
+    let sections: PageSection[] | undefined;
+    if (opts?.extractSections) {
+      const raw = await page
+        .evaluate(() => {
+          const found: {
+            label: string;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+          }[] = [];
+          const seen = new Set<string>();
+          const nodes = Array.from(
+            document.querySelectorAll(
+              "section, [id], main > div, header, footer, article",
+            ),
+          );
+          for (const el of nodes) {
+            const r = el.getBoundingClientRect();
+            if (r.width < 200 || r.height < 80) continue;
+            const heading = el.querySelector("h1,h2,h3,h4");
+            const label = (heading?.textContent || el.textContent || "")
+              .trim()
+              .replace(/\s+/g, " ")
+              .slice(0, 120);
+            if (!label || seen.has(label)) continue;
+            seen.add(label);
+            found.push({
+              label,
+              x: r.left + window.scrollX,
+              y: r.top + window.scrollY,
+              width: r.width,
+              height: r.height,
+            });
+            if (found.length >= 25) break;
+          }
+          return found;
+        })
+        .catch(() => []);
+      sections = raw.map((s) => ({
+        label: s.label,
+        crop: bboxToCrop(s, VIEWPORT.width, captureHeight),
+      }));
+    }
+
     logger.info(
       { url: url.toString(), title, captureHeight },
       "Website captured",
@@ -138,6 +212,8 @@ export async function captureWebsite(
       screenshotPath,
       width: VIEWPORT.width,
       height: captureHeight,
+      selectorCrop,
+      sections,
     };
   } finally {
     await browser.close().catch(() => undefined);

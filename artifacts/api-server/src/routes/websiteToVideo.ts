@@ -79,7 +79,7 @@ router.post(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const { url, previewId, crop, duration } = parsed.data;
+    const { url, previewId, crop, selector, section, duration } = parsed.data;
     if (!url && !previewId) {
       res.status(400).json({ error: "A url or previewId is required." });
       return;
@@ -93,6 +93,8 @@ router.post(
         url: url ? normalizeWebsiteUrl(url) : undefined,
         previewId: previewId ?? undefined,
         crop: crop ?? undefined,
+        selector: selector ?? undefined,
+        section: section ?? undefined,
         duration: duration ?? undefined,
       });
       res.status(201).json(GetProjectResponse.parse(serializeDates(project)));

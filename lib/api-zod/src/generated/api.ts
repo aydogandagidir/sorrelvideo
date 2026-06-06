@@ -837,6 +837,8 @@ export const websiteToVideoBodyCropWMax = 1;
 export const websiteToVideoBodyCropHMin = 0;
 export const websiteToVideoBodyCropHMax = 1;
 
+export const websiteToVideoBodySelectorMax = 400;
+
 export const websiteToVideoBodyDurationMin = 3;
 export const websiteToVideoBodyDurationMax = 60;
 
@@ -851,6 +853,8 @@ export const WebsiteToVideoBody = zod.object({
   "w": zod.number().min(websiteToVideoBodyCropWMin).max(websiteToVideoBodyCropWMax),
   "h": zod.number().min(websiteToVideoBodyCropHMin).max(websiteToVideoBodyCropHMax)
 }).optional().describe('A region to FEATURE, as 0–1 fractions of the captured screenshot (x\/y = top-left, w\/h = size). Clamped server-side; w\/h are floored so a tiny selection can\'t zoom to infinity.'),
+  "selector": zod.string().max(websiteToVideoBodySelectorMax).optional().describe('A CSS selector (\"by element\" mode) — the capture resolves the matching element\'s box and features it. Requires `url`.'),
+  "section": zod.enum(['hero']).optional().describe('A preset section — \"hero\" features the first screen. Requires `url`.'),
   "duration": zod.number().min(websiteToVideoBodyDurationMin).max(websiteToVideoBodyDurationMax).optional().describe('Video length in seconds. Clamped server-side to 3–60; defaults to 9. The intro\/outro are fixed-length and the page scroll stretches to fill the rest, so a longer value simply scrolls the page more slowly.')
 }).describe('Provide either `url` (capture fresh — the one-shot flow) or `previewId` (from POST \/website-to-video\/preview — the crop flow). Exactly one.')
 
