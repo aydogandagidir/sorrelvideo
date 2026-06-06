@@ -29,6 +29,11 @@ export const projectsTable = pgTable(
     status: text("status").notNull().default("draft"),
     module: text("module").notNull(),
     templateId: integer("template_id"),
+    // Optional brand kit this project renders with. Null → the user's default
+    // kit at render time (renderService.loadBrandKit). A bare integer (like
+    // templateId) rather than an FK: ownership is re-checked at load time, so a
+    // dangling id is treated as "use the default" instead of failing a write.
+    brandKitId: integer("brand_kit_id"),
     thumbnailUrl: text("thumbnail_url"),
     videoUrl: text("video_url"),
     duration: integer("duration"),

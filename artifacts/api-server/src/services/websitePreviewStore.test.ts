@@ -18,6 +18,8 @@ function makeEntry(userId: string) {
     title: "t",
     url: "https://example.test",
     captureHeight: 800,
+    mediaType: "image/jpeg" as const,
+    themeColor: null,
     userId,
   };
 }

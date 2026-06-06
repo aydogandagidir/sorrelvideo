@@ -18,6 +18,11 @@ export interface Project {
   module: string;
   /** @nullable */
   templateId?: number | null;
+  /**
+     * The brand kit this project renders with. Null → the user's default.
+     * @nullable
+     */
+  brandKitId?: number | null;
   /** @nullable */
   thumbnailUrl?: string | null;
   /** @nullable */

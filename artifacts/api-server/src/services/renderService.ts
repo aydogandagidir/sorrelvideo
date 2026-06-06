@@ -7,13 +7,9 @@ import {
   RenderCancelledError,
 } from "@hyperframes/producer";
 import { eq } from "drizzle-orm";
-import {
-  db,
-  brandKitTable,
-  projectsTable,
-  type RenderFormat,
-} from "@workspace/db";
+import { db, projectsTable, type RenderFormat } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { getBrandKit, getDefaultBrandKit } from "./brandKitService";
 import { resolveSettings, toEngineConfig } from "./renderSettingsService";
 import { decrementRenderCount } from "./billingService";
 import {
@@ -262,12 +258,21 @@ function buildVarMap(
   return map;
 }
 
-async function loadBrandKit(userId: string): Promise<BrandKitSnapshot | null> {
+/**
+ * Resolve the brand kit a project renders with: the kit it pins
+ * (`brandKitId`, ownership re-checked) when set and still owned, else the user's
+ * default kit. Returns null only when the user has no kits at all (→
+ * STUDIO_FALLBACKS). Users now have MANY kits, so a plain `WHERE user_id` would
+ * be non-deterministic — go through brandKitService's default resolution.
+ */
+async function loadBrandKit(
+  userId: string,
+  brandKitId?: number | null,
+): Promise<BrandKitSnapshot | null> {
   try {
-    const [row] = await db
-      .select()
-      .from(brandKitTable)
-      .where(eq(brandKitTable.userId, userId));
+    const row =
+      (brandKitId != null ? await getBrandKit(userId, brandKitId) : null) ??
+      (await getDefaultBrandKit(userId));
     if (!row) return null;
     return {
       companyName: row.companyName ?? null,
@@ -278,7 +283,7 @@ async function loadBrandKit(userId: string): Promise<BrandKitSnapshot | null> {
       logoUrl: row.logoUrl ?? null,
     };
   } catch (err) {
-    logger.warn({ err, userId }, "Could not load brand kit");
+    logger.warn({ err, userId, brandKitId }, "Could not load brand kit");
     return null;
   }
 }
@@ -308,6 +313,7 @@ export async function buildCompositionHtml(project: {
   module: string;
   compositionVars: Record<string, string> | null;
   compositionHtml?: string | null;
+  brandKitId?: number | null;
 }): Promise<string> {
   if (
     typeof project.compositionHtml === "string" &&
@@ -322,7 +328,7 @@ export async function buildCompositionHtml(project: {
     "utf-8",
   );
 
-  const brand = await loadBrandKit(project.userId);
+  const brand = await loadBrandKit(project.userId, project.brandKitId);
   const vars = buildVarMap(brand, project.compositionVars);
   return renderCompositionTemplate(source, vars);
 }
@@ -344,6 +350,7 @@ async function prepareCompositionFor(
     module: string;
     compositionVars: Record<string, string> | null;
     compositionHtml?: string | null;
+    brandKitId?: number | null;
   },
   options: { watermark: boolean } = { watermark: true },
 ): Promise<{ dir: string; file: string }> {
@@ -391,6 +398,7 @@ export async function executeRender(
         module: projectsTable.module,
         compositionVars: projectsTable.compositionVars,
         compositionHtml: projectsTable.compositionHtml,
+        brandKitId: projectsTable.brandKitId,
         renderSettings: projectsTable.renderSettings,
       })
       .from(projectsTable)

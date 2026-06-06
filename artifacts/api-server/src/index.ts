@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
 import { applyRenderJobsMigration } from "./lib/applyRenderJobsMigration";
+import { applyBrandKitMigration } from "./lib/applyBrandKitMigration";
 import { closeRenderQueue, startRenderWorker } from "./lib/renderQueue";
 import { recoverStuckRenders } from "./lib/recoverStuckRenders";
 import {
@@ -47,6 +48,22 @@ async function initRenderJobs(): Promise<void> {
   }
 }
 
+async function initBrandKits(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    logger.warn("DATABASE_URL not set — skipping brand-kit migration");
+    return;
+  }
+
+  try {
+    await applyBrandKitMigration();
+  } catch (err) {
+    logger.warn(
+      { err },
+      "Brand-kit migration failed — brand kits may misbehave",
+    );
+  }
+}
+
 async function initTemplates(): Promise<void> {
   if (!process.env.DATABASE_URL) {
     logger.warn("DATABASE_URL not set — skipping platform template seed");
@@ -77,6 +94,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 await initBilling();
 await initRenderJobs();
+await initBrandKits();
 await initTemplates();
 
 // Boot the render worker before recovery so any jobs already persisted in Redis

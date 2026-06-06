@@ -271,6 +271,43 @@ from a single account hammering it.
 Tokens are deliberately not stored: AI provider keys live only in env,
 and provider response usage is logged but not persisted.
 
+## Brand Kit
+
+**Many-per-user** (was one-per-user). `brand_kit` carries `name`, `isDefault`,
+and `sourceUrl` (the site a kit was auto-detected from); the old
+`UNIQUE(user_id)` is replaced by a **partial-unique index**
+`UQ_brand_kit_default ON (user_id) WHERE is_default` — at most one default per
+user, many non-defaults. `brandKitService` centralises the invariant: any write
+that sets a kit default clears the user's other defaults in the same transaction.
+`projects.brandKitId` (a bare integer, like `templateId`) pins a project's kit;
+null → the user's default at render time (`renderService.loadBrandKit`).
+
+- **API**: `/brand-kits` collection — `GET` (list, default first), `POST`
+  (create), `GET/PATCH/DELETE /brand-kits/:id`, and `POST /brand-kits/extract`
+  (detect from a URL, does NOT save). `GET/PUT /brand` are kept as a back-compat
+  **default-kit** accessor (studio's `useGetBrandKit`); `GET /brand` returns a
+  NON-persisted `transientDefaultBrandKit` when the user has no kit, so it never
+  litters an empty placeholder row (a placeholder would wrongly satisfy
+  website→video's "do you have a kit?" check and reimpose the generic look).
+- **Auto-extraction (`brandExtractionService`)**: `captureWebsite({ extractBrand })`
+  scrapes RAW brand signals in-page (CSS custom props, theme-color, the dominant
+  CTA/link/header colors via an area-weighted frequency map, fonts, logo
+  candidates, og:site_name) — `lib/brandColors.ts` (pure, unit-tested) then
+  parses/normalises/dedupes them and `pickBrandColors` makes the deterministic
+  pick. An AI **refine** step (`AiProvider.extractBrand`, Claude/OpenAI vision on
+  the screenshot + signals → canonical primary/secondary/accent + company name +
+  font) runs when configured and within AI quota
+  (`consumeAiUnitIfAvailable`, charges one AI unit), with the heuristic as a hard
+  fallback — so extraction always returns a brand, AI or not. Every extracted
+  value is re-validated (`isSafeCssColor`/`isSafeLogoUrl`/`sanitizeFontFamily`)
+  before it can be saved or rendered.
+- **Validation at write**: `assertSafeBrandFields` rejects unsafe colors / logo /
+  font on every create+update (colors land UNQUOTED in composition CSS; the
+  template layer only escapes `< > &`, not quotes — see `lib/compositionVars.ts`).
+- **AI provider keys** reuse the existing `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`
+  + `AI_PROVIDER` — no new env. Brand extraction is rate-limited
+  (`brandExtractLimiter`, 10 / 15 min) because it launches Chrome.
+
 ## OAuth (GitHub + Google)
 
 Optional, gated by env. When
@@ -310,19 +347,43 @@ a draft project from the branded `website-showcase` composition, returned so the
 SPA (`pages/website-to-video.tsx`) navigates straight to it. The flow:
 `websiteToVideoService.createWebsiteVideoProject` →
 `websiteCaptureService.captureWebsite` (headless Chrome via Puppeteer) → embeds
-the screenshot as a `capture.image` **data URI** in `compositionVars`
-(+ `capture.height`/`title`/`url`), at the composition's native 1920×1080.
-`renderService` substitutes those (HTML-escaping the untrusted title/url) into
-`compositions/website-showcase.html` (intro → mac-style browser scrolling the
-screenshot → outro CTA).
+the **full-page** screenshot as a `capture.image` **JPEG data URI** in
+`compositionVars` (+ `capture.height`/`title`/`url`), at the composition's native
+1920×1080. `renderService` substitutes those (HTML-escaping the untrusted
+title/url) into `compositions/website-showcase.html` (intro → mac-style browser
+scrolling the screenshot → outro CTA).
+
+**Brand wiring (the showcase is actually branded).** The intro card and stage
+glow read `brand.primaryColor`/`secondaryColor`/`companyName`, which come from the
+project's brand kit at render time (`renderService.loadBrandKit(userId,
+brandKitId)`). `createWebsiteVideoProject` resolves and stamps `projects.brandKitId`
+up front: an explicit `brandKitId` → the user's **configured** default kit
+(`isConfiguredBrandKit` — a real kit, not an empty placeholder) → else it
+**auto-extracts a kit from the captured site** and saves it (so the very first
+video of a site is branded, not the generic "Your Brand" placeholder). `autoBrand:
+true` forces fresh detection even when a default exists. Extraction =
+`brandExtractionService` (DOM scrape via the SAME capture + AI refine, see Brand
+Kit); the AI step is best-effort + quota-gated (`consumeAiUnitIfAvailable`), with
+a deterministic heuristic fallback.
+
+**Length (the "too short / shows it incompletely" fix).** The capture is the
+**whole page** (cap raised to 9000px, JPEG-encoded so the inlined data URI stays
+bounded — the old 2800px PNG cap truncated tall sites), and `duration` is
+**adaptive when omitted**: `computeAutoDuration(captureHeight)` sizes the scroll
+to a calm ~360 px/s reading pace (matching the composition's scroll math) so the
+ENTIRE page scrolls through without racing, capped at 45s. An explicit `duration`
+(3–60) still overrides. `STUDIO_FALLBACKS` keeps `duration: "9"` only for legacy
+projects whose `compositionVars` predate the field.
 
 **Capabilities (shipped).** The video dialog (`projects.tsx`) has **Download**
 (direct same-origin MP4) + **Share** (Web Share API with the actual file so a
 private render shares without a public link; falls back to copy-link). **Length
 is selectable** — `website-showcase` reads `data-duration="{{duration}}"` and the
 GSAP page-scroll stretches to fill (intro/outro fixed); the request `duration` is
-clamped server-side to 3–60 (`STUDIO_FALLBACKS` defaults 9 — a 9s render is
-byte-identical). **"Which section" to feature** is user-chosen, and *every* mode
+clamped server-side to 3–60, and **omitting it picks an adaptive length** from the
+page height (calm full-page scroll, ≤45s — see "Length" above). **Brand** is
+user-chosen too (automatic / always-detect / a specific kit). **"Which section" to
+feature** is user-chosen, and *every* mode
 reduces to one `CropRegion` (0–1 fractions) emitted as `capture.cropX/Y/W/H` that
 the composition zooms/pans/scrolls into (default `0/0/1/1` = whole page,
 byte-identical). Pure crop math is `lib/websiteCrop.ts`
@@ -382,8 +443,9 @@ can't break the `parseFloat("…")` literals). Modes:
 
 **`CAPTURE_NO_SANDBOX`**: Chrome's sandbox is ON by default (untrusted pages).
 Set `=true` ONLY on container hosts that can't start a sandboxed Chrome (root /
-no user namespaces). The captured screenshot is currently embedded as a data URI
-(capped at 2800px tall); moving it to object storage is a future optimisation.
+no user namespaces). The captured screenshot is embedded as a **JPEG** data URI
+(full page, capped at 9000px tall — JPEG keeps a tall capture's base64 ~1–1.5MB);
+moving it to object storage is still a future optimisation.
 
 ## Billing
 
@@ -510,11 +572,16 @@ no user namespaces). The captured screenshot is currently embedded as a data URI
 - Run `pnpm --filter @workspace/db run push` after every schema change before
   restarting the API server. **Outstanding pushes from recent work**: the
   `IDX_session_user` session index, the `stripe_subscriptions` ordering columns +
-  `processed_stripe_events` table, and the four tenant **cascade FKs**
-  (`projects.userId`, `brand_kit.userId`, `render_jobs.userId`+`projectId`).
-  Boot migrations self-heal the billing/render_jobs tables, but the FKs + index
-  exist only via `db push`. **The FK push FAILS on prod if orphan rows already
-  exist** (a tenant row whose parent was deleted) — clean those up first, then push.
+  `processed_stripe_events` table, the four tenant **cascade FKs**
+  (`projects.userId`, `brand_kit.userId`, `render_jobs.userId`+`projectId`), and
+  the **multi-kit brand schema** (`brand_kit` `name`/`is_default`/`source_url`,
+  drop `UQ_brand_kit_user`, add `UQ_brand_kit_default` partial-unique + the
+  `IDX_brand_kit_user` index, `projects.brand_kit_id`). Boot migrations self-heal
+  the billing/render_jobs tables AND the multi-kit brand schema
+  (`applyBrandKitMigration`, which also back-fills one default per user), but the
+  tenant FKs exist only via `db push`. **The FK push FAILS on prod if orphan rows
+  already exist** (a tenant row whose parent was deleted) — clean those up first,
+  then push.
 - Run `pnpm --filter @workspace/api-spec run codegen` after every OpenAPI edit;
   generated files are committed
 - `@hyperframes/engine` ships TypeScript that needs `dom`, `dom.iterable` and

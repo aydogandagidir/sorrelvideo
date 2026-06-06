@@ -4,9 +4,22 @@ import {
   captureWebsite,
   WebsiteCaptureError,
   type PageSection,
+  type CaptureMediaType,
+  type ScrapedBrandSignals,
 } from "./websiteCaptureService";
 import { assertSafeCompositionVars } from "../lib/compositionVars";
 import { buildCropVars, heroCrop, type CropRegion } from "../lib/websiteCrop";
+import {
+  getBrandKit,
+  getDefaultBrandKit,
+  createBrandKit,
+  isConfiguredBrandKit,
+} from "./brandKitService";
+import {
+  refineBrandFromCapture,
+  consumeAiUnitIfAvailable,
+} from "./brandExtractionService";
+import { logger } from "../lib/logger";
 import {
   savePreview,
   consumePreview,
@@ -15,26 +28,38 @@ import {
 } from "./websitePreviewStore";
 
 const SHOWCASE_MODULE = "website-showcase";
-// Bound the embedded screenshot so the data URI stored in compositionVars (and
-// inlined into the rendered composition) stays reasonable. ~2800px gives a hero
-// + a couple of sections to scroll through.
-const SHOWCASE_MAX_CAPTURE_HEIGHT = 2800;
+// Capture the WHOLE page (most landing pages are 4–8k px tall) so the showcase
+// scrolls through all of it — the previous 2800px cap truncated tall sites
+// (bluedev.dev), showing the page "incompletely". JPEG (below) keeps the inlined
+// data URI bounded even at this height; object storage is the real long-term fix.
+const SHOWCASE_MAX_CAPTURE_HEIGHT = 9000;
+// JPEG, not PNG: a full-page screenshot as PNG would be multiple MB of base64 in
+// the project's compositionVars jsonb (and re-read on every render/preview). JPEG
+// q82 keeps a 1280×9000 capture well under ~1.5MB while staying crisp.
+const CAPTURE_FORMAT: CaptureMediaType = "image/jpeg";
 // The capture viewport width — the screenshot is this many px wide. The crop
 // fractions the SPA sends back are relative to this × the captured height.
 const CAPTURE_WIDTH = 1280;
 
-// Video length is user-selectable. Coerce to a whole number of seconds in a sane
-// range BEFORE it becomes a compositionVar: it lands in the composition's
-// `data-duration` and a `parseFloat("{{duration}}")` JS literal, and
-// renderCompositionTemplate does NOT escape quotes — so a clamped *number* is the
-// only safe thing to substitute. 3s floor keeps the fixed intro/outro from
-// colliding; 60s ceiling bounds render cost.
-const SHOWCASE_DEFAULT_DURATION = 9;
+// Duration bounds (seconds). It lands in the composition's `data-duration` and a
+// `parseFloat("{{duration}}")` literal, and renderCompositionTemplate does NOT
+// escape quotes — so only a clamped *number* is ever substituted. 3s floor keeps
+// the fixed intro/outro from colliding; 60s ceiling bounds render cost.
 const SHOWCASE_MIN_DURATION = 3;
 const SHOWCASE_MAX_DURATION = 60;
+const SHOWCASE_FALLBACK_DURATION = 9;
 
-function clampDuration(raw: number | undefined): number {
-  if (raw === undefined || !Number.isFinite(raw)) return SHOWCASE_DEFAULT_DURATION;
+// Showcase timing (mirrors website-showcase.html): the screenshot is displayed
+// 1300px wide and scrolls inside a 748px viewport; intro+outro are fixed. The
+// AUTO duration sizes the scroll to a calm reading speed so the WHOLE page is
+// shown without racing — the core of the "too short / shows it too briefly" fix.
+const DISPLAY_WIDTH = 1300;
+const DISPLAY_VIEWPORT_H = 748;
+const INTRO_OUTRO_SECONDS = 3.3 + 1.3;
+const SCROLL_PX_PER_SEC = 360; // calm, readable scroll pace
+const AUTO_MAX_DURATION = 45; // don't auto-pick a 60s render; user can opt in
+
+function clampDuration(raw: number): number {
   return Math.min(
     SHOWCASE_MAX_DURATION,
     Math.max(SHOWCASE_MIN_DURATION, Math.round(raw)),
@@ -42,9 +67,50 @@ function clampDuration(raw: number | undefined): number {
 }
 
 /**
- * Step 1 of the crop flow: capture the full page (SSRF-guarded) and stash it
- * server-side so the SPA can show it, let the user drag-select a region, then
- * POST the region back. Returns the screenshot as a data URI + its pixel size.
+ * Pick a calm default duration from the captured page height: enough seconds for
+ * the page to scroll top→bottom at a readable pace, plus the fixed intro/outro.
+ * A tall page therefore gets a longer (but capped) video instead of a 9s race.
+ */
+export function computeAutoDuration(captureHeight: number): number {
+  const displayHeight = captureHeight * (DISPLAY_WIDTH / CAPTURE_WIDTH);
+  const scrollPx = Math.max(0, displayHeight - DISPLAY_VIEWPORT_H);
+  const total = INTRO_OUTRO_SECONDS + scrollPx / SCROLL_PX_PER_SEC;
+  return Math.min(
+    AUTO_MAX_DURATION,
+    Math.max(SHOWCASE_MIN_DURATION, Math.round(total)),
+  );
+}
+
+/** Explicit user duration wins (clamped); otherwise scale to the page height. */
+function resolveDuration(
+  raw: number | undefined,
+  captureHeight: number,
+): number {
+  if (raw === undefined || !Number.isFinite(raw)) {
+    return captureHeight > 0
+      ? computeAutoDuration(captureHeight)
+      : SHOWCASE_FALLBACK_DURATION;
+  }
+  return clampDuration(raw);
+}
+
+function dataUri(screenshotPath: string, mediaType: CaptureMediaType): string {
+  return `data:${mediaType};base64,${fs.readFileSync(screenshotPath).toString("base64")}`;
+}
+
+/** A short, friendly brand-kit name derived from the captured URL. */
+function brandKitNameFor(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").slice(0, 80);
+  } catch {
+    return "Captured brand";
+  }
+}
+
+/**
+ * Step 1 of the crop flow: capture the full page (SSRF-guarded) + brand signals
+ * and stash it server-side so the SPA can show it, let the user drag-select a
+ * region, then POST the region back. Returns the screenshot as a data URI + size.
  *
  * Throws SsrfError (unsafe URL) or WebsiteCaptureError (couldn't load the site).
  */
@@ -57,16 +123,20 @@ export async function captureWebsitePreview(
   try {
     const capture = await captureWebsite(rawUrl, dir, {
       maxHeight: SHOWCASE_MAX_CAPTURE_HEIGHT,
+      format: CAPTURE_FORMAT,
+      // Always scrape brand signals so the crop flow can auto-create a kit too.
+      extractBrand: true,
     });
-    const image =
-      "data:image/png;base64," +
-      fs.readFileSync(capture.screenshotPath).toString("base64");
+    const image = dataUri(capture.screenshotPath, capture.mediaType);
     const previewId = savePreview({
       screenshotPath: capture.screenshotPath,
       dir,
       title: capture.title,
       url: capture.url,
       captureHeight: capture.height,
+      mediaType: capture.mediaType,
+      themeColor: capture.themeColor,
+      brand: capture.brand,
       userId,
     });
     saved = true;
@@ -81,18 +151,21 @@ interface ResolvedCapture {
   height: number;
   url: string;
   title: string;
+  mediaType: CaptureMediaType;
+  themeColor: string | null;
   cleanupDir: string;
   /** Set when a CSS `selector` matched during capture — the region to feature. */
   selectorCrop?: CropRegion;
   /** Set when `extractSections` — candidate sections for AI matching. */
   sections?: PageSection[];
+  /** Scraped brand signals (preview path always has them; fresh path when asked). */
+  brand?: ScrapedBrandSignals;
 }
 
 /**
  * Resolve the capture from a stored preview (the drag-crop flow) or a fresh URL
- * capture. For a fresh capture, `selector` / `extractSections` are threaded to
- * captureWebsite so the element box / section list comes back with it (the crop
- * for the by-element + AI modes is derived during the single capture).
+ * capture. `extractBrand` is threaded to a fresh capture so brand signals come
+ * back with it; the preview already carries them from step 1.
  */
 async function resolveCapture(
   userId: string,
@@ -101,6 +174,7 @@ async function resolveCapture(
     previewId?: string;
     selector?: string;
     extractSections?: boolean;
+    extractBrand?: boolean;
   },
 ): Promise<ResolvedCapture> {
   if (opts.previewId) {
@@ -115,7 +189,10 @@ async function resolveCapture(
       height: preview.captureHeight,
       url: preview.url,
       title: preview.title,
+      mediaType: preview.mediaType,
+      themeColor: preview.themeColor,
       cleanupDir: preview.dir,
+      brand: preview.brand,
     };
   }
   if (opts.url) {
@@ -123,17 +200,22 @@ async function resolveCapture(
     try {
       const capture = await captureWebsite(opts.url, dir, {
         maxHeight: SHOWCASE_MAX_CAPTURE_HEIGHT,
+        format: CAPTURE_FORMAT,
         selector: opts.selector,
         extractSections: opts.extractSections,
+        extractBrand: opts.extractBrand,
       });
       return {
         screenshotPath: capture.screenshotPath,
         height: capture.height,
         url: capture.url,
         title: capture.title,
+        mediaType: capture.mediaType,
+        themeColor: capture.themeColor,
         cleanupDir: dir,
         selectorCrop: capture.selectorCrop,
         sections: capture.sections,
+        brand: capture.brand,
       };
     } catch (err) {
       disposePreview({ dir });
@@ -144,11 +226,66 @@ async function resolveCapture(
 }
 
 /**
+ * Resolve which brand kit the showcase renders with, auto-creating one from the
+ * captured site when the user has none yet (the fix for the "magenta Your Brand"
+ * placeholder). Order: an explicit `brandKitId` (if owned) → the user's default
+ * kit → a NEW kit extracted from the captured page. Returns the kit id (stamped
+ * onto the project) or null when nothing could be resolved/scraped.
+ */
+async function resolveBrandKitId(
+  userId: string,
+  cap: ResolvedCapture,
+  existing: { id: number } | null,
+): Promise<number | null> {
+  if (existing) return existing.id;
+  if (!cap.brand) return null; // couldn't scrape signals → render uses fallbacks
+
+  const allowAi = await consumeAiUnitIfAvailable(userId);
+  const extracted = await refineBrandFromCapture(
+    {
+      url: cap.url,
+      title: cap.title,
+      themeColor: cap.themeColor,
+      height: cap.height,
+      screenshotPath: cap.screenshotPath,
+      mediaType: cap.mediaType,
+      brand: cap.brand,
+    },
+    { allowAi },
+  );
+  try {
+    const created = await createBrandKit(userId, {
+      name: brandKitNameFor(cap.url),
+      companyName: extracted.companyName,
+      primaryColor: extracted.primaryColor,
+      secondaryColor: extracted.secondaryColor,
+      accentColor: extracted.accentColor,
+      fontFamily: extracted.fontFamily ?? undefined,
+      logoUrl: extracted.logoUrl,
+      sourceUrl: extracted.sourceUrl,
+      isDefault: true,
+    });
+    logger.info(
+      { userId, brandKitId: created.id, url: cap.url, allowAi },
+      "Auto-created brand kit from website",
+    );
+    return created.id;
+  } catch (err) {
+    // A malformed extracted value shouldn't fail the whole video — fall back to
+    // no kit (render uses STUDIO_FALLBACKS) rather than 500.
+    logger.warn({ err, userId, url: cap.url }, "Auto brand-kit create failed");
+    return null;
+  }
+}
+
+/**
  * website→video: build a draft `website-showcase` project from either a fresh URL
  * capture (`url`) or a previously-previewed capture (`previewId`, the crop flow).
- * The screenshot is embedded as a `capture.image` data URI (renderService
- * HTML-escapes the untrusted title/url); an optional `crop` (0–1 fractions)
- * features a region of the page; `duration` sets the length. Returns the project.
+ * The screenshot is embedded as a `capture.image` data URI; an optional `crop`
+ * (0–1 fractions) features a region; `duration` sets the length (auto-scaled to
+ * the page height when omitted). The project is stamped with a brand kit —
+ * an existing/default one, or a new one auto-extracted from the site — so the
+ * render is actually branded. Returns the project.
  *
  * Throws SsrfError (unsafe URL) or WebsiteCaptureError (couldn't load / preview
  * gone).
@@ -159,22 +296,38 @@ export async function createWebsiteVideoProject(
     url?: string;
     previewId?: string;
     duration?: number;
+    brandKitId?: number;
+    /** Force detecting a fresh brand kit from the site, ignoring the default. */
+    autoBrand?: boolean;
     // "Which section" — at most one determines the crop; none = whole page:
     crop?: CropRegion; // an explicit drag-selected region (with previewId)
     selector?: string; // a CSS element ("by element")
     section?: "hero"; // a preset — the first screen
   },
 ): Promise<typeof projectsTable.$inferSelect> {
-  const duration = clampDuration(opts.duration);
+  // Decide the brand kit BEFORE capture so we only pay to scrape brand signals
+  // when we'll actually auto-create one. Reuse a kit only when it's pinned
+  // explicitly, OR (not forced to auto-detect) the user has a CONFIGURED default
+  // — an untouched/empty placeholder default doesn't count, so it can't reimpose
+  // the generic "Your Brand" look on a site that has a real brand to detect.
+  const pinned =
+    opts.brandKitId != null ? await getBrandKit(userId, opts.brandKitId) : null;
+  const defaultKit = pinned ? null : await getDefaultBrandKit(userId);
+  const reuseKit =
+    pinned ??
+    (!opts.autoBrand && defaultKit && isConfiguredBrandKit(defaultKit)
+      ? defaultKit
+      : null);
+
   const cap = await resolveCapture(userId, {
     url: opts.url,
     previewId: opts.previewId,
     selector: opts.selector,
+    extractBrand: !reuseKit, // only when we'll auto-create a kit
   });
   try {
-    const dataUri =
-      "data:image/png;base64," +
-      fs.readFileSync(cap.screenshotPath).toString("base64");
+    const duration = resolveDuration(opts.duration, cap.height);
+    const brandKitId = await resolveBrandKitId(userId, cap, reuseKit);
 
     // Resolve the region to feature from the chosen mode. Whole page → no crop.
     let crop = opts.crop;
@@ -182,7 +335,7 @@ export async function createWebsiteVideoProject(
     if (!crop && opts.section === "hero") crop = heroCrop(cap.height);
 
     const compositionVars: Record<string, string> = {
-      "capture.image": dataUri,
+      "capture.image": dataUri(cap.screenshotPath, cap.mediaType),
       "capture.height": String(cap.height),
       "capture.url": cap.url,
       "capture.title": cap.title,
@@ -191,25 +344,18 @@ export async function createWebsiteVideoProject(
     };
 
     // Defense in depth: route this server-built map through the same injection
-    // gate the project write routes use. The values are a trusted image data URI,
-    // the captured title/url, and clamped numbers — so this never throws in
-    // practice; it guards against a future change letting attacker bytes in.
+    // gate the project write routes use (the image is a data URI, title/url are
+    // captured text, numbers are clamped — so this never throws in practice).
     assertSafeCompositionVars(compositionVars);
-
-    let hostname = cap.url;
-    try {
-      hostname = new URL(cap.url).hostname;
-    } catch {
-      /* keep the full url as the fallback name */
-    }
 
     const [project] = await db
       .insert(projectsTable)
       .values({
         userId,
-        name: cap.title || hostname,
+        name: cap.title || brandKitNameFor(cap.url),
         module: SHOWCASE_MODULE,
         compositionVars,
+        brandKitId,
         // The showcase is authored 1920×1080 — match the project so the render
         // isn't forced into the portrait default and letterboxed.
         renderSettings: { ...DEFAULT_RENDER_SETTINGS, resolution: "landscape" },

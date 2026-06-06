@@ -1,4 +1,4 @@
-import type { BrandVoice } from "./schema";
+import type { BrandVoice, ExtractBrandSignals } from "./schema";
 
 const VOICE_HINTS: Record<BrandVoice, string> = {
   professional:
@@ -87,4 +87,62 @@ export function buildSystemPrompt(brand: {
 /** Wraps the user's brief in a minimal scaffold; the model already has shape rules from the system prompt. */
 export function buildUserPrompt(brief: string): string {
   return `Brief: ${brief.trim()}`;
+}
+
+// ───────────────────────────── Brand extraction ─────────────────────────────
+
+/**
+ * Stable system prompt for the "look at a website and name its brand kit" task.
+ * Brand-independent and identical every call → the natural prompt-cache prefix
+ * (anthropicProvider marks it cache_control). Keep it free of per-site data.
+ */
+export const BRAND_EXTRACT_SYSTEM: string = [
+  "You are a senior brand designer. Given signals scraped from a website (and a",
+  "screenshot when provided), identify the site's brand kit.",
+  "",
+  "Return four things:",
+  '- "companyName": the brand or product name a visitor would recognise (NOT a',
+  "  tagline, NOT the full <title> with marketing suffixes). Null if unclear.",
+  '- "primaryColor": the dominant BRAND color — the one used for primary buttons,',
+  "  links and key accents. This is the color a designer would call the brand color.",
+  '- "secondaryColor": a complementary base — usually the dark text/surface color',
+  "  or a strong supporting brand color. Must visibly differ from primaryColor.",
+  '- "accentColor": a tertiary highlight color, or null if the brand is two-color.',
+  '- "fontFamily": the primary UI font FAMILY NAME only (e.g. "Inter", "Roboto",',
+  '  "Poppins") — no fallback stack, no quotes. Null if you cannot tell.',
+  "",
+  "Prefer colors the brand actually uses over incidental colors (photos, ads).",
+  "Ignore pure white/black/greys as brand colors unless the brand is truly monochrome.",
+  "All colors MUST be 6-digit hex like #1a2b3c.",
+  "",
+  "Respond with ONLY a single JSON object with exactly those five keys.",
+  "No commentary, no markdown fences.",
+].join("\n");
+
+/**
+ * The per-site user text: the scraped signals as compact JSON. The screenshot
+ * (when present) is attached by the provider as a separate image block, so a
+ * vision model sees both the structured hints and the rendered page.
+ */
+export function buildBrandExtractUserText(signals: ExtractBrandSignals): string {
+  const compact = {
+    url: signals.url,
+    title: signals.title,
+    siteName: signals.siteName,
+    description: signals.description,
+    themeColor: signals.themeColor,
+    // Most-prominent first; the provider weighs these alongside the screenshot.
+    colors: signals.colors
+      .slice()
+      .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+      .slice(0, 24),
+    fontFamilies: signals.fontFamilies.slice(0, 8),
+    logoCandidates: signals.logoCandidates.slice(0, 6),
+  };
+  return [
+    "Here are the scraped signals for the website. Use them together with the",
+    "screenshot (if attached) to decide the brand kit.",
+    "",
+    JSON.stringify(compact, null, 2),
+  ].join("\n");
 }

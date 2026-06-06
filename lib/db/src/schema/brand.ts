@@ -1,4 +1,13 @@
-import { pgTable, text, serial, timestamp, unique } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  boolean,
+  timestamp,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./auth";
@@ -8,12 +17,19 @@ export const brandKitTable = pgTable(
   {
     id: serial("id").primaryKey(),
     // FK → users.id (varchar). text↔varchar is FK-comparable in Postgres. The
-    // owning user going away deletes their brand kit (ON DELETE CASCADE). Keep
+    // owning user going away deletes their brand kits (ON DELETE CASCADE). Keep
     // the .default("") for legacy inserts that predate the column being required.
     userId: text("user_id")
       .notNull()
       .default("")
       .references(() => usersTable.id, { onDelete: "cascade" }),
+    // A user can keep several brand kits (one per brand / per captured site).
+    // `name` is the human label shown in the picker; `isDefault` marks the kit
+    // used when a project doesn't pin a specific one. `sourceUrl` records the
+    // website a kit was auto-extracted from (null for hand-authored kits).
+    name: text("name").notNull().default("Brand kit"),
+    isDefault: boolean("is_default").notNull().default(false),
+    sourceUrl: text("source_url"),
     logoUrl: text("logo_url"),
     primaryColor: text("primary_color").notNull().default("#6366f1"),
     secondaryColor: text("secondary_color").notNull().default("#8b5cf6"),
@@ -33,11 +49,18 @@ export const brandKitTable = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  // One brand kit per user. This UNIQUE doubles as the index backing the
-  // hot `WHERE user_id = ?` lookup AND the conflict target the brand route
-  // upserts on, so concurrent first-touch can't insert duplicate rows (which
-  // would make a user's brand colors/logo non-deterministic run-to-run).
-  (table) => [unique("UQ_brand_kit_user").on(table.userId)],
+  (table) => [
+    // Hot path: every brand query filters `WHERE user_id = ?` (list, ownership
+    // checks, the render-time default lookup), so keep it off a seq scan.
+    index("IDX_brand_kit_user").on(table.userId),
+    // At most ONE default kit per user. A PARTIAL unique index (only rows where
+    // is_default) lets a user own many non-default kits while guaranteeing the
+    // render-time `WHERE is_default` lookup is unambiguous. Replaces the old
+    // UNIQUE(user_id) (which capped users at a single kit).
+    uniqueIndex("UQ_brand_kit_default")
+      .on(table.userId)
+      .where(sql`${table.isDefault}`),
+  ],
 );
 
 export const insertBrandKitSchema = createInsertSchema(brandKitTable).omit({

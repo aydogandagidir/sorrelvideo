@@ -71,3 +71,10 @@ export const websiteCaptureLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
 });
+
+// Authenticated brand-from-URL extraction. Also launches headless Chrome (and
+// optionally an LLM refine), so rate-limit it like the capture endpoint.
+export const brandExtractLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+});

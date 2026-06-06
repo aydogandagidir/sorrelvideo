@@ -4,6 +4,8 @@ import puppeteer from "puppeteer";
 import { assertSafeUrl, SsrfError } from "../lib/ssrfGuard";
 import { logger } from "../lib/logger";
 import { bboxToCrop, type CropRegion } from "../lib/websiteCrop";
+import { mergeCandidates, type ColorCandidate } from "../lib/brandColors";
+import { isSafeLogoUrl } from "../lib/logoUrl";
 
 export class WebsiteCaptureError extends Error {
   constructor(message: string) {
@@ -20,17 +22,37 @@ export interface PageSection {
   crop: CropRegion;
 }
 
+/** Brand signals scraped from the page (for the Brand Kit auto-extract flow). */
+export interface ScrapedBrandSignals {
+  /** og:site_name / application-name — a cleaner brand name than the <title>. */
+  siteName: string | null;
+  /** meta description / og:description — context for naming the company. */
+  description: string | null;
+  /** Deduped, normalised, weight-sorted color candidates seen on the page. */
+  colors: ColorCandidate[];
+  /** Primary font family names seen on headings/body (raw first tokens). */
+  fontFamilies: string[];
+  /** Absolute, http(s)-safe logo image URLs (header img / og:image / icon). */
+  logoCandidates: string[];
+}
+
+export type CaptureMediaType = "image/png" | "image/jpeg";
+
 export interface WebsiteCapture {
   url: string;
   title: string;
   themeColor: string | null;
   screenshotPath: string;
+  /** MIME type of the written screenshot — build the data URI from this. */
+  mediaType: CaptureMediaType;
   width: number;
   height: number;
   /** Set when `opts.selector` matched an element — the region to feature. */
   selectorCrop?: CropRegion;
   /** Set when `opts.extractSections` — candidate sections for AI matching. */
   sections?: PageSection[];
+  /** Set when `opts.extractBrand` — scraped brand signals for AI refinement. */
+  brand?: ScrapedBrandSignals;
 }
 
 const VIEWPORT = { width: 1280, height: 800 } as const;
@@ -50,13 +72,29 @@ const MAX_CAPTURE_HEIGHT = 6000;
 export async function captureWebsite(
   rawUrl: string,
   outDir: string,
-  opts?: { maxHeight?: number; selector?: string; extractSections?: boolean },
+  opts?: {
+    maxHeight?: number;
+    selector?: string;
+    extractSections?: boolean;
+    /** Also scrape brand signals (colors/fonts/logo/name) for the brand-kit flow. */
+    extractBrand?: boolean;
+    /**
+     * Screenshot encoding. "jpeg" keeps a tall full-page capture's data URI
+     * bounded (the website→video flow embeds it inline). Defaults to "png".
+     */
+    format?: CaptureMediaType;
+    /** JPEG quality 1–100 (ignored for png). Defaults to 82. */
+    quality?: number;
+  },
 ): Promise<WebsiteCapture> {
   // SSRF guard first — throws SsrfError before any network/browser work.
   const url = await assertSafeUrl(rawUrl);
 
+  const mediaType: CaptureMediaType = opts?.format ?? "image/png";
+  const ext = mediaType === "image/jpeg" ? "jpg" : "png";
+
   fs.mkdirSync(outDir, { recursive: true });
-  const screenshotPath = path.join(outDir, "capture.png");
+  const screenshotPath = path.join(outDir, `capture.${ext}`);
 
   // Resolve an explicit Chrome binary the way the render engine does, so prod
   // works. The full `puppeteer` package downloads Chrome into ~/.cache/puppeteer
@@ -134,10 +172,18 @@ export async function captureWebsite(
       Math.min(fullHeight, opts?.maxHeight ?? MAX_CAPTURE_HEIGHT),
     );
 
-    const buf = await page.screenshot({
-      type: "png",
-      clip: { x: 0, y: 0, width: VIEWPORT.width, height: captureHeight },
-    });
+    const buf = await page.screenshot(
+      mediaType === "image/jpeg"
+        ? {
+            type: "jpeg",
+            quality: opts?.quality ?? 82,
+            clip: { x: 0, y: 0, width: VIEWPORT.width, height: captureHeight },
+          }
+        : {
+            type: "png",
+            clip: { x: 0, y: 0, width: VIEWPORT.width, height: captureHeight },
+          },
+    );
     fs.writeFileSync(screenshotPath, buf);
 
     // Optional: resolve a CSS-selector region (the "by element" mode). The page
@@ -201,6 +247,18 @@ export async function captureWebsite(
       }));
     }
 
+    // Optional: scrape brand signals (colors / fonts / logo / name) for the
+    // Brand Kit auto-extract flow. The page returns RAW computed color strings
+    // (rgb(...)) + meta; Node normalises them (lib/brandColors) so the parsing
+    // logic stays unit-testable without a browser.
+    let brand: ScrapedBrandSignals | undefined;
+    if (opts?.extractBrand) {
+      brand = await scrapeBrandSignals(page).catch((err) => {
+        logger.warn({ err, url: url.toString() }, "Brand signal scrape failed");
+        return undefined;
+      });
+    }
+
     logger.info(
       { url: url.toString(), title, captureHeight },
       "Website captured",
@@ -210,14 +268,225 @@ export async function captureWebsite(
       title,
       themeColor,
       screenshotPath,
+      mediaType,
       width: VIEWPORT.width,
       height: captureHeight,
       selectorCrop,
       sections,
+      brand,
     };
   } finally {
     await browser.close().catch(() => undefined);
   }
+}
+
+/** A handle to a Puppeteer page (kept loose to avoid importing puppeteer types). */
+type EvaluablePage = {
+  evaluate: <T>(fn: () => T) => Promise<T>;
+};
+
+/**
+ * Scrape raw brand signals from the loaded page, then normalise them in Node.
+ * In-page: collect meta, CSS custom properties, the dominant CTA/link/header
+ * colors, an area-weighted background/text color frequency map, fonts, and logo
+ * candidates — all as RAW strings. Node: parse → dedupe → weight-sort via
+ * lib/brandColors, and resolve safe logo URLs.
+ */
+async function scrapeBrandSignals(
+  page: EvaluablePage,
+): Promise<ScrapedBrandSignals> {
+  const raw = await page.evaluate(() => {
+    const meta = (sel: string): string | null => {
+      const el = document.querySelector(sel);
+      const c = el?.getAttribute("content");
+      return c && c.trim() ? c.trim() : null;
+    };
+
+    // Probe common design-system CSS custom properties for brand colors.
+    const VAR_NAMES = [
+      "--primary",
+      "--color-primary",
+      "--primary-color",
+      "--brand",
+      "--brand-primary",
+      "--brand-color",
+      "--color-brand",
+      "--accent",
+      "--color-accent",
+      "--accent-color",
+      "--secondary",
+      "--color-secondary",
+      "--theme-color",
+      "--ds-color-primary",
+      "--ion-color-primary",
+      "--chakra-colors-brand-500",
+    ];
+    const rootStyle = getComputedStyle(document.documentElement);
+    const cssVars: { name: string; value: string }[] = [];
+    for (const name of VAR_NAMES) {
+      const value = rootStyle.getPropertyValue(name).trim();
+      if (value) cssVars.push({ name, value });
+    }
+
+    // Area-weighted color frequency. Walk a bounded set of visible elements,
+    // tally background-color (strong signal) and text color (weak signal) by
+    // on-screen area. Aggregate by the raw computed string (browser-normalised).
+    const bgMap: Record<string, number> = {};
+    const fgMap: Record<string, number> = {};
+    const els = Array.from(document.querySelectorAll("body *"));
+    const cap = Math.min(els.length, 4000);
+    for (let i = 0; i < cap; i++) {
+      const el = els[i];
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      const area = Math.min(r.width * r.height, 1920 * 1080);
+      const cs = getComputedStyle(el);
+      if (cs.backgroundImage && cs.backgroundImage !== "none") continue;
+      const bg = cs.backgroundColor;
+      if (bg) bgMap[bg] = (bgMap[bg] || 0) + area;
+      const fg = cs.color;
+      if (fg) fgMap[fg] = (fgMap[fg] || 0) + area * 0.2;
+    }
+
+    // The dominant CTA: the largest button-ish element in the first screen with
+    // a real background color.
+    const buttons = Array.from(
+      document.querySelectorAll(
+        'button, a[class*="btn"], a[class*="button"], [role="button"], [class*="cta"]',
+      ),
+    );
+    let cta: string | null = null;
+    let ctaArea = 0;
+    for (const b of buttons) {
+      const r = b.getBoundingClientRect();
+      if (r.top > 1400 || r.width < 40 || r.height < 20) continue;
+      const a = r.width * r.height;
+      if (a > ctaArea) {
+        ctaArea = a;
+        cta = getComputedStyle(b).backgroundColor;
+      }
+    }
+
+    const firstLink = document.querySelector("a[href]");
+    const link = firstLink ? getComputedStyle(firstLink).color : null;
+    const headerEl = document.querySelector(
+      'header, nav, [class*="header"], [class*="navbar"]',
+    );
+    const header = headerEl ? getComputedStyle(headerEl).backgroundColor : null;
+    const h1 = document.querySelector("h1");
+    const heading = h1 ? getComputedStyle(h1).color : null;
+    const bodyBg = getComputedStyle(document.body).backgroundColor;
+
+    const fontOf = (sel: string): string | null => {
+      const el = document.querySelector(sel);
+      return el ? getComputedStyle(el).fontFamily : null;
+    };
+    const fontFamilies = [
+      fontOf("h1"),
+      fontOf("h2"),
+      getComputedStyle(document.body).fontFamily,
+    ].filter((f): f is string => !!f);
+
+    const abs = (u: string | null): string | null => {
+      if (!u) return null;
+      try {
+        return new URL(u, location.href).href;
+      } catch {
+        return null;
+      }
+    };
+    const logoCandidates: string[] = [];
+    document.querySelectorAll("img").forEach((img) => {
+      const hay = (
+        (img.getAttribute("alt") || "") +
+        " " +
+        (img.className || "") +
+        " " +
+        (img.id || "") +
+        " " +
+        (img.getAttribute("src") || "")
+      ).toLowerCase();
+      if (/logo|brand/.test(hay)) {
+        const u = abs(img.currentSrc || img.src);
+        if (u) logoCandidates.push(u);
+      }
+    });
+    const headerImg = document.querySelector(
+      "header img, nav img, [class*='header'] img, [class*='navbar'] img",
+    ) as HTMLImageElement | null;
+    if (headerImg) {
+      const u = abs(headerImg.currentSrc || headerImg.src);
+      if (u) logoCandidates.push(u);
+    }
+    const og = abs(meta('meta[property="og:image"]'));
+    if (og) logoCandidates.push(og);
+    const iconEl = document.querySelector(
+      'link[rel="apple-touch-icon"], link[rel~="icon"]',
+    );
+    const icon = abs(iconEl?.getAttribute("href") ?? null);
+    if (icon) logoCandidates.push(icon);
+
+    return {
+      siteName:
+        meta('meta[property="og:site_name"]') ||
+        meta('meta[name="application-name"]'),
+      description:
+        meta('meta[name="description"]') ||
+        meta('meta[property="og:description"]'),
+      cssVars,
+      backgrounds: Object.entries(bgMap),
+      texts: Object.entries(fgMap),
+      cta,
+      link,
+      header,
+      heading,
+      bodyBg,
+      fontFamilies,
+      logoCandidates,
+    };
+  });
+
+  // ── Normalise in Node (testable; the browser only emits raw strings) ──
+  const candidates: { hex: string; source: string; weight?: number }[] = [];
+  for (const v of raw.cssVars)
+    candidates.push({ hex: v.value, source: `var(${v.name})`, weight: 0.6 });
+  if (raw.cta) candidates.push({ hex: raw.cta, source: "cta", weight: 0.5 });
+  if (raw.link) candidates.push({ hex: raw.link, source: "link", weight: 0.4 });
+  if (raw.header)
+    candidates.push({ hex: raw.header, source: "header", weight: 0.35 });
+  if (raw.heading)
+    candidates.push({ hex: raw.heading, source: "heading", weight: 0.25 });
+  if (raw.bodyBg)
+    candidates.push({ hex: raw.bodyBg, source: "background", weight: 0.2 });
+
+  const maxBg = Math.max(1, ...raw.backgrounds.map(([, a]) => a));
+  for (const [color, area] of raw.backgrounds)
+    candidates.push({ hex: color, source: "background", weight: 0.5 * (area / maxBg) });
+  const maxFg = Math.max(1, ...raw.texts.map(([, a]) => a));
+  for (const [color, area] of raw.texts)
+    candidates.push({ hex: color, source: "text", weight: 0.2 * (area / maxFg) });
+
+  const colors = mergeCandidates(candidates).slice(0, 28);
+
+  const fontFamilies = [
+    ...new Set(
+      raw.fontFamilies.map((f) => f.split(",")[0]?.replace(/["']/g, "").trim()),
+    ),
+  ].filter((f): f is string => !!f);
+
+  // Only logos that are clean, http(s), attribute-safe URLs (they end up in an
+  // <img src="…"> at render time via the brand kit).
+  const logoCandidates = [...new Set(raw.logoCandidates)].filter((u) =>
+    isSafeLogoUrl(u),
+  );
+
+  return {
+    siteName: raw.siteName,
+    description: raw.description,
+    colors,
+    fontFamilies,
+    logoCandidates,
+  };
 }
 
 export { SsrfError };

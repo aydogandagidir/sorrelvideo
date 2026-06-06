@@ -164,6 +164,8 @@ export async function dispatchLambdaRender(
       id: projectsTable.id,
       module: projectsTable.module,
       compositionVars: projectsTable.compositionVars,
+      compositionHtml: projectsTable.compositionHtml,
+      brandKitId: projectsTable.brandKitId,
     })
     .from(projectsTable)
     .where(eq(projectsTable.id, projectId));
@@ -176,6 +178,8 @@ export async function dispatchLambdaRender(
     userId,
     module: project.module || module,
     compositionVars: project.compositionVars,
+    compositionHtml: project.compositionHtml,
+    brandKitId: project.brandKitId,
   });
   // Burn in the watermark on the same terms as the inline/bullmq path so the
   // monetization lever is backend-agnostic (always on for Free, removable on

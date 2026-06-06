@@ -2,6 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import type {
+  CaptureMediaType,
+  ScrapedBrandSignals,
+} from "./websiteCaptureService";
 
 /**
  * Short-lived, in-memory store for website→video CAPTURE PREVIEWS.
@@ -25,6 +29,12 @@ export interface PreviewEntry {
   title: string;
   url: string;
   captureHeight: number;
+  /** MIME of the stored screenshot, so the data URI is built correctly. */
+  mediaType: CaptureMediaType;
+  /** meta theme-color (a brand-color hint), if any. */
+  themeColor: string | null;
+  /** Scraped brand signals — lets the crop flow auto-create a kit too. */
+  brand?: ScrapedBrandSignals;
   userId: string;
   expiresAt: number;
 }

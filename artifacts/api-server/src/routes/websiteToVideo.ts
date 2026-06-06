@@ -79,7 +79,16 @@ router.post(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const { url, previewId, crop, selector, section, duration } = parsed.data;
+    const {
+      url,
+      previewId,
+      crop,
+      selector,
+      section,
+      duration,
+      brandKitId,
+      autoBrand,
+    } = parsed.data;
     if (!url && !previewId) {
       res.status(400).json({ error: "A url or previewId is required." });
       return;
@@ -96,6 +105,8 @@ router.post(
         selector: selector ?? undefined,
         section: section ?? undefined,
         duration: duration ?? undefined,
+        brandKitId: brandKitId ?? undefined,
+        autoBrand: autoBrand ?? undefined,
       });
       res.status(201).json(GetProjectResponse.parse(serializeDates(project)));
     } catch (err) {
