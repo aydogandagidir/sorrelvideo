@@ -782,6 +782,35 @@ paths:
         "404":
           description: Not found
 
+  /brand-kits/{id}/video-ideas:
+    post:
+      operationId: generateVideoIdeas
+      tags: [brand]
+      summary: Generate ready-to-render video ideas from a brand kit's DNA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Generated video ideas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoIdeasResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden — upgrade_required when the AI quota is exhausted
+        "404":
+          description: Not found
+        "502":
+          description: The AI provider could not generate ideas
+        "503":
+          description: AI is not configured
+
   /modules:
     get:
       operationId: listModules
@@ -1436,6 +1465,9 @@ components:
           type: string
         templateId:
           type: integer
+        brandKitId:
+          type: integer
+          description: Brand kit (DNA) to render with. Null/omitted → the user's default.
         compositionVars:
           type: object
           additionalProperties:
@@ -1584,6 +1616,26 @@ components:
           enum: [professional, playful, bold, minimal, null]
         voiceDescription:
           type: ["string", "null"]
+        tagline:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        valueProposition:
+          type: ["string", "null"]
+        targetAudience:
+          type: ["string", "null"]
+        industry:
+          type: ["string", "null"]
+        keywords:
+          type: ["array", "null"]
+          items:
+            type: string
+        personality:
+          type: ["array", "null"]
+          items:
+            type: string
+        imageStyle:
+          type: ["string", "null"]
         updatedAt:
           type: string
 
@@ -1616,6 +1668,32 @@ components:
         voiceDescription:
           type: string
           maxLength: 500
+        tagline:
+          type: string
+          maxLength: 140
+        description:
+          type: string
+          maxLength: 400
+        valueProposition:
+          type: string
+          maxLength: 280
+        targetAudience:
+          type: string
+          maxLength: 280
+        industry:
+          type: string
+          maxLength: 80
+        keywords:
+          type: array
+          items:
+            type: string
+        personality:
+          type: array
+          items:
+            type: string
+        imageStyle:
+          type: string
+          maxLength: 280
 
     ExtractBrandRequest:
       type: object
@@ -1628,8 +1706,8 @@ components:
 
     ExtractedBrand:
       type: object
-      description: A brand kit detected from a website (review then POST /brand-kits).
-      required: [primaryColor, secondaryColor, sourceUrl]
+      description: A brand DNA detected from a website (review then POST /brand-kits).
+      required: [primaryColor, secondaryColor, sourceUrl, keywords, personality]
       properties:
         companyName:
           type: ["string", "null"]
@@ -1645,6 +1723,53 @@ components:
           type: ["string", "null"]
         sourceUrl:
           type: string
+        tagline:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        valueProposition:
+          type: ["string", "null"]
+        targetAudience:
+          type: ["string", "null"]
+        industry:
+          type: ["string", "null"]
+        keywords:
+          type: array
+          items:
+            type: string
+        personality:
+          type: array
+          items:
+            type: string
+        imageStyle:
+          type: ["string", "null"]
+
+    VideoIdea:
+      type: object
+      required: [title, description, module, headline, bodyText, ctaText]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        module:
+          type: string
+          enum: [product-launch, brand-promo, social-teaser, studio]
+        headline:
+          type: string
+        bodyText:
+          type: string
+        ctaText:
+          type: string
+
+    VideoIdeasResponse:
+      type: object
+      required: [ideas]
+      properties:
+        ideas:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoIdea"
 
     Module:
       type: object

@@ -22,4 +22,18 @@ export interface BrandKitInput {
   brandVoice?: BrandKitInputBrandVoice;
   /** @maxLength 500 */
   voiceDescription?: string;
+  /** @maxLength 140 */
+  tagline?: string;
+  /** @maxLength 400 */
+  description?: string;
+  /** @maxLength 280 */
+  valueProposition?: string;
+  /** @maxLength 280 */
+  targetAudience?: string;
+  /** @maxLength 80 */
+  industry?: string;
+  keywords?: string[];
+  personality?: string[];
+  /** @maxLength 280 */
+  imageStyle?: string;
 }

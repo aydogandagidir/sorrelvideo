@@ -4,13 +4,19 @@ import type { AiProvider } from "./providers/types";
 
 export {
   BrandVoiceSchema,
+  BrandDnaSchema,
   SuggestInputSchema,
   SuggestOutputSchema,
   ExtractBrandInputSchema,
   ExtractBrandOutputSchema,
   ExtractBrandSignalsSchema,
   BrandScreenshotSchema,
+  VideoIdeaSchema,
+  VideoIdeaModuleSchema,
+  GenerateVideoIdeasInputSchema,
+  GenerateVideoIdeasOutputSchema,
   type BrandVoice,
+  type BrandDna,
   type SuggestInput,
   type SuggestOutput,
   type SuggestResult,
@@ -21,6 +27,10 @@ export {
   type ExtractBrandSignals,
   type BrandSignalColor,
   type BrandScreenshot,
+  type VideoIdea,
+  type VideoIdeaModule,
+  type GenerateVideoIdeasInput,
+  type GenerateVideoIdeasResult,
 } from "./schema";
 export { buildSystemPrompt, buildUserPrompt } from "./prompt";
 export type { AiProvider };

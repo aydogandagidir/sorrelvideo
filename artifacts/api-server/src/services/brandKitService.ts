@@ -23,6 +23,15 @@ export type BrandKitWrite = {
   voiceDescription?: string | null;
   sourceUrl?: string | null;
   isDefault?: boolean;
+  // Brand DNA (narrative identity)
+  tagline?: string | null;
+  description?: string | null;
+  valueProposition?: string | null;
+  targetAudience?: string | null;
+  industry?: string | null;
+  keywords?: string[] | null;
+  personality?: string[] | null;
+  imageStyle?: string | null;
 };
 
 export class BrandKitValidationError extends Error {
@@ -126,6 +135,14 @@ export function transientDefaultBrandKit(userId: string): BrandKit {
     companyName: null,
     brandVoice: null,
     voiceDescription: null,
+    tagline: null,
+    description: null,
+    valueProposition: null,
+    targetAudience: null,
+    industry: null,
+    keywords: null,
+    personality: null,
+    imageStyle: null,
     updatedAt: new Date(),
   };
 }

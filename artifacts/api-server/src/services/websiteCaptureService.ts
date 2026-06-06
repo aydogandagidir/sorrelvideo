@@ -34,6 +34,8 @@ export interface ScrapedBrandSignals {
   fontFamilies: string[];
   /** Absolute, http(s)-safe logo image URLs (header img / og:image / icon). */
   logoCandidates: string[];
+  /** Visible page copy (headings + paragraphs) for narrative DNA synthesis. */
+  textSample: string;
 }
 
 export type CaptureMediaType = "image/png" | "image/jpeg";
@@ -426,6 +428,22 @@ async function scrapeBrandSignals(
     const icon = abs(iconEl?.getAttribute("href") ?? null);
     if (icon) logoCandidates.push(icon);
 
+    // Visible copy for the narrative DNA: headings + lead paragraphs, in document
+    // order, deduped + bounded. Skip tiny/empty nodes; cap so the AI prompt stays
+    // cheap (the provider further truncates).
+    const textParts: string[] = [];
+    const seenText = new Set<string>();
+    const textNodes = Array.from(
+      document.querySelectorAll("h1, h2, h3, p, li, blockquote"),
+    ).slice(0, 400);
+    for (const el of textNodes) {
+      const t = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (t.length < 12 || t.length > 400 || seenText.has(t)) continue;
+      seenText.add(t);
+      textParts.push(t);
+      if (textParts.join(" ").length > 4000) break;
+    }
+
     return {
       siteName:
         meta('meta[property="og:site_name"]') ||
@@ -443,6 +461,7 @@ async function scrapeBrandSignals(
       bodyBg,
       fontFamilies,
       logoCandidates,
+      textSample: textParts.join("\n"),
     };
   });
 
@@ -486,6 +505,7 @@ async function scrapeBrandSignals(
     colors,
     fontFamilies,
     logoCandidates,
+    textSample: raw.textSample,
   };
 }
 

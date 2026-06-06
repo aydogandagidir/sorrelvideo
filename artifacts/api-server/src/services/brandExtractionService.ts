@@ -54,7 +54,7 @@ export async function consumeAiUnitIfAvailable(
   }
 }
 
-/** A fully-resolved brand kit detected from a website (NOT yet persisted). */
+/** A fully-resolved brand DNA detected from a website (NOT yet persisted). */
 export interface ExtractedBrand {
   companyName: string | null;
   primaryColor: string;
@@ -63,6 +63,15 @@ export interface ExtractedBrand {
   fontFamily: string | null;
   logoUrl: string | null;
   sourceUrl: string;
+  // ── Narrative DNA (null/[] without AI) ──
+  tagline: string | null;
+  description: string | null;
+  valueProposition: string | null;
+  targetAudience: string | null;
+  industry: string | null;
+  keywords: string[];
+  personality: string[];
+  imageStyle: string | null;
 }
 
 // Brand-page extraction captures only a modest slice — enough to read the brand
@@ -111,6 +120,16 @@ function heuristicBrand(
     fontFamily: sanitizeFontFamily(signals.fontFamilies[0] ?? null),
     logoUrl: signals.logoCandidates[0] ?? null,
     sourceUrl: url,
+    // The heuristic seeds a description from the meta description but leaves the
+    // rest of the narrative DNA to the AI step (null/[] here).
+    tagline: null,
+    description: signals.description,
+    valueProposition: null,
+    targetAudience: null,
+    industry: null,
+    keywords: [],
+    personality: [],
+    imageStyle: null,
   };
 }
 
@@ -136,6 +155,7 @@ export async function refineBrandFromCapture(
     colors: [],
     fontFamilies: [],
     logoCandidates: [],
+    textSample: "",
   };
 
   const base = heuristicBrand(
@@ -158,6 +178,7 @@ export async function refineBrandFromCapture(
       colors: signals.colors,
       fontFamilies: signals.fontFamilies,
       logoCandidates: signals.logoCandidates,
+      textSample: signals.textSample,
     };
 
     // Attach the screenshot only when it's small enough to be cheap for vision.
@@ -171,6 +192,13 @@ export async function refineBrandFromCapture(
 
     const ai = await provider.extractBrand({ signals: aiSignals, screenshot });
 
+    const text = (v: string | null, max: number): string | null => {
+      const t = v?.trim();
+      return t ? t.slice(0, max) : null;
+    };
+    const list = (v: string[], max: number): string[] =>
+      [...new Set(v.map((s) => s.trim()).filter(Boolean))].slice(0, max);
+
     // Trust AI only where it produced something safe; otherwise keep heuristic.
     return {
       companyName: ai.companyName?.trim().slice(0, 80) || base.companyName,
@@ -180,6 +208,14 @@ export async function refineBrandFromCapture(
       fontFamily: sanitizeFontFamily(ai.fontFamily) ?? base.fontFamily,
       logoUrl: base.logoUrl,
       sourceUrl: capture.url,
+      tagline: text(ai.tagline, 140),
+      description: text(ai.description, 400) ?? base.description,
+      valueProposition: text(ai.valueProposition, 280),
+      targetAudience: text(ai.targetAudience, 280),
+      industry: text(ai.industry, 80),
+      keywords: list(ai.keywords, 12),
+      personality: list(ai.personality, 8),
+      imageStyle: text(ai.imageStyle, 280),
     };
   } catch (err) {
     logger.warn(

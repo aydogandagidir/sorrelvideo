@@ -1,4 +1,9 @@
-import type { BrandVoice, ExtractBrandSignals } from "./schema";
+import type {
+  BrandVoice,
+  BrandDna,
+  ExtractBrandSignals,
+  GenerateVideoIdeasInput,
+} from "./schema";
 
 const VOICE_HINTS: Record<BrandVoice, string> = {
   professional:
@@ -42,15 +47,25 @@ export const SYSTEM_CORE: string = [
  * brief changes. Returns `null` when the brand kit carries no voice signal, so
  * no empty block is emitted.
  */
-export function buildBrandContext(brand: {
-  companyName: string | null;
-  voice: BrandVoice | null;
-  voiceDescription: string | null;
-}): string | null {
+export function buildBrandContext(brand: BrandDna): string | null {
   const parts: string[] = [];
 
   if (brand.companyName) {
     parts.push(`The brand is ${brand.companyName}.`);
+  }
+  if (brand.tagline) parts.push(`Tagline: ${brand.tagline}`);
+  if (brand.description) parts.push(`What they do: ${brand.description}`);
+  if (brand.valueProposition) {
+    parts.push(`Value proposition: ${brand.valueProposition}`);
+  }
+  if (brand.targetAudience) {
+    parts.push(`Target audience: ${brand.targetAudience}`);
+  }
+  if (brand.keywords && brand.keywords.length > 0) {
+    parts.push(`Themes / keywords: ${brand.keywords.join(", ")}`);
+  }
+  if (brand.personality && brand.personality.length > 0) {
+    parts.push(`Brand personality: ${brand.personality.join(", ")}`);
   }
   if (brand.voice) {
     parts.push(`Voice: ${VOICE_HINTS[brand.voice]}`);
@@ -75,11 +90,7 @@ export function buildBrandContext(brand: {
  * automatically). `anthropicProvider` instead consumes `SYSTEM_CORE` +
  * `buildBrandContext` as separate, individually cache-controlled blocks.
  */
-export function buildSystemPrompt(brand: {
-  companyName: string | null;
-  voice: BrandVoice | null;
-  voiceDescription: string | null;
-}): string {
+export function buildSystemPrompt(brand: BrandDna): string {
   const brandContext = buildBrandContext(brand);
   return brandContext ? `${SYSTEM_CORE}\n\n${brandContext}` : SYSTEM_CORE;
 }
@@ -97,26 +108,59 @@ export function buildUserPrompt(brief: string): string {
  * (anthropicProvider marks it cache_control). Keep it free of per-site data.
  */
 export const BRAND_EXTRACT_SYSTEM: string = [
-  "You are a senior brand designer. Given signals scraped from a website (and a",
-  "screenshot when provided), identify the site's brand kit.",
+  "You are a senior brand strategist + designer. Given signals scraped from a",
+  "website (and a screenshot when provided), extract the brand's DNA: its visual",
+  "identity AND its narrative identity.",
   "",
-  "Return four things:",
-  '- "companyName": the brand or product name a visitor would recognise (NOT a',
-  "  tagline, NOT the full <title> with marketing suffixes). Null if unclear.",
-  '- "primaryColor": the dominant BRAND color — the one used for primary buttons,',
-  "  links and key accents. This is the color a designer would call the brand color.",
-  '- "secondaryColor": a complementary base — usually the dark text/surface color',
-  "  or a strong supporting brand color. Must visibly differ from primaryColor.",
+  "Return a JSON object with EXACTLY these keys:",
+  "Visual identity:",
+  '- "companyName": the brand/product name a visitor recognises (NOT a tagline,',
+  "  NOT the full <title> with marketing suffixes). Null if unclear.",
+  '- "primaryColor": the dominant BRAND color (primary buttons, links, key accents).',
+  '- "secondaryColor": a complementary base (dark text/surface or a strong support',
+  "  color); must visibly differ from primaryColor.",
   '- "accentColor": a tertiary highlight color, or null if the brand is two-color.',
-  '- "fontFamily": the primary UI font FAMILY NAME only (e.g. "Inter", "Roboto",',
-  '  "Poppins") — no fallback stack, no quotes. Null if you cannot tell.',
+  '- "fontFamily": the primary UI font FAMILY NAME only ("Inter"), no stack/quotes.',
+  "  Null if unknown.",
+  "Narrative identity (infer from the copy + imagery; concise, on-brand, no hype):",
+  '- "tagline": a short brand tagline/slogan (<= 12 words), or null.',
+  '- "description": 1–2 sentences on what the business does.',
+  '- "valueProposition": the core promise / unique selling point, one sentence.',
+  '- "targetAudience": who it is for, one short phrase.',
+  '- "industry": a short category label (e.g. "SaaS", "coffee roaster").',
+  '- "keywords": 4–8 lowercase theme keywords (array of strings).',
+  '- "personality": 3–5 adjectives describing the brand voice (array of strings).',
+  '- "imageStyle": one phrase describing the photography/imagery style, or null.',
   "",
-  "Prefer colors the brand actually uses over incidental colors (photos, ads).",
-  "Ignore pure white/black/greys as brand colors unless the brand is truly monochrome.",
-  "All colors MUST be 6-digit hex like #1a2b3c.",
+  "Prefer colors the brand actually uses over incidental ones (photos, ads).",
+  "Ignore pure white/black/greys as brand colors unless truly monochrome.",
+  "All colors MUST be 6-digit hex like #1a2b3c. Use null (not empty strings) when",
+  "unknown; keywords/personality must be arrays (use [] only if truly nothing).",
   "",
-  "Respond with ONLY a single JSON object with exactly those five keys.",
-  "No commentary, no markdown fences.",
+  "Respond with ONLY the JSON object. No commentary, no markdown fences.",
+].join("\n");
+
+/**
+ * Stable system prompt for turning a Brand DNA into ready-to-render video ideas
+ * (Pomelli's "campaign ideas" step). Brand-independent → cache-friendly prefix.
+ */
+export const VIDEO_IDEAS_SYSTEM: string = [
+  "You are a short-form video strategist for Sorrel. Given a brand's DNA, propose",
+  "distinct, on-brand short video concepts the brand could publish.",
+  "",
+  "Each idea is a JSON object with EXACTLY these keys:",
+  '- "title": a 2–5 word internal name for the concept.',
+  '- "description": one sentence on the concept/angle and why it fits the brand.',
+  '- "module": which template to use — one of EXACTLY: "product-launch",',
+  '  "brand-promo", "social-teaser", "studio". Pick the best fit per idea.',
+  '- "headline": <= 80 chars on-screen headline (use "\\n" for a line break).',
+  '- "bodyText": <= 240 chars supporting line.',
+  '- "ctaText": <= 24 chars call to action.',
+  "",
+  "Make the ideas genuinely different from each other (different angle/goal), and",
+  "ground every word in the brand's voice, audience and value proposition.",
+  "",
+  'Respond with ONLY a JSON object: { "ideas": [ ... ] }. No markdown, no commentary.',
 ].join("\n");
 
 /**
@@ -138,11 +182,36 @@ export function buildBrandExtractUserText(signals: ExtractBrandSignals): string 
       .slice(0, 24),
     fontFamilies: signals.fontFamilies.slice(0, 8),
     logoCandidates: signals.logoCandidates.slice(0, 6),
+    // Visible copy for the narrative DNA (bounded so the prompt stays cheap).
+    pageText: signals.textSample.slice(0, 3500),
   };
   return [
     "Here are the scraped signals for the website. Use them together with the",
-    "screenshot (if attached) to decide the brand kit.",
+    "screenshot (if attached) to decide the brand DNA.",
     "",
+    JSON.stringify(compact, null, 2),
+  ].join("\n");
+}
+
+/** The per-brand user text for the video-idea generator: the DNA + how many. */
+export function buildVideoIdeasUserText(input: GenerateVideoIdeasInput): string {
+  const { dna, count } = input;
+  const compact = {
+    companyName: dna.companyName,
+    tagline: dna.tagline ?? null,
+    description: dna.description ?? null,
+    valueProposition: dna.valueProposition ?? null,
+    targetAudience: dna.targetAudience ?? null,
+    industry: dna.industry ?? null,
+    keywords: dna.keywords ?? [],
+    personality: dna.personality ?? [],
+    voice: dna.voice,
+    voiceNotes: dna.voiceDescription ?? null,
+  };
+  return [
+    `Propose ${count} distinct short-video concepts for this brand.`,
+    "",
+    "Brand DNA:",
     JSON.stringify(compact, null, 2),
   ].join("\n");
 }

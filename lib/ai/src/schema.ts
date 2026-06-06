@@ -9,14 +9,25 @@ export const BrandVoiceSchema = z.enum([
 ]);
 export type BrandVoice = z.infer<typeof BrandVoiceSchema>;
 
+/** The Brand DNA context shared by the copy suggester + the video-idea generator. */
+export const BrandDnaSchema = z.object({
+  companyName: z.string().nullable(),
+  tagline: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  valueProposition: z.string().nullable().optional(),
+  targetAudience: z.string().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  keywords: z.array(z.string()).nullable().optional(),
+  personality: z.array(z.string()).nullable().optional(),
+  voice: BrandVoiceSchema.nullable(),
+  voiceDescription: z.string().max(500).nullable(),
+});
+export type BrandDna = z.infer<typeof BrandDnaSchema>;
+
 /** What the API route hands to the provider. */
 export const SuggestInputSchema = z.object({
   prompt: z.string().min(3).max(500),
-  brand: z.object({
-    companyName: z.string().nullable(),
-    voice: BrandVoiceSchema.nullable(),
-    voiceDescription: z.string().max(500).nullable(),
-  }),
+  brand: BrandDnaSchema,
   maxTokens: z.number().int().positive().max(2000).optional(),
 });
 export type SuggestInput = z.infer<typeof SuggestInputSchema>;
@@ -79,6 +90,8 @@ export const ExtractBrandSignalsSchema = z.object({
   colors: z.array(BrandSignalColorSchema).default([]),
   fontFamilies: z.array(z.string()).default([]),
   logoCandidates: z.array(z.string()).default([]),
+  /** Visible page copy (headings + hero/lead paragraphs) for narrative DNA synthesis. */
+  textSample: z.string().default(""),
 });
 export type ExtractBrandSignals = z.infer<typeof ExtractBrandSignalsSchema>;
 
@@ -108,9 +121,61 @@ export const ExtractBrandOutputSchema = z.object({
   accentColor: z.string().regex(HEX6).nullable(),
   /** The primary UI font FAMILY name only ("Inter"), no fallback stack. Null = unknown. */
   fontFamily: z.string().min(1).max(80).nullable(),
+  // ── Brand DNA (narrative identity) ──
+  tagline: z.string().max(140).nullable(),
+  description: z.string().max(400).nullable(),
+  valueProposition: z.string().max(280).nullable(),
+  targetAudience: z.string().max(280).nullable(),
+  industry: z.string().max(80).nullable(),
+  keywords: z.array(z.string().max(40)).max(12),
+  personality: z.array(z.string().max(40)).max(8),
+  imageStyle: z.string().max(280).nullable(),
 });
 export type ExtractBrandOutput = z.infer<typeof ExtractBrandOutputSchema>;
 
 export interface ExtractBrandResult extends ExtractBrandOutput {
+  usage: SuggestUsage;
+}
+
+// ───────────────────────────── Video ideas from DNA ─────────────────────────
+// Pomelli's "campaign ideas" step, adapted to Sorrel: turn the Brand DNA into a
+// handful of ready-to-render video concepts the user can one-click into a project.
+
+/** The composition modules a video idea may target (kept in sync with renderService). */
+export const VideoIdeaModuleSchema = z.enum([
+  "product-launch",
+  "brand-promo",
+  "social-teaser",
+  "studio",
+]);
+export type VideoIdeaModule = z.infer<typeof VideoIdeaModuleSchema>;
+
+export const VideoIdeaSchema = z.object({
+  title: z.string().min(1).max(80),
+  description: z.string().min(1).max(240),
+  module: VideoIdeaModuleSchema,
+  headline: z.string().min(1).max(160),
+  bodyText: z.string().min(1).max(500),
+  ctaText: z.string().min(1).max(48),
+});
+export type VideoIdea = z.infer<typeof VideoIdeaSchema>;
+
+export const GenerateVideoIdeasInputSchema = z.object({
+  dna: BrandDnaSchema,
+  count: z.number().int().min(1).max(6).default(4),
+  maxTokens: z.number().int().positive().max(3000).optional(),
+});
+export type GenerateVideoIdeasInput = z.infer<
+  typeof GenerateVideoIdeasInputSchema
+>;
+
+export const GenerateVideoIdeasOutputSchema = z.object({
+  ideas: z.array(VideoIdeaSchema).max(6),
+});
+export type GenerateVideoIdeasOutput = z.infer<
+  typeof GenerateVideoIdeasOutputSchema
+>;
+
+export interface GenerateVideoIdeasResult extends GenerateVideoIdeasOutput {
   usage: SuggestUsage;
 }

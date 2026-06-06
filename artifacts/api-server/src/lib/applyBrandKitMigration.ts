@@ -23,6 +23,19 @@ export async function applyBrandKitMigration(): Promise<void> {
         ADD COLUMN IF NOT EXISTS source_url text
     `);
 
+    // Brand DNA (narrative identity) columns — see lib/db/src/schema/brand.ts.
+    await client.query(`
+      ALTER TABLE brand_kit
+        ADD COLUMN IF NOT EXISTS tagline            text,
+        ADD COLUMN IF NOT EXISTS description        text,
+        ADD COLUMN IF NOT EXISTS value_proposition  text,
+        ADD COLUMN IF NOT EXISTS target_audience    text,
+        ADD COLUMN IF NOT EXISTS industry           text,
+        ADD COLUMN IF NOT EXISTS keywords           jsonb,
+        ADD COLUMN IF NOT EXISTS personality        jsonb,
+        ADD COLUMN IF NOT EXISTS image_style        text
+    `);
+
     // Projects can pin a specific kit; null falls back to the user's default.
     await client.query(`
       ALTER TABLE projects
