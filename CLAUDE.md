@@ -316,6 +316,35 @@ the screenshot as a `capture.image` **data URI** in `compositionVars`
 `compositions/website-showcase.html` (intro → mac-style browser scrolling the
 screenshot → outro CTA).
 
+**Capabilities (shipped).** The video dialog (`projects.tsx`) has **Download**
+(direct same-origin MP4) + **Share** (Web Share API with the actual file so a
+private render shares without a public link; falls back to copy-link). **Length
+is selectable** — `website-showcase` reads `data-duration="{{duration}}"` and the
+GSAP page-scroll stretches to fill (intro/outro fixed); the request `duration` is
+clamped server-side to 3–60 (`STUDIO_FALLBACKS` defaults 9 — a 9s render is
+byte-identical). **"Which section" to feature** is user-chosen, and *every* mode
+reduces to one `CropRegion` (0–1 fractions) emitted as `capture.cropX/Y/W/H` that
+the composition zooms/pans/scrolls into (default `0/0/1/1` = whole page,
+byte-identical). Pure crop math is `lib/websiteCrop.ts`
+(`heroCrop`/`bboxToCrop`/`buildCropVars`, clamped + floored so a hostile fraction
+can't break the `parseFloat("…")` literals). Modes:
+
+- **Whole page** — `{ url }`, no crop.
+- **Drag-select a region** — two-step: `POST /website-to-video/preview { url }`
+  captures + returns `{ previewId, image, width, height }` WITHOUT creating a
+  project (screenshot held in `websitePreviewStore` — owner-scoped, single-use,
+  15-min TTL); the SPA shows it, the user drags, then
+  `POST /website-to-video { previewId, crop }`.
+- **Hero** — `{ url, section: "hero" }` → `heroCrop()` (top viewport).
+- **By element** — `{ url, selector }` → `captureWebsite` resolves the element box
+  → `bboxToCrop()`.
+- **AI / text** (PLANNED — backend half-done): `captureWebsite({ extractSections })`
+  already returns candidate `sections` (label + crop); the missing pieces are a
+  `lib/ai` `pickSection(description, sections)` method (both providers) the service
+  calls to pick the region from a natural-language prompt (gate with
+  `checkAndIncrementAiCount`), plus the interactive multi-mode SPA UI (mode picker
+  + drag-select crop component + selector/AI text inputs). See Future work #11.
+
 **Security (SSRF) — this loads an arbitrary user URL server-side:**
 
 - `lib/ssrfGuard.ts` `assertSafeUrl` rejects non-http(s) schemes, embedded
@@ -703,6 +732,20 @@ upload-sourcemaps` in the deploy workflow + strip `.map` from the
     in a root `vitest.config.ts`). Deferred to a focused change that compares the
     4-project test **count** (not just green) before/after, since a botched
     migration can silently skip whole projects.
+11. **Website→Video — AI section mode + interactive crop UI** (backend mostly
+    landed): four "which section to feature" modes ship today — whole page,
+    drag-selected region (the `/website-to-video/preview` two-step flow),
+    `section:"hero"`, and CSS `selector` — all reducing to `capture.crop*` (see
+    **Website → Video**). Still to build: (a) the **AI/text mode** —
+    `captureWebsite({ extractSections })` already returns candidate `sections`
+    (label + crop); add a `lib/ai` `pickSection(description, sections)` method on
+    `AiProvider` (anthropic + openai impls + a tiny schema) that the service calls
+    (gate with `checkAndIncrementAiCount`) to map a natural-language prompt → a
+    section's crop; expose it as `aiPrompt` on `WebsiteToVideoRequest`. (b) The
+    **interactive SPA**: a section-mode picker on `pages/website-to-video.tsx` + a
+    drag-select crop overlay component (consumes the preview's `image`/`width`/
+    `height`) + selector / AI-text inputs, wired through the generated
+    `useWebsiteToVideoPreview` + `useWebsiteToVideo` hooks.
 
 ## User preferences
 
