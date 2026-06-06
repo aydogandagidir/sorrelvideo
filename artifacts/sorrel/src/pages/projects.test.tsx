@@ -1,13 +1,12 @@
 /**
- * Projects page — the paid-path surface that matters here is the project list's
- * data-driven states (loading skeleton / error alert / empty CTA) and, per
- * card, the status → controls mapping (a draft renders, a ready card watches, a
- * rendering card locks the destructive action). The headline new behavior is
- * the delete-confirmation AlertDialog: the trash button must only *arm* the
- * dialog, and only the explicit "Delete" confirm may fire the DELETE — Cancel
- * must not. We mock at the fetch boundary (real Responses, so the generated
- * `useListProjects` / `useDeleteProject` hooks run for real through
- * `customFetch`) and assert on the actual request the mutation issues.
+ * Projects page — the render library. After the design port, each project is a
+ * 9:16 thumbnail card that opens a detail modal; the per-project controls
+ * (Render / Re-render / Download / Delete) live in that modal. The surface that
+ * matters here: the list's data-driven states (loading / error / empty CTA), the
+ * status → controls mapping in the detail, and the delete-confirmation
+ * AlertDialog (trash only *arms* it; only the explicit "Delete" confirm fires the
+ * DELETE — Cancel must not). We mock at the fetch boundary (real Responses, so the
+ * generated hooks run through `customFetch`) and assert on the issued request.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
@@ -26,7 +25,6 @@ afterEach(() => {
   fetchMock = undefined;
 });
 
-/** A draft project (rendered with the Render + Delete + Studio controls). */
 function draftProject(over: Record<string, unknown> = {}) {
   return {
     id: 1,
@@ -39,35 +37,42 @@ function draftProject(over: Record<string, unknown> = {}) {
     videoUrl: null,
     duration: 12,
     renderError: null,
+    compositionVars: { "user.headline": "Hi", "user.ctaText": "Go" },
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-02T00:00:00.000Z",
     ...over,
   };
 }
 
-/** Common no-op stubs for the ambient Layout fetches (auth + billing). */
+/** Common no-op stubs for the ambient Layout + brand fetches. */
 const LAYOUT_ROUTES: ApiFetchRoute[] = [
   { url: "/api/auth/user", json: { user: null } },
   { url: "/api/billing/me", status: 500, json: {} },
+  { url: "/api/brand", status: 500, json: {} },
 ];
 
 function listRoute(projects: unknown[]): ApiFetchRoute {
   return { url: "/api/projects", method: "GET", json: projects };
 }
 
+/** Open a project's detail modal by clicking its card (by project name). */
+async function openDetail(name: string) {
+  const user = userEvent.setup();
+  await waitFor(() => expect(screen.getByText(name)).toBeInTheDocument());
+  await user.click(screen.getByText(name));
+  return screen.findByRole("dialog");
+}
+
 describe("Projects — list states", () => {
   it("shows the skeleton loaders while the project list is loading", () => {
-    // Never-resolving fetch → the query stays in its loading state.
     fetchMock = installApiFetchMock([]);
     fetchMock.mock.mockImplementation(() => new Promise(() => {}));
 
     const { container } = renderWithProviders(<Projects />);
 
-    // The skeleton cards use the `animate-pulse` utility from <Skeleton>.
-    expect(
-      container.querySelectorAll(".animate-pulse").length,
-    ).toBeGreaterThan(0);
-    // And no empty-state CTA yet.
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
+      0,
+    );
     expect(
       screen.queryByRole("heading", { name: /no projects yet/i }),
     ).not.toBeInTheDocument();
@@ -82,9 +87,7 @@ describe("Projects — list states", () => {
     renderWithProviders(<Projects />);
 
     await waitFor(() =>
-      expect(
-        screen.getByText(/failed to load projects/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/failed to load projects/i)).toBeInTheDocument(),
     );
     expect(screen.getByRole("alert")).toBeInTheDocument();
   });
@@ -105,54 +108,49 @@ describe("Projects — list states", () => {
   });
 });
 
-describe("Projects — card status → controls", () => {
-  it("a draft card offers Render and an enabled delete control", async () => {
+describe("Projects — card → detail controls", () => {
+  it("a draft card opens a detail with Render + an enabled delete control", async () => {
     fetchMock = installApiFetchMock([
       ...LAYOUT_ROUTES,
       listRoute([draftProject({ name: "Draft One" })]),
     ]);
 
     renderWithProviders(<Projects />);
+    const dialog = await openDetail("Draft One");
 
-    await waitFor(() =>
-      expect(screen.getByText("Draft One")).toBeInTheDocument(),
-    );
-    expect(screen.getByText("Draft")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Render" })).toBeInTheDocument();
-    // Watch is only for ready projects.
     expect(
-      screen.queryByRole("button", { name: /watch/i }),
+      within(dialog).getByRole("button", { name: /render now/i }),
+    ).toBeInTheDocument();
+    // Ready-only actions are absent for a draft.
+    expect(
+      within(dialog).queryByRole("button", { name: /re-render/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /delete draft one/i }),
+      within(dialog).getByRole("button", { name: /delete project/i }),
     ).toBeEnabled();
   });
 
-  it("a ready card offers Watch + Re-render", async () => {
+  it("a ready card opens a detail with Download + Re-render", async () => {
     fetchMock = installApiFetchMock([
       ...LAYOUT_ROUTES,
-      listRoute([
-        draftProject({ id: 2, name: "Ready One", status: "ready" }),
-      ]),
+      listRoute([draftProject({ id: 2, name: "Ready One", status: "ready" })]),
     ]);
 
     renderWithProviders(<Projects />);
+    const dialog = await openDetail("Ready One");
 
-    await waitFor(() =>
-      expect(screen.getByText("Ready One")).toBeInTheDocument(),
-    );
-    expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /watch/i })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /re-render/i }),
+      within(dialog).getByRole("link", { name: /download mp4/i }),
     ).toBeInTheDocument();
-    // No plain "Render" (that's draft-only).
     expect(
-      screen.queryByRole("button", { name: "Render" }),
-    ).not.toBeInTheDocument();
+      within(dialog).getByRole("button", { name: /re-render/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: /share/i }),
+    ).toBeInTheDocument();
   });
 
-  it("a rendering card shows the rendering badge and disables delete", async () => {
+  it("a rendering card shows the rendering badge and disables delete in the detail", async () => {
     fetchMock = installApiFetchMock([
       ...LAYOUT_ROUTES,
       listRoute([
@@ -166,18 +164,16 @@ describe("Projects — card status → controls", () => {
     ]);
 
     renderWithProviders(<Projects />);
-
+    // The card shows a "Rendering" status before we open anything.
     await waitFor(() =>
       expect(screen.getByText("Rendering One")).toBeInTheDocument(),
     );
-    // The status badge text ("Rendering…") appears; the in-thumbnail overlay
-    // uses the same copy, so there is more than one match — assert ≥ 1.
     expect(screen.getAllByText(/rendering/i).length).toBeGreaterThan(0);
-    // Determinate progress percentage from renderProgress.
-    expect(screen.getByText("42%")).toBeInTheDocument();
-    // Destructive delete is disabled mid-render (can't pull the rug out).
+
+    const dialog = await openDetail("Rendering One");
+    expect(within(dialog).getByText(/42%/)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /delete rendering one/i }),
+      within(dialog).getByRole("button", { name: /delete project/i }),
     ).toBeDisabled();
   });
 });
@@ -189,30 +185,27 @@ describe("Projects — delete confirmation AlertDialog", () => {
       ...LAYOUT_ROUTES,
       listRoute([draftProject({ id: 7, name: "Doomed" })]),
       { url: "/api/projects/7", method: "DELETE", status: 204, json: {} },
-      // The post-delete invalidation re-fetches the (now empty) list.
       { url: "/api/projects", method: "GET", json: [] },
     ]);
 
     renderWithProviders(<Projects />);
-    await waitFor(() => expect(screen.getByText("Doomed")).toBeInTheDocument());
+    const dialog = await openDetail("Doomed");
 
-    // Trash button only arms the dialog — no DELETE yet.
-    await user.click(screen.getByRole("button", { name: /delete doomed/i }));
-
-    const dialog = await screen.findByRole("alertdialog");
-    expect(
-      within(dialog).getByText(/can.t be undone/i),
-    ).toBeInTheDocument();
+    // Trash only arms the AlertDialog — no DELETE yet.
+    await user.click(
+      within(dialog).getByRole("button", { name: /delete project/i }),
+    );
+    const confirm = await screen.findByRole("alertdialog");
+    expect(within(confirm).getByText(/can.t be undone/i)).toBeInTheDocument();
     expect(deleteCalls()).toHaveLength(0);
 
-    // Confirm → the DELETE for project 7 fires exactly once.
-    await user.click(within(dialog).getByRole("button", { name: /^delete$/i }));
+    await user.click(within(confirm).getByRole("button", { name: /^delete$/i }));
 
     await waitFor(() => expect(deleteCalls()).toHaveLength(1));
     expect(deleteCalls()[0]?.url).toMatch(/\/api\/projects\/7$/);
   });
 
-  it("Cancel dismisses the dialog WITHOUT issuing a DELETE", async () => {
+  it("Cancel dismisses the confirm WITHOUT issuing a DELETE", async () => {
     const user = userEvent.setup();
     fetchMock = installApiFetchMock([
       ...LAYOUT_ROUTES,
@@ -221,17 +214,17 @@ describe("Projects — delete confirmation AlertDialog", () => {
     ]);
 
     renderWithProviders(<Projects />);
-    await waitFor(() => expect(screen.getByText("Spared")).toBeInTheDocument());
+    const dialog = await openDetail("Spared");
 
-    await user.click(screen.getByRole("button", { name: /delete spared/i }));
-    const dialog = await screen.findByRole("alertdialog");
-
-    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+    await user.click(
+      within(dialog).getByRole("button", { name: /delete project/i }),
+    );
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(within(confirm).getByRole("button", { name: /cancel/i }));
 
     await waitFor(() =>
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
     );
-    // Crucially: no DELETE was ever issued.
     expect(deleteCalls()).toHaveLength(0);
   });
 });

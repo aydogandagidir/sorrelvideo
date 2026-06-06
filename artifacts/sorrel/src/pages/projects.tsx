@@ -7,15 +7,31 @@ import {
   useCreateProject,
   useDeleteProject,
   useStartProjectRender,
+  useGetBrandKit,
   getListProjectsQueryKey,
+  type Project,
+  type BrandKit,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Film, Play, Trash2, Clock, Plus, Loader2, Clapperboard, AlertTriangle, Download, Share2 } from "lucide-react";
+import { CompositionThumb } from "@/components/composition";
+import {
+  AlertCircle,
+  Film,
+  Play,
+  Trash2,
+  Plus,
+  Loader2,
+  Clapperboard,
+  Download,
+  Share2,
+  X,
+  RotateCcw,
+  Search,
+  PencilRuler,
+} from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -29,7 +45,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,77 +56,117 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { buttonVariants } from "@/components/ui/button";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
-type Project = {
-  id: number;
-  name: string;
-  status: string;
-  module: string;
-  thumbnailUrl?: string | null;
-  videoUrl?: string | null;
-  duration?: number | null;
-  renderError?: string | null;
-  renderProgress?: number | null;
-  renderCost?: number | null;
-  createdAt: string;
-  updatedAt: string;
-};
+const DEFAULT_ACCENT = "#cdfb45";
+const COMP_BG = "#0d1110";
+const FILTERS = ["All", "Ready", "Rendering", "Draft", "Failed"] as const;
 
-function StatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case "ready":
-      return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Ready</Badge>;
-    case "rendering":
-      return <Badge className="bg-spark/10 text-spark border-spark/25 animate-pulse">Rendering…</Badge>;
-    case "failed":
-      return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Failed</Badge>;
-    default:
-      return <Badge variant="outline" className="text-muted-foreground">Draft</Badge>;
-  }
+function thumbProps(project: Project, brand?: BrandKit) {
+  const v = project.compositionVars ?? {};
+  const company = brand?.companyName || "Sorrel";
+  return {
+    vars: {
+      headline: v["user.headline"] || project.name,
+      body: v["user.bodyText"] || "",
+      cta: v["user.ctaText"] || "Learn more",
+    },
+    brand: { companyName: company, logoMark: company.charAt(0).toUpperCase() },
+    accent: brand?.primaryColor || DEFAULT_ACCENT,
+    bg: COMP_BG,
+  };
 }
 
-/** Formats a cost in cents as a short USD label, e.g. 12 → "$0.12". */
-function formatCost(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+function StatusDot({ status }: { status: string }) {
+  const map: Record<string, { cls: string; label: string; live?: boolean }> = {
+    ready: {
+      cls: "bg-green-500/15 text-green-400 border-green-500/25",
+      label: "Ready",
+    },
+    rendering: {
+      cls: "bg-spark/15 text-spark border-spark/30",
+      label: "Rendering",
+      live: true,
+    },
+    failed: {
+      cls: "bg-red-500/15 text-red-400 border-red-500/25",
+      label: "Failed",
+    },
+    draft: {
+      cls: "bg-secondary text-muted-foreground border-border",
+      label: "Draft",
+    },
+  };
+  const s = map[status] ?? map.draft;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold backdrop-blur",
+        s.cls,
+      )}
+    >
+      <span
+        className={cn("h-1.5 w-1.5 rounded-full bg-current", s.live && "animate-pulse")}
+      />
+      {s.label}
+    </span>
+  );
 }
 
-/** Polls a single project by id every `intervalMs` while its status is "rendering". */
-function useProjectPolling(projectId: number, active: boolean, intervalMs = 3000) {
+/** Poll the projects list every `intervalMs` while `active`. */
+function useProjectPolling(active: boolean, intervalMs = 3000) {
   const queryClient = useQueryClient();
-
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => {
       void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
     }, intervalMs);
     return () => clearInterval(timer);
-  }, [active, projectId, intervalMs, queryClient]);
+  }, [active, intervalMs, queryClient]);
+}
+
+function RenderRing({ progress }: { progress: number }) {
+  const C = 119; // 2πr, r=19
+  return (
+    <div className="relative h-[46px] w-[46px]">
+      <svg width="46" height="46" viewBox="0 0 46 46" className="-rotate-90">
+        <circle cx="23" cy="23" r="19" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="4" />
+        <circle
+          cx="23"
+          cy="23"
+          r="19"
+          fill="none"
+          stroke="hsl(var(--spark))"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={C}
+          strokeDashoffset={C * (1 - progress / 100)}
+          style={{ transition: "stroke-dashoffset .5s ease" }}
+        />
+      </svg>
+      <span className="absolute inset-0 grid place-items-center font-mono text-[11px] font-bold text-white">
+        {Math.round(progress)}
+      </span>
+    </div>
+  );
 }
 
 function ProjectCard({
   project,
-  focused = false,
+  brand,
+  focused,
+  onOpen,
+  index,
 }: {
   project: Project;
-  focused?: boolean;
+  brand?: BrandKit;
+  focused: boolean;
+  onOpen: () => void;
+  index: number;
 }) {
-  const queryClient = useQueryClient();
-  const deleteProject = useDeleteProject();
-  const renderMutation = useStartProjectRender();
-  const [showVideo, setShowVideo] = useState(false);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState<"render_limit" | "premium_template">("render_limit");
-
   const isRendering = project.status === "rendering";
-  const isReady = project.status === "ready";
+  useProjectPolling(isRendering);
 
-  // Poll while rendering
-  useProjectPolling(project.id, isRendering);
-
-  // One-shot scroll + highlight when arriving from Studio with ?focus=<id>.
-  // The didFocus guard keeps the 3s poll-driven re-renders from re-triggering it.
   const cardRef = useRef<HTMLDivElement>(null);
   const didFocus = useRef(false);
   const [highlight, setHighlight] = useState(false);
@@ -124,44 +179,101 @@ function ProjectCard({
     return () => clearTimeout(t);
   }, [focused]);
 
-  const handleRender = () => {
-    renderMutation.mutate(
-      { id: project.id },
-      {
-        onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-        },
-        onError: (err) => {
-          // Check for upgrade_required 403 from backend
-          const e = err as { response?: { data?: { reason?: string; error?: string } }; data?: { reason?: string; error?: string }; status?: number; message?: string };
-          const reason = e.response?.data?.reason ?? e.data?.reason;
-          const errorMsg = e.response?.data?.error ?? e.data?.error ?? e.message ?? "";
-          if (reason === "upgrade_required" || e.status === 403) {
-            if (errorMsg.toLowerCase().includes("template")) {
-              setUpgradeReason("premium_template");
-            } else {
-              setUpgradeReason("render_limit");
-            }
-            setUpgradeOpen(true);
-          }
-        },
-      },
-    );
-  };
+  const showImg = project.status === "ready" && project.thumbnailUrl;
+  const layouts = ["center", "grid", "stat", "quote", "sweep"] as const;
 
-  const handleDelete = () => {
-    deleteProject.mutate(
-      { id: project.id },
-      {
-        onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-        },
-      },
-    );
-  };
+  return (
+    <div ref={cardRef}>
+      <button
+        type="button"
+        onClick={onOpen}
+        className={cn(
+          "block w-full text-left",
+          "group/card transition-transform",
+          highlight && "rounded-xl ring-2 ring-primary ring-offset-2 ring-offset-background",
+        )}
+      >
+        <div className="relative aspect-[9/16] overflow-hidden rounded-xl border bg-[#0d1110] transition-all group-hover/card:-translate-y-0.5 group-hover/card:border-primary/40 group-hover/card:shadow-lg">
+          {showImg ? (
+            <img
+              src={project.thumbnailUrl ?? undefined}
+              alt={project.name}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <CompositionThumb
+              {...thumbProps(project, brand)}
+              layout={layouts[index % layouts.length]}
+            />
+          )}
 
-  const videoSrc = project.videoUrl ?? `/api/projects/${project.id}/video`;
+          {isRendering && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-black/60 backdrop-blur-[3px]">
+              <RenderRing progress={project.renderProgress ?? 0} />
+              <span className="text-[11px] font-semibold text-white/80">
+                Rendering mp4…
+              </span>
+            </div>
+          )}
+          {project.status === "failed" && (
+            <div className="absolute inset-0 grid place-items-center bg-black/55">
+              <div className="text-center">
+                <AlertCircle className="mx-auto h-5 w-5 text-red-400" />
+                <div className="mt-1 text-[11px] text-white">Render failed</div>
+              </div>
+            </div>
+          )}
+          {project.status === "ready" && (
+            <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent pb-3.5 opacity-0 transition-opacity group-hover/card:opacity-100">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground">
+                <Play className="h-4 w-4" fill="currentColor" />
+              </span>
+            </div>
+          )}
+
+          <div className="absolute left-2 top-2">
+            <StatusDot status={project.status} />
+          </div>
+          {project.duration ? (
+            <div className="absolute right-2 top-2 rounded bg-black/45 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white/85">
+              {project.duration}s
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-2">
+          <div className="truncate text-[13px] font-semibold">{project.name}</div>
+          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span>{new Date(project.updatedAt).toLocaleDateString()}</span>
+            <span className="capitalize">· {project.module}</span>
+          </div>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+function ProjectDetail({
+  project,
+  brand,
+  onClose,
+}: {
+  project: Project;
+  brand?: BrandKit;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const deleteProject = useDeleteProject();
+  const renderMutation = useStartProjectRender();
   const { toast } = useToast();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<
+    "render_limit" | "premium_template"
+  >("render_limit");
+
+  const isReady = project.status === "ready";
+  const isRendering = project.status === "rendering";
+  const videoSrc = project.videoUrl ?? `/api/projects/${project.id}/video`;
+  const v = project.compositionVars ?? {};
   const downloadName = `${
     (project.name || "video")
       .replace(/[^a-z0-9-_]+/gi, "-")
@@ -169,9 +281,31 @@ function ProjectCard({
       .slice(0, 60) || "video"
   }.mp4`;
 
-  // Share the rendered video. Prefer the Web Share API with the actual file so a
-  // PRIVATE (owner-only) render can be shared without a public link; fall back to
-  // copying the project link. The fetch carries the session cookie (same-origin).
+  const invalidate = () =>
+    void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+
+  const handleRender = () =>
+    renderMutation.mutate(
+      { id: project.id },
+      {
+        onSuccess: invalidate,
+        onError: (err) => {
+          const e = err as {
+            data?: { reason?: string; error?: string };
+            status?: number;
+          };
+          if (e.data?.reason === "upgrade_required" || e.status === 403) {
+            setUpgradeReason(
+              (e.data?.error ?? "").toLowerCase().includes("template")
+                ? "premium_template"
+                : "render_limit",
+            );
+            setUpgradeOpen(true);
+          }
+        },
+      },
+    );
+
   const handleShare = async () => {
     if (typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
       try {
@@ -185,7 +319,6 @@ function ProjectCard({
           }
         }
       } catch (err) {
-        // User dismissed the share sheet — not an error, don't fall through.
         if (err instanceof Error && err.name === "AbortError") return;
       }
     }
@@ -199,245 +332,221 @@ function ProjectCard({
   };
 
   return (
-    <Card
-      ref={cardRef}
-      className={cn(
-        "overflow-hidden transition-all hover:border-primary/30 group",
-        highlight && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-      )}
-    >
-      <CardContent className="p-0 flex items-stretch">
-        {/* Thumbnail / status indicator */}
-        <div className="w-40 bg-muted shrink-0 flex flex-col items-center justify-center border-r relative overflow-hidden">
-          {project.thumbnailUrl ? (
-            <img
-              src={project.thumbnailUrl}
-              alt={project.name}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-          ) : (
-            <Film className="h-8 w-8 text-muted-foreground/30" />
-          )}
-          {isRendering && (
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-spark" />
-              <span className="text-xs text-muted-foreground font-medium">Rendering…</span>
-            </div>
-          )}
-          {isReady && (
-            <div className="absolute inset-0 bg-background/40 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setShowVideo(true)}>
-              <Play className="h-8 w-8 text-white drop-shadow-lg" />
-            </div>
-          )}
-        </div>
-
-        {/* Details */}
-        <div className="flex-1 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 mb-1">
-              <h3 className="text-lg font-semibold truncate">{project.name}</h3>
-              <StatusBadge status={project.status} />
-            </div>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-              <Badge variant="outline" className="capitalize text-xs font-normal">
-                {project.module}
-              </Badge>
-              {project.duration && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {project.duration}s
-                </span>
-              )}
-              <span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span>
-              {isRendering && typeof project.renderCost === "number" && (
-                <Badge variant="outline" className="text-xs font-normal" title="Estimated render cost">
-                  {formatCost(project.renderCost)}
-                </Badge>
-              )}
-            </div>
-            {/* Live render progress — determinate bar from renderProgress, or an
-                indeterminate pulse while the first progress tick is pending. The
-                3s project poll refreshes the value; no extra request needed. */}
-            {isRendering && (
-              <div className="mt-3 max-w-sm">
-                {typeof project.renderProgress === "number" ? (
-                  <>
-                    <Progress
-                      value={project.renderProgress}
-                      className="h-2 bg-spark/20 [&>*]:bg-spark"
-                    />
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {project.renderProgress}%
-                    </span>
-                  </>
-                ) : (
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-spark/20">
-                    <div className="h-full w-1/3 animate-pulse rounded-full bg-spark" />
-                  </div>
-                )}
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-[820px] gap-0 overflow-hidden p-0">
+        <DialogTitle className="sr-only">{project.name}</DialogTitle>
+        <div className="grid md:grid-cols-[300px_1fr]">
+          {/* Preview */}
+          <div className="border-b bg-[#0d1110] p-5 md:border-b-0 md:border-r">
+            {isReady ? (
+              <video
+                src={videoSrc}
+                controls
+                className="mx-auto aspect-[9/16] w-full max-w-[240px] rounded-[14px] border"
+              />
+            ) : (
+              <div className="relative mx-auto aspect-[9/16] w-full max-w-[240px] overflow-hidden rounded-[14px] border">
+                <CompositionThumb {...thumbProps(project, brand)} chrome />
               </div>
             )}
+          </div>
+          {/* Meta + actions */}
+          <div className="flex flex-col gap-4 p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="mb-2">
+                  <StatusDot status={project.status} />
+                </div>
+                <h2 className="text-[22px] font-semibold">{project.name}</h2>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">
+                  Updated {new Date(project.updatedAt).toLocaleDateString()}
+                  {project.duration ? ` · ${project.duration}s` : ""} ·{" "}
+                  <span className="capitalize">{project.module}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="grid h-8 w-8 place-items-center rounded-lg border bg-secondary text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {(v["user.headline"] || v["user.bodyText"] || v["user.ctaText"]) && (
+              <div>
+                <div className="mb-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground/70">
+                  Copy
+                </div>
+                <div className="flex flex-col gap-2 text-[13.5px]">
+                  {v["user.headline"] && (
+                    <div>
+                      <span className="text-muted-foreground">Headline · </span>
+                      {v["user.headline"].replace(/\n/g, " ")}
+                    </div>
+                  )}
+                  {v["user.bodyText"] && (
+                    <div>
+                      <span className="text-muted-foreground">Body · </span>
+                      {v["user.bodyText"]}
+                    </div>
+                  )}
+                  {v["user.ctaText"] && (
+                    <div>
+                      <span className="text-muted-foreground">CTA · </span>
+                      <span className="font-semibold text-primary">
+                        {v["user.ctaText"]}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {project.status === "failed" && project.renderError && (
-              <div className="mt-2 flex items-start gap-1.5 text-xs text-destructive">
-                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span className="truncate max-w-sm" title={project.renderError}>
-                  {project.renderError}
-                </span>
-              </div>
+              <p className="text-xs text-destructive">{project.renderError}</p>
             )}
-          </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Delete — confirmation guards a permanent, undoable removal */}
-            <AlertDialog>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        disabled={isRendering}
-                        aria-label={`Delete ${project.name}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>Delete project</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete &ldquo;{project.name}&rdquo;?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This permanently removes the project and its rendered video. This can&rsquo;t be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={deleteProject.isPending}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className={cn(buttonVariants({ variant: "destructive" }))}
-                    onClick={handleDelete}
-                    disabled={deleteProject.isPending}
-                  >
-                    {deleteProject.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
-                    )}
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Open this project in the embedded @hyperframes/studio editor */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                window.location.href = `/editor/#project/${project.id}`;
-              }}
-            >
-              Studio
-            </Button>
-
-            {/* Render button — shown only for draft status */}
-            {project.status === "draft" && (
-              <Button
-                variant="outline"
-                onClick={handleRender}
-                disabled={renderMutation.isPending}
-              >
-                {renderMutation.isPending ? (
+            <div className="mt-auto flex flex-wrap gap-2 pt-2">
+              {isReady && (
+                <>
+                  <Button asChild>
+                    <a href={videoSrc} download={downloadName}>
+                      <Download className="mr-2 h-4 w-4" /> Download mp4
+                    </a>
+                  </Button>
+                  <Button variant="outline" onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" /> Share
+                  </Button>
+                </>
+              )}
+              {(isReady || project.status === "failed") && (
+                <Button
+                  variant={project.status === "failed" ? "default" : "ghost"}
+                  onClick={handleRender}
+                  disabled={renderMutation.isPending}
+                >
+                  {renderMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                  )}
+                  {project.status === "failed" ? "Retry render" : "Re-render"}
+                </Button>
+              )}
+              {project.status === "draft" && (
+                <Button onClick={handleRender} disabled={renderMutation.isPending}>
+                  {renderMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Clapperboard className="mr-2 h-4 w-4" />
+                  )}
+                  Render now
+                </Button>
+              )}
+              {isRendering && (
+                <Button variant="outline" disabled>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Clapperboard className="mr-2 h-4 w-4" />
-                )}
-                Render
-              </Button>
-            )}
-
-            {/* Re-render button — shown when ready or failed */}
-            {(project.status === "ready" || project.status === "failed") && (
+                  Rendering… {Math.round(project.renderProgress ?? 0)}%
+                </Button>
+              )}
               <Button
                 variant="outline"
-                size="sm"
-                onClick={handleRender}
-                disabled={renderMutation.isPending}
+                onClick={() => {
+                  window.location.href = `/editor/#project/${project.id}`;
+                }}
               >
-                {renderMutation.isPending ? (
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                ) : (
-                  <Clapperboard className="mr-2 h-3 w-3" />
-                )}
-                Re-render
+                <PencilRuler className="mr-2 h-4 w-4" /> Studio editor
               </Button>
-            )}
-
-            {/* Watch button — only when ready */}
-            {isReady && (
-              <Button onClick={() => setShowVideo(true)}>
-                <Play className="mr-2 h-4 w-4" />
-                Watch
-              </Button>
-            )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={isRendering}
+                    aria-label="Delete project"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete &ldquo;{project.name}&rdquo;?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently removes the project and its rendered
+                      video. This can&rsquo;t be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleteProject.isPending}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className={cn(buttonVariants({ variant: "destructive" }))}
+                      onClick={() =>
+                        deleteProject.mutate(
+                          { id: project.id },
+                          {
+                            onSuccess: () => {
+                              invalidate();
+                              onClose();
+                            },
+                          },
+                        )
+                      }
+                      disabled={deleteProject.isPending}
+                    >
+                      {deleteProject.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
-      </CardContent>
-
-      {/* Video player dialog */}
-      <Dialog open={showVideo} onOpenChange={setShowVideo}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black">
-          <DialogTitle className="sr-only">{project.name || "Video"}</DialogTitle>
-          <video
-            src={videoSrc}
-            controls
-            autoPlay
-            className="w-full max-h-[70vh] rounded-lg"
-          />
-          <div className="flex items-center justify-end gap-2 px-4 pb-4 pt-1">
-            <Button asChild variant="secondary" size="sm">
-              <a href={videoSrc} download={downloadName}>
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </a>
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleShare}>
-              <Share2 className="mr-2 h-4 w-4" />
-              Share
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Upgrade modal — shown when render is blocked due to plan limits */}
+      </DialogContent>
       <UpgradeModal
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
         reason={upgradeReason}
       />
-    </Card>
+    </Dialog>
   );
 }
 
 export default function Projects() {
   const queryClient = useQueryClient();
   const { data: projects, isLoading, isError } = useListProjects();
+  const { data: brand } = useGetBrandKit();
   const createProject = useCreateProject();
   const focusId = Number(new URLSearchParams(useSearch()).get("focus")) || null;
 
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectModule, setNewProjectModule] = useState("studio");
 
-  const hasRenderingProjects = projects?.some((p) => p.status === "rendering") ?? false;
+  const hasRendering = projects?.some((p) => p.status === "rendering") ?? false;
+  useProjectPolling(hasRendering);
 
-  // Global poll when any project is rendering
-  useProjectPolling(0, hasRenderingProjects);
+  const readyCount = projects?.filter((p) => p.status === "ready").length ?? 0;
+  const renderingCount =
+    projects?.filter((p) => p.status === "rendering").length ?? 0;
+  const filtered =
+    filter === "All"
+      ? (projects ?? [])
+      : (projects ?? []).filter((p) => p.status === filter.toLowerCase());
+  const detail = projects?.find((p) => p.id === detailId) ?? null;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -460,103 +569,160 @@ export default function Projects() {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>Failed to load projects. Please try again later.</AlertDescription>
+          <AlertDescription>
+            Failed to load projects. Please try again later.
+          </AlertDescription>
         </Alert>
       </Layout>
     );
   }
 
+  const total = projects?.length ?? 0;
+
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">Manage and render your video production projects.</p>
+      <div className="mx-auto max-w-[1180px]">
+        {/* Head */}
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-[27px] leading-tight">Projects</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {total} videos · {readyCount} ready
+              {renderingCount ? ` · ${renderingCount} rendering` : ""}
+            </p>
+          </div>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> New video
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Project</DialogTitle>
+                <DialogDescription>
+                  Start a new video production project.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreate}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Project Name</Label>
+                    <Input
+                      id="name"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      placeholder="E.g., Q3 Marketing Promo"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="module">Module</Label>
+                    <select
+                      id="module"
+                      value={newProjectModule}
+                      onChange={(e) => setNewProjectModule(e.target.value)}
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      <option value="studio">Studio</option>
+                      <option value="ai">AI Gen</option>
+                      <option value="bulk">Bulk Render</option>
+                    </select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    disabled={!newProjectName || createProject.isPending}
+                  >
+                    {createProject.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Create Project
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> New Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>Start a new video production project.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreate}>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Project Name</Label>
-                  <Input
-                    id="name"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    placeholder="E.g., Q3 Marketing Promo"
-                    autoFocus
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="module">Module</Label>
-                  <select
-                    id="module"
-                    value={newProjectModule}
-                    onChange={(e) => setNewProjectModule(e.target.value)}
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="studio">Studio</option>
-                    <option value="ai">AI Gen</option>
-                    <option value="bulk">Bulk Render</option>
-                  </select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={!newProjectName || createProject.isPending}>
-                  {createProject.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Create Project
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="grid gap-4">
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6 flex items-center gap-4">
-                <Skeleton className="h-16 w-24 rounded-md" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-5 w-1/3" />
-                  <Skeleton className="h-4 w-1/4" />
-                </div>
-                <Skeleton className="h-9 w-20" />
-              </CardContent>
-            </Card>
-          ))
-        ) : projects?.length ? (
-          projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project as Project}
-              focused={project.id === focusId}
-            />
-          ))
-        ) : (
-          <div className="text-center py-16 border rounded-xl border-dashed">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-              <Film className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-            <p className="text-muted-foreground max-w-sm mx-auto mb-6">
-              Create your first video project and hit <strong>Render</strong> to produce a video.
-            </p>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Create First Project
-            </Button>
+        {/* Filters */}
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
+                filter === f
+                  ? "border-transparent bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {f}
+            </button>
+          ))}
+          <div className="ml-auto hidden h-[34px] w-[180px] items-center gap-2 rounded-md border bg-secondary px-2.5 text-muted-foreground sm:flex">
+            <Search className="h-3.5 w-3.5" />
+            <span className="text-[12.5px]">Filter projects…</span>
           </div>
+        </div>
+
+        {/* Grid */}
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-[9/16] w-full rounded-xl" />
+            ))}
+          </div>
+        ) : filtered.length ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {filtered.map((p, i) => (
+              <ProjectCard
+                key={p.id}
+                project={p}
+                brand={brand}
+                index={i}
+                focused={p.id === focusId}
+                onOpen={() => setDetailId(p.id)}
+              />
+            ))}
+          </div>
+        ) : total === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+              <Film className="h-8 w-8 text-muted-foreground/40" />
+              <h3 className="text-lg font-medium">No projects yet</h3>
+              <p className="m-0 max-w-sm text-sm text-muted-foreground">
+                Create your first video project and hit <strong>Render</strong>{" "}
+                to produce a video.
+              </p>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Create first project
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
+              <Film className="h-8 w-8 text-muted-foreground/40" />
+              <div className="font-semibold">
+                No {filter.toLowerCase()} projects
+              </div>
+              <p className="m-0 text-sm text-muted-foreground">
+                Try another filter or compose a new video.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {detail && (
+          <ProjectDetail
+            project={detail}
+            brand={brand}
+            onClose={() => setDetailId(null)}
+          />
         )}
       </div>
     </Layout>
