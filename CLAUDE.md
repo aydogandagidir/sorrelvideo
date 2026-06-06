@@ -712,15 +712,21 @@ across).
 install deps, verify OpenAPI codegen is in sync, lint, typecheck, run
 Vitest (with Postgres testcontainer for integration tests), build.
 
-**Deploy** (`.github/workflows/deploy.yml`): listens for the CI workflow
-to finish on `main`; if green, runs `railway up --service api --detach`
-using a `RAILWAY_TOKEN` secret. Subsequent pushes auto-ship. The deploy is
-**opt-in / gated on the secret**: a first guard step skips the Railway steps
-(job stays GREEN with a `::notice::`) whenever `RAILWAY_TOKEN` is unset, so an
-unprovisioned environment doesn't fail the workflow red on every merge — adding
-the secret auto-activates the deploy with no workflow edit. The Railway CLI is
-installed via `curl … | bash` (NOT `sh`: the install script uses bash-only
-`${var//…/…}` + `local`, which dash rejects with "Bad substitution").
+**Deploy.** The app runs on Railway (project `mellow-gratitude`, service
+`@workspace/api-server`, `production` env) and **deploys via Railway's native
+GitHub integration** (Settings → Deploy from repo) — that's the active deployer:
+a push to `main` triggers a Railway Docker build + release; the public URL is
+`workspaceapi-server-production-5961.up.railway.app`.
+
+`.github/workflows/deploy.yml` is an **optional, opt-in CI deploy path** (listens
+for green CI on `main`, then `railway up --service "$RAILWAY_SERVICE"`). It is
+**gated on a `RAILWAY_TOKEN` secret**: a guard step skips the Railway steps (job
+stays GREEN with a `::notice::`) when the secret is unset — so it stays dormant
+(no red, no double-deploy) while the native integration does the work. Enable it
+ONLY if you also disable native auto-deploy, else both fire. Two prior bugs are
+fixed: the CLI installs via `curl … | bash` (NOT `sh`: the script uses bash-only
+`${var//…/…}` + `local`, which dash rejects with "Bad substitution"), and the
+service is referenced as `@workspace/api-server` (was a non-existent `api`).
 
 **Observability**:
 
