@@ -4,155 +4,272 @@ import {
   useGetStats,
   useGetBillingInfo,
   useListProjects,
+  useGetBrandKit,
+  type Project,
+  type BrandKit,
+  type BillingInfo,
 } from "@workspace/api-client-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CompositionThumb,
+  type CompositionLayout,
+} from "@/components/composition";
 import {
   Film,
   Video,
-  Plus,
   Layers,
   Wand2,
-  AlertCircle,
-  Sparkles,
-  Clapperboard,
   Palette,
-  Globe,
+  Play,
   ArrowRight,
+  ChevronRight,
   Loader2,
-  Crown,
+  AlertCircle,
   type LucideIcon,
 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
-/** SVG progress ring — the signature dashboard quota dial. */
-function QuotaRing({
-  used,
-  limit,
-}: {
-  used: number;
-  limit: number | null | undefined;
-}) {
-  const unlimited = limit == null;
-  const pct = unlimited
-    ? 100
-    : limit > 0
-      ? Math.min(100, Math.round((used / limit) * 100))
-      : 0;
-  const R = 54;
-  const C = 2 * Math.PI * R;
-  const dash = (pct / 100) * C;
-  const near = !unlimited && pct >= 80;
+const DEFAULT_ACCENT = "#cdfb45";
+const COMP_BG = "#0d1110";
+const LAYOUTS: CompositionLayout[] = ["center", "grid", "stat", "quote"];
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+/** Map a project + brand into composition props (real compositionVars). */
+function thumbProps(project: Project, brand?: BrandKit) {
+  const v = project.compositionVars ?? {};
+  const company = brand?.companyName || "Sorrel";
+  return {
+    vars: {
+      headline: v["user.headline"] || project.name,
+      body: v["user.bodyText"] || "",
+      cta: v["user.ctaText"] || "Learn more",
+    },
+    brand: { companyName: company, logoMark: company.charAt(0).toUpperCase() },
+    accent: brand?.primaryColor || DEFAULT_ACCENT,
+    bg: COMP_BG,
+  };
+}
+
+function StatusDot({ status }: { status: string }) {
+  const map: Record<string, { cls: string; label: string; live?: boolean }> = {
+    ready: {
+      cls: "bg-green-500/15 text-green-400 border-green-500/25",
+      label: "Ready",
+    },
+    rendering: {
+      cls: "bg-spark/15 text-spark border-spark/30",
+      label: "Rendering",
+      live: true,
+    },
+    failed: { cls: "bg-red-500/15 text-red-400 border-red-500/25", label: "Failed" },
+    draft: {
+      cls: "bg-secondary text-muted-foreground border-border",
+      label: "Draft",
+    },
+  };
+  const s = map[status] ?? map.draft;
   return (
-    <div className="relative h-32 w-32 shrink-0">
-      <svg viewBox="0 0 128 128" className="h-full w-full -rotate-90">
-        <circle
-          cx="64"
-          cy="64"
-          r={R}
-          fill="none"
-          stroke="hsl(var(--muted))"
-          strokeWidth={11}
-        />
-        <circle
-          cx="64"
-          cy="64"
-          r={R}
-          fill="none"
-          stroke={near ? "hsl(var(--spark))" : "hsl(var(--primary))"}
-          strokeWidth={11}
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${C}`}
-          className="transition-all duration-700"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-3xl font-bold tabular-nums leading-none">
-          {unlimited ? "∞" : used}
-        </span>
-        <span className="mt-1 text-[11px] text-muted-foreground">
-          {unlimited ? "renders" : `of ${limit}`}
-        </span>
-      </div>
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+        s.cls,
+      )}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 rounded-full bg-current",
+          s.live && "animate-pulse",
+        )}
+      />
+      {s.label}
+    </span>
   );
 }
 
-function StatTile({
-  title,
-  value,
-  icon: Icon,
-  hint,
-  href,
+function ProjectThumb({
+  project,
+  brand,
+  index,
 }: {
-  title: string;
-  value: string | number;
-  icon: LucideIcon;
-  hint: string;
-  href: string;
+  project: Project;
+  brand?: BrandKit;
+  index: number;
 }) {
+  const showImg = project.status === "ready" && project.thumbnailUrl;
+  const props = thumbProps(project, brand);
+  const layout = LAYOUTS[index % LAYOUTS.length];
   return (
-    <Link href={href}>
-      <Card className="group h-full cursor-pointer transition-colors hover:border-primary/40">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{title}</span>
-            <Icon className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+    <Link href="/projects" className="group block">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-xl border bg-[#0d1110] transition-colors group-hover:border-primary/40">
+        {showImg ? (
+          <img
+            src={project.thumbnailUrl ?? undefined}
+            alt={project.name}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <CompositionThumb {...props} layout={layout} />
+        )}
+        {project.status === "rendering" && (
+          <div className="absolute inset-0 grid place-items-center bg-black/55 backdrop-blur-[2px]">
+            <div className="text-center text-white">
+              <Loader2 className="mx-auto h-5 w-5 animate-spin text-spark" />
+              <div className="mt-1.5 font-mono text-[10.5px]">
+                {Math.round(project.renderProgress ?? 0)}%
+              </div>
+            </div>
           </div>
-          <div className="mt-3 font-mono text-3xl font-bold tabular-nums">
-            {value}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-        </CardContent>
-      </Card>
+        )}
+        <div className="absolute left-2 top-2">
+          <StatusDot status={project.status} />
+        </div>
+      </div>
+      <div className="mt-1.5 truncate text-[12.5px] font-semibold">
+        {project.name}
+      </div>
+      <div className="text-[11px] text-muted-foreground">
+        {new Date(project.updatedAt).toLocaleDateString()}
+      </div>
     </Link>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    ready: "bg-green-500/10 text-green-500 border-green-500/20",
-    rendering: "bg-spark/10 text-spark border-spark/25 animate-pulse",
-    failed: "bg-red-500/10 text-red-500 border-red-500/20",
-    draft: "bg-secondary text-muted-foreground border-border",
-  };
+function StatTile({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+}) {
   return (
-    <Badge className={cn("capitalize", map[status] ?? map.draft)}>
-      {status}
-    </Badge>
+    <Card>
+      <CardContent className="flex flex-col gap-2.5 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-[12.5px] font-medium text-muted-foreground">
+            {label}
+          </span>
+          <span className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-secondary text-muted-foreground">
+            <Icon className="h-[15px] w-[15px]" />
+          </span>
+        </div>
+        <span
+          className="text-3xl font-semibold tabular-nums"
+          style={{ fontFamily: "var(--font-display)", letterSpacing: "-.03em" }}
+        >
+          {value}
+        </span>
+      </CardContent>
+    </Card>
   );
 }
 
-const QUICK_ACTIONS = [
-  { href: "/studio", label: "Open Studio", icon: Wand2 },
-  { href: "/website-to-video", label: "Website → Video", icon: Globe },
-  { href: "/templates", label: "Browse Templates", icon: Layers },
-  { href: "/brand", label: "Edit Brand DNA", icon: Palette },
-] as const;
+function QuotaRing({ billing }: { billing?: BillingInfo }) {
+  const isPro = billing?.plan === "pro";
+  const used = billing?.renderCount ?? 0;
+  const limit = isPro ? null : (billing?.renderLimit ?? null);
+  const pct = isPro ? 1 : limit && limit > 0 ? Math.min(1, used / limit) : 0;
+  const R = 26;
+  const C = 2 * Math.PI * R;
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 p-4">
+        <div className="relative h-[68px] w-[68px] shrink-0">
+          <svg width="68" height="68" viewBox="0 0 68 68" className="-rotate-90">
+            <circle
+              cx="34"
+              cy="34"
+              r={R}
+              fill="none"
+              stroke="hsl(var(--muted))"
+              strokeWidth="7"
+            />
+            <circle
+              cx="34"
+              cy="34"
+              r={R}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="7"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - pct)}
+              style={{ transition: "stroke-dashoffset 1s ease" }}
+            />
+          </svg>
+          <div className="absolute inset-0 grid place-items-center">
+            <Film className="h-5 w-5 text-primary" />
+          </div>
+        </div>
+        <div>
+          <div className="text-[12.5px] text-muted-foreground">
+            Renders this month
+          </div>
+          <div
+            className="text-2xl font-semibold tabular-nums"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {used}{" "}
+            <span className="text-sm font-normal text-muted-foreground">
+              / {isPro || limit == null ? "∞" : limit}
+            </span>
+          </div>
+          <div className="mt-0.5 text-[11.5px] font-semibold text-primary">
+            {isPro ? "Pro · unlimited" : "Free plan"}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+  desc,
+  href,
+}: {
+  icon: LucideIcon;
+  label: string;
+  desc: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border hover:bg-secondary"
+    >
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="flex-1">
+        <span className="block text-[13px] font-semibold">{label}</span>
+        <span className="block text-[11.5px] text-muted-foreground">{desc}</span>
+      </span>
+      <ChevronRight className="h-[15px] w-[15px] text-muted-foreground/50" />
+    </Link>
+  );
+}
 
 export default function Dashboard() {
   const { data: stats, isLoading, isError } = useGetStats();
   const { data: billing } = useGetBillingInfo();
   const { data: projects } = useListProjects();
+  const { data: brand } = useGetBrandKit();
 
-  const isPro = billing?.plan === "pro";
-  const renderUsed = billing?.renderCount ?? 0;
-  const renderLimit = isPro ? null : (billing?.renderLimit ?? null);
-  const aiUsed = billing?.aiCount ?? 0;
-  const aiLimit = isPro ? null : (billing?.aiLimit ?? null);
-  const aiPct =
-    aiLimit && aiLimit > 0 ? Math.min(100, (aiUsed / aiLimit) * 100) : 100;
-
-  const liveRender = projects?.find((p) => p.status === "rendering");
+  const rendering = projects?.find((p) => p.status === "rendering");
+  const recent = projects?.slice(0, 4) ?? [];
+  const latestReady = projects?.find((p) => p.status === "ready");
 
   if (isError) {
     return (
@@ -170,248 +287,219 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      {/* Hero */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            <Badge
-              className={cn(
-                "gap-1",
-                isPro
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : "border-border bg-secondary text-muted-foreground",
-              )}
-            >
-              {isPro && <Crown className="h-3 w-3" />}
-              {isPro ? "Pro" : "Free"}
-            </Badge>
+      <div className="mx-auto max-w-[1180px]">
+        {/* Page head */}
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-[27px] leading-tight">
+              {greeting()} <span className="text-muted-foreground">👋</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Here&apos;s what&apos;s moving in your workspace today.
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            Welcome back — compose, render and ship branded short-form video.
-          </p>
+          <div className="flex items-center gap-2.5">
+            <Button variant="outline" asChild>
+              <Link href="/brand">
+                <Palette className="mr-2 h-4 w-4" /> Brand DNA
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/studio">
+                <Wand2 className="mr-2 h-4 w-4" /> New video
+              </Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" asChild>
-            <Link href="/projects">
-              <Plus className="mr-2 h-4 w-4" /> New Project
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/studio">
-              <Wand2 className="mr-2 h-4 w-4" /> Open Studio
-            </Link>
-          </Button>
-        </div>
-      </div>
 
-      {/* Top row: quota dial + stat tiles */}
-      <div className="mb-6 grid gap-5 lg:grid-cols-3">
-        <Card className="lg:row-span-1">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Render quota</CardTitle>
-            <CardDescription>
-              {isPro ? "Pro — unlimited renders" : "Resets monthly"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center gap-5">
-            <QuotaRing used={renderUsed} limit={renderLimit} />
-            <div className="min-w-0 flex-1 space-y-3">
-              <div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" /> AI suggestions
-                  </span>
-                  <span className="font-mono tabular-nums">
-                    {aiUsed}
-                    {aiLimit != null ? `/${aiLimit}` : ""}
-                  </span>
-                </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${aiPct}%` }}
-                  />
-                </div>
-              </div>
-              {!isPro ? (
-                <Button size="sm" variant="outline" className="w-full" asChild>
-                  <Link href="/settings">
-                    <Crown className="mr-2 h-3.5 w-3.5" /> Upgrade to Pro
-                  </Link>
-                </Button>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Unlimited AI &amp; renders, 4K export, no watermark.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-2 gap-5 lg:col-span-2">
+        {/* Stat row */}
+        <div className="mb-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <QuotaRing billing={billing} />
           {isLoading || !stats ? (
-            Array.from({ length: 4 }).map((_, i) => (
+            Array.from({ length: 3 }).map((_, i) => (
               <Card key={i}>
-                <CardContent className="p-5">
+                <CardContent className="p-4">
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="mt-3 h-8 w-14" />
-                  <Skeleton className="mt-2 h-3 w-24" />
                 </CardContent>
               </Card>
             ))
           ) : (
             <>
               <StatTile
-                title="Projects"
-                value={stats.totalProjects}
-                icon={Film}
-                hint="Active video projects"
-                href="/projects"
-              />
-              <StatTile
-                title="Rendered"
+                label="Videos shipped"
                 value={stats.videosRendered}
                 icon={Video}
-                hint="Completed videos"
-                href="/projects"
               />
               <StatTile
-                title="Templates"
+                label="Projects"
+                value={stats.totalProjects}
+                icon={Film}
+              />
+              <StatTile
+                label="Templates"
                 value={stats.totalTemplates}
                 icon={Layers}
-                hint="Ready to use"
-                href="/templates"
-              />
-              <StatTile
-                title="Modules"
-                value={stats.activeModules}
-                icon={Plus}
-                hint="Enabled features"
-                href="/modules"
               />
             </>
           )}
         </div>
-      </div>
 
-      {/* Live render spark card */}
-      {liveRender && (
-        <Card className="mb-6 border-spark/30 bg-spark/[0.04]">
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-spark/10">
-              <Loader2 className="h-5 w-5 animate-spin text-spark" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Rendering now</span>
-                <span className="truncate text-sm text-muted-foreground">
-                  {liveRender.name}
-                </span>
-              </div>
-              <div className="mt-2 h-1.5 w-full max-w-md overflow-hidden rounded-full bg-spark/20">
-                <div
-                  className={cn(
-                    "h-full rounded-full bg-spark",
-                    typeof liveRender.renderProgress !== "number" &&
-                      "w-1/3 animate-pulse",
-                  )}
-                  style={
-                    typeof liveRender.renderProgress === "number"
-                      ? { width: `${liveRender.renderProgress}%` }
-                      : undefined
-                  }
-                />
-              </div>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/projects">View</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Recent renders + quick actions */}
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>Recent renders</CardTitle>
-              <CardDescription>Your latest video projects.</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/projects">
-                All <ArrowRight className="ml-1 h-3.5 w-3.5" />
+        {/* Main grid */}
+        <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
+          {/* Recent renders */}
+          <div>
+            <div className="mb-3.5 flex items-center justify-between">
+              <h2 className="text-base">Recent renders</h2>
+              <Link
+                href="/projects"
+                className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"
+              >
+                View all <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
+            </div>
             {isLoading ? (
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
+                  <Skeleton key={i} className="aspect-[9/16] w-full rounded-xl" />
                 ))}
               </div>
-            ) : stats?.recentProjects?.length ? (
-              <div className="space-y-1">
-                {stats.recentProjects.map((project) => (
-                  <Link
-                    key={project.id}
-                    href="/projects"
-                    className="flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground">
-                      <Clapperboard className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">
-                        {project.name}
-                      </div>
-                      <div className="truncate text-xs capitalize text-muted-foreground">
-                        {project.module}
-                      </div>
-                    </div>
-                    <StatusBadge status={project.status} />
-                  </Link>
+            ) : recent.length ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {recent.map((p, i) => (
+                  <ProjectThumb key={p.id} project={p} brand={brand} index={i} />
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-3 py-10 text-center">
-                <Clapperboard className="h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  No renders yet — start in Studio.
-                </p>
-                <Button size="sm" asChild>
-                  <Link href="/studio">
-                    <Wand2 className="mr-2 h-4 w-4" /> Open Studio
-                  </Link>
-                </Button>
-              </div>
+              <Card>
+                <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+                  <Film className="h-8 w-8 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">
+                    No renders yet — start in Studio.
+                  </p>
+                  <Button size="sm" asChild>
+                    <Link href="/studio">
+                      <Wand2 className="mr-2 h-4 w-4" /> New video
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick actions</CardTitle>
-            <CardDescription>Jump back into the loop.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            {QUICK_ACTIONS.map((a) => (
-              <Button
-                key={a.href}
-                variant="outline"
-                className="justify-start"
-                asChild
-              >
-                <Link href={a.href}>
-                  <a.icon className="mr-2 h-4 w-4 text-primary" />
-                  {a.label}
-                </Link>
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
+          {/* Side column */}
+          <div className="flex flex-col gap-5">
+            {rendering && (
+              <Card className="border-spark/20 bg-gradient-to-b from-spark/[0.08] to-transparent">
+                <CardContent className="p-4">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-spark/30 bg-spark/10 px-2 py-0.5 text-[11px] font-semibold text-spark">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                      RENDERING
+                    </span>
+                    <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">
+                      {Math.round(rendering.renderProgress ?? 0)}%
+                    </span>
+                  </div>
+                  <div className="mb-2 truncate text-[13.5px] font-semibold">
+                    {rendering.name}
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-spark/20">
+                    <div
+                      className="h-full rounded-full bg-spark transition-all"
+                      style={{ width: `${rendering.renderProgress ?? 5}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11.5px] text-muted-foreground">
+                    Chrome is rasterizing frames, FFmpeg will encode the mp4.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="mb-3 text-[15px]">Jump back in</h2>
+                <div className="flex flex-col gap-1">
+                  <QuickAction
+                    icon={Wand2}
+                    label="Compose a video"
+                    desc="Headline, body, CTA → render"
+                    href="/studio"
+                  />
+                  <QuickAction
+                    icon={Layers}
+                    label="Browse templates"
+                    desc="Motion templates"
+                    href="/templates"
+                  />
+                  <QuickAction
+                    icon={Palette}
+                    label="Tune your Brand DNA"
+                    desc="Colors, type, voice"
+                    href="/brand"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {latestReady && (
+              <Card>
+                <CardContent className="p-4">
+                  <h2 className="mb-3 text-[15px]">Latest render</h2>
+                  <div className="flex items-center gap-3">
+                    <div className="relative aspect-[9/16] w-[54px] shrink-0 overflow-hidden rounded-lg border bg-[#0d1110]">
+                      {latestReady.thumbnailUrl ? (
+                        <img
+                          src={latestReady.thumbnailUrl}
+                          alt={latestReady.name}
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      ) : (
+                        <CompositionThumb
+                          {...thumbProps(latestReady, brand)}
+                          layout="stat"
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-semibold">
+                        {latestReady.name}
+                      </div>
+                      <div className="mt-1.5 flex gap-4">
+                        <div>
+                          <div
+                            className="text-[17px] font-semibold tabular-nums"
+                            style={{ fontFamily: "var(--font-display)" }}
+                          >
+                            {latestReady.duration ?? "—"}
+                            {latestReady.duration ? "s" : ""}
+                          </div>
+                          <div className="text-[10.5px] text-muted-foreground">
+                            duration
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[13px] font-semibold capitalize text-primary">
+                            {latestReady.module}
+                          </div>
+                          <div className="text-[10.5px] text-muted-foreground">
+                            template
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link href="/projects" aria-label="View render">
+                        <Play className="h-4 w-4" fill="currentColor" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </Layout>
   );
