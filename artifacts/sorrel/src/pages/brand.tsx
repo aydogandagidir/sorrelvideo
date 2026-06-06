@@ -43,6 +43,8 @@ import {
 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { CompositionThumb } from "@/components/composition";
+import { cn } from "@/lib/utils";
 
 type Voice = "" | "professional" | "playful" | "bold" | "minimal";
 
@@ -88,7 +90,28 @@ const BLANK: FormState = {
   sourceUrl: "",
 };
 
-const FONT_PRESETS = ["Inter", "Space Mono", "Georgia", "system-ui"];
+const HANDOFF_FONTS = ["Space Grotesk", "Inter", "Space Mono"];
+const QUICK_PALETTES: [string, string, string][] = [
+  ["#cdfb45", "#0d1110", "#ff4d1c"],
+  ["#7cdcff", "#0a1016", "#ff8fab"],
+  ["#f5d76e", "#14110a", "#4ade80"],
+  ["#c084fc", "#120a16", "#cdfb45"],
+];
+
+/** One key→value row in the live-preview summary. */
+function Row({ k, v, font }: { k: string; v: string; font?: string }) {
+  return (
+    <div className="flex items-center justify-between text-[12.5px]">
+      <span className="text-muted-foreground">{k}</span>
+      <span
+        className="font-semibold capitalize"
+        style={font ? { fontFamily: font } : undefined}
+      >
+        {v}
+      </span>
+    </div>
+  );
+}
 
 function toForm(kit: BrandKit): FormState {
   return {
@@ -372,9 +395,10 @@ export default function Brand() {
   const selectedKit =
     selectedId !== "new" ? kits?.find((k) => k.id === selectedId) : undefined;
   const saving = createKit.isPending || updateKit.isPending;
-  const fontOptions = FONT_PRESETS.includes(form.fontFamily)
-    ? FONT_PRESETS
-    : [form.fontFamily, ...FONT_PRESETS];
+  const fontButtons =
+    form.fontFamily && !HANDOFF_FONTS.includes(form.fontFamily)
+      ? [form.fontFamily, ...HANDOFF_FONTS]
+      : HANDOFF_FONTS;
 
   if (isError) {
     return (
@@ -625,37 +649,92 @@ export default function Brand() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="fontFamily">Typography</Label>
-                      <select
-                        id="fontFamily"
-                        name="fontFamily"
-                        value={form.fontFamily}
-                        onChange={handleChange}
-                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
-                        {fontOptions.map((f) => (
-                          <option key={f} value={f}>
-                            {f}
-                          </option>
+                      <Label>Typography</Label>
+                      <div className="flex gap-2">
+                        {fontButtons.map((f) => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => set("fontFamily", f)}
+                            className={cn(
+                              "flex-1 rounded-md border px-2 py-2.5 text-center transition-colors",
+                              form.fontFamily === f
+                                ? "border-primary bg-primary/10"
+                                : "border-border bg-secondary hover:border-muted-foreground/40",
+                            )}
+                            style={{ fontFamily: f }}
+                          >
+                            <span className="text-lg leading-none">Ag</span>
+                            <span
+                              className="mt-1 block truncate text-[10px] text-muted-foreground"
+                              style={{ fontFamily: "var(--font-sans)" }}
+                            >
+                              {f}
+                            </span>
+                          </button>
                         ))}
-                      </select>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      {(
-                        [
-                          ["primaryColor", "Primary"],
-                          ["secondaryColor", "Secondary"],
-                          ["accentColor", "Accent"],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <div key={key} className="space-y-2">
-                          <Label htmlFor={key}>{label}</Label>
-                          <div className="flex gap-2">
-                            <Input type="color" id={key} name={key} value={form[key]} onChange={handleChange} className="w-12 h-10 p-1 px-1 cursor-pointer" />
-                            <Input value={form[key]} onChange={handleChange} name={key} className="flex-1 font-mono uppercase" />
+                    <div className="space-y-3">
+                      <Label>Palette</Label>
+                      <div className="flex gap-3">
+                        {(
+                          [
+                            ["primaryColor", "Primary"],
+                            ["secondaryColor", "Background"],
+                            ["accentColor", "Accent"],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <div key={key} className="flex-1">
+                            <div
+                              className="relative h-16 w-full overflow-hidden rounded-lg border"
+                              style={{ background: form[key] }}
+                            >
+                              <input
+                                type="color"
+                                name={key}
+                                value={form[key]}
+                                onChange={handleChange}
+                                aria-label={`${label} color`}
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                              />
+                            </div>
+                            <div className="mt-1.5 flex items-center justify-between">
+                              <span className="text-xs font-semibold">{label}</span>
+                              <span className="font-mono text-[11px] uppercase text-muted-foreground">
+                                {form[key]}
+                              </span>
+                            </div>
                           </div>
+                        ))}
+                      </div>
+                      <div>
+                        <div className="mb-2 text-[11.5px] text-muted-foreground">
+                          Quick palettes
                         </div>
-                      ))}
+                        <div className="flex gap-2">
+                          {QUICK_PALETTES.map((pal, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              aria-label={`Apply palette ${i + 1}`}
+                              onClick={() =>
+                                setForm((d) => ({
+                                  ...d,
+                                  primaryColor: pal[0],
+                                  secondaryColor: pal[1],
+                                  accentColor: pal[2],
+                                }))
+                              }
+                              className="flex h-[30px] w-16 overflow-hidden rounded-lg border transition-transform hover:-translate-y-0.5"
+                            >
+                              {pal.map((c, j) => (
+                                <span key={j} className="flex-1" style={{ background: c }} />
+                              ))}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -690,42 +769,48 @@ export default function Brand() {
 
         {/* Right column: preview + video ideas */}
         <div className="lg:sticky lg:top-8 h-fit space-y-6">
-          <Card className="overflow-hidden border-2">
-            <CardHeader className="bg-muted/50 border-b">
-              <CardTitle className="text-sm font-medium flex items-center justify-between">
-                <span>Live Preview</span>
-                <span className="text-xs text-muted-foreground font-normal">Video Title Card</span>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                Live brand preview
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                  LIVE
+                </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <div
-                className="aspect-video w-full flex flex-col items-center justify-center p-8 relative"
-                style={{ background: `linear-gradient(135deg, ${form.primaryColor}, ${form.secondaryColor})` }}
-              >
-                <div className="z-10 flex flex-col items-center text-center gap-4">
-                  {form.logoUrl ? (
-                    <img src={form.logoUrl} alt="Logo" className="h-14 object-contain" />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold" style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }}>
-                      {form.companyName ? form.companyName.charAt(0).toUpperCase() : "A"}
-                    </div>
-                  )}
-                  <div className="text-4xl font-bold text-white" style={{ fontFamily: form.fontFamily }}>
-                    {form.companyName || "Your Brand"}
-                  </div>
-                  {form.tagline && <div className="text-sm text-white/80 max-w-xs">{form.tagline}</div>}
-                  <div className="px-4 py-1 rounded-full text-sm font-medium" style={{ backgroundColor: form.accentColor, color: "#0b0b0f" }}>
-                    {form.keywords[0] ?? "New Feature"}
-                  </div>
-                </div>
+            <CardContent className="space-y-3">
+              <div className="relative mx-auto aspect-[9/16] w-full max-w-[240px] overflow-hidden rounded-[14px] border bg-[#0d1110]">
+                <CompositionThumb
+                  vars={{
+                    headline:
+                      (form.companyName || "Your brand").split(" ")[0] +
+                      ",\nin motion.",
+                    body: form.tagline || form.description || "",
+                    cta: form.keywords[0] || "Shop now",
+                  }}
+                  brand={{
+                    companyName: form.companyName || "Your brand",
+                    logoMark: (form.companyName || "S").charAt(0).toUpperCase(),
+                  }}
+                  accent={form.primaryColor}
+                  bg="#0d1110"
+                  layout="center"
+                  chrome
+                />
               </div>
+              <div className="space-y-1.5 border-t pt-3">
+                <Row k="Company" v={form.companyName || "—"} />
+                <Row k="Voice" v={form.brandVoice || "—"} />
+                <Row k="Font" v={form.fontFamily} font={form.fontFamily} />
+              </div>
+              {form.sourceUrl && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Detected from {form.sourceUrl}
+                </p>
+              )}
             </CardContent>
           </Card>
-          {form.sourceUrl && (
-            <p className="text-xs text-muted-foreground -mt-3 text-center">
-              Detected from {form.sourceUrl}
-            </p>
-          )}
 
           {/* Video ideas (Pomelli-style campaign ideas) */}
           <Card>
