@@ -57,7 +57,7 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `VITE_SENTRY_DSN` / `VITE_SENTRY_TRACES_SAMPLE_RATE`           | sorrel (optional, **build-time**)       | Frontend Sentry. Vite inlines `import.meta.env.VITE_*` at build → must be a Docker build ARG (Railway injects matching service vars). Unset → browser SDK no-ops. |
 | `SENTRY_TRACES_SAMPLE_RATE`                                     | api-server (optional)                   | Backend Sentry trace sampling — defaults to `0.1` (10 %).                                        |
 | `LOG_LEVEL`                                                     | api-server (optional)                   | Pino level (default `info`). Logs are JSON on stdout; ship them off Railway with a **log drain**, not an in-process transport. |
-| `GIT_SHA` / `VITE_GIT_SHA`                                      | api-server / sorrel (optional, set by CI) | `deploy.yml` pins both to `github.event.workflow_run.head_sha`; surface as the `release` tag in backend / frontend Sentry events (`VITE_GIT_SHA` is a build ARG). |
+| `GIT_SHA` / `VITE_GIT_SHA`                                      | api-server / sorrel (optional)          | Sentry `release` tag (backend / frontend). Under the native Railway deploy both fall back to Railway's built-in `RAILWAY_GIT_COMMIT_SHA` (backend reads it at runtime; the Dockerfile defaults the `VITE_GIT_SHA` build ARG from it), so neither needs to be set manually. |
 
 ## Stack
 
@@ -712,21 +712,18 @@ across).
 install deps, verify OpenAPI codegen is in sync, lint, typecheck, run
 Vitest (with Postgres testcontainer for integration tests), build.
 
-**Deploy.** The app runs on Railway (project `mellow-gratitude`, service
-`@workspace/api-server`, `production` env) and **deploys via Railway's native
-GitHub integration** (Settings → Deploy from repo) — that's the active deployer:
-a push to `main` triggers a Railway Docker build + release; the public URL is
-`workspaceapi-server-production-5961.up.railway.app`.
-
-`.github/workflows/deploy.yml` is an **optional, opt-in CI deploy path** (listens
-for green CI on `main`, then `railway up --service "$RAILWAY_SERVICE"`). It is
-**gated on a `RAILWAY_TOKEN` secret**: a guard step skips the Railway steps (job
-stays GREEN with a `::notice::`) when the secret is unset — so it stays dormant
-(no red, no double-deploy) while the native integration does the work. Enable it
-ONLY if you also disable native auto-deploy, else both fire. Two prior bugs are
-fixed: the CLI installs via `curl … | bash` (NOT `sh`: the script uses bash-only
-`${var//…/…}` + `local`, which dash rejects with "Bad substitution"), and the
-service is referenced as `@workspace/api-server` (was a non-existent `api`).
+**Deploy — Railway native GitHub integration (single path).** The app runs on
+Railway (project `mellow-gratitude`, service `@workspace/api-server`,
+`production` env) and deploys **automatically on push to `main`** via Railway's
+native GitHub integration (Settings → Deploy from repo): Railway builds the
+Dockerfile + releases. Public URL: `workspaceapi-server-production-5961.up.railway.app`.
+There is **no GitHub Actions deploy workflow** — it was removed (it was a broken,
+redundant second deployer; CI-driving deploys would double-fire alongside the
+native integration). To restore a CI-driven deploy instead, disable native
+auto-deploy first and re-add a workflow (see git history / DEPLOYMENT.md §12).
+The release SHA for Sentry comes from Railway's built-in `RAILWAY_GIT_COMMIT_SHA`
+(backend reads it directly; the Dockerfile defaults the `VITE_GIT_SHA` build ARG
+from it for the SPA) — no CI step needed.
 
 **Observability**:
 

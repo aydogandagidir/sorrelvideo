@@ -54,10 +54,15 @@ ENV NODE_ENV=production \
 # frontend error tracking. See DEPLOYMENT.md (Sentry) + .env.production.example.
 ARG VITE_SENTRY_DSN=""
 ARG VITE_SENTRY_TRACES_SAMPLE_RATE=""
+# Railway injects RAILWAY_GIT_COMMIT_SHA into the build; default VITE_GIT_SHA to
+# it so the SPA Sentry release is tagged under the native GitHub-integration
+# deploy with no CI. An explicit --build-arg VITE_GIT_SHA still wins; if both are
+# empty the build is byte-identical to before (Vite inlines undefined → no-op).
+ARG RAILWAY_GIT_COMMIT_SHA=""
 ARG VITE_GIT_SHA=""
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
     VITE_SENTRY_TRACES_SAMPLE_RATE=$VITE_SENTRY_TRACES_SAMPLE_RATE \
-    VITE_GIT_SHA=$VITE_GIT_SHA
+    VITE_GIT_SHA=${VITE_GIT_SHA:-$RAILWAY_GIT_COMMIT_SHA}
 # Typecheck everything, but only build what ships: the api-server bundle, the
 # sorrel SPA, and the embedded studio-editor (served at /editor/). mockup-sandbox
 # is a dev-only Hyperframes playground and is not deployed.

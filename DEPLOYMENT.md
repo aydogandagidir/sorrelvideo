@@ -196,30 +196,23 @@ If any of these break:
 - Sentry → first issue at the top.
 - Better Stack → live tail of structured Pino logs.
 
-## 12. GitHub Actions auto-deploy (OPTIONAL — native integration is the default)
+## 12. Auto-deploy (Railway native GitHub integration)
 
-By default the app deploys via **Railway's native GitHub integration** (step 1:
-"Deploy from GitHub repo") — every push to `main` builds + releases. The
-`Deploy` workflow is a **separate, opt-in** CI deploy path that is **gated on the
-`RAILWAY_TOKEN` secret**: until you add it the workflow skips the Railway steps
-and stays green (a `::notice::` explains why), so it never fails red and never
-double-deploys alongside the native integration.
+Deploys are handled by **Railway's native GitHub integration** (set up in step 1,
+"Deploy from GitHub repo"): every push to `main` triggers a Docker build +
+release on Railway — nothing else to configure. The Sentry release tag is taken
+from Railway's built-in `RAILWAY_GIT_COMMIT_SHA` (the backend reads it at runtime;
+the Dockerfile defaults the `VITE_GIT_SHA` build ARG from it for the SPA), so no
+CI step is needed to tag releases.
 
-**Only enable it if you want CI to own deploys instead of the native integration**
-— and if so, **first disable native auto-deploy** on the `@workspace/api-server`
-service (Railway → service → Settings → turn off "Deploy on push"), or both will
-fire on every push. Then:
-
-1. [Railway account → Tokens](https://railway.com/account/tokens) →
-   create a personal token. **Do not** re-use the project token — it
-   doesn't have account-level permissions.
-2. GitHub repo → Settings → Secrets and variables → Actions → New repository
-   secret named `RAILWAY_TOKEN` (paste the token from step 1). Or from the CLI:
-   `gh secret set RAILWAY_TOKEN`.
-3. Push to `main`. CI runs → the deploy workflow's guard sees the secret →
-   `railway up --service "$RAILWAY_SERVICE"` ships the image. `RAILWAY_SERVICE`
-   defaults to `@workspace/api-server` (the service name in this project); update
-   the workflow env if you rename the service.
+> There is **no GitHub Actions deploy workflow** — the old `.github/workflows/deploy.yml`
+> was removed because it duplicated the native integration (and CI-driving
+> `railway up` while native auto-deploy is on would double-fire). If you ever want
+> CI to own deploys instead: **first** disable native auto-deploy on the
+> `@workspace/api-server` service (Railway → service → Settings → "Deploy on
+> push"), **then** add a workflow that runs `railway up --service "@workspace/api-server"`
+> with a `RAILWAY_TOKEN` account-token secret (`gh secret set RAILWAY_TOKEN`). A
+> known-good version is in git history.
 
 ## Rollback
 

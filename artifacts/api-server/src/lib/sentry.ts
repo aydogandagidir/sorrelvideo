@@ -19,7 +19,11 @@ export async function initSentry(): Promise<void> {
   sentry.init({
     dsn,
     environment: process.env.NODE_ENV ?? "development",
-    release: process.env.GIT_SHA,
+    // GIT_SHA is set by CI when CI drives the deploy; under Railway's native
+    // GitHub-integration deploy (the active path) fall back to Railway's
+    // built-in RAILWAY_GIT_COMMIT_SHA so the release tag is still correct.
+    release:
+      process.env.GIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA || undefined,
     tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"),
     sendDefaultPii: false,
     beforeSend(event) {
