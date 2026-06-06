@@ -64,7 +64,7 @@ function StatusBadge({ status }: { status: string }) {
     case "ready":
       return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Ready</Badge>;
     case "rendering":
-      return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 animate-pulse">Rendering…</Badge>;
+      return <Badge className="bg-spark/10 text-spark border-spark/25 animate-pulse">Rendering…</Badge>;
     case "failed":
       return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Failed</Badge>;
     default:
@@ -220,7 +220,7 @@ function ProjectCard({
           )}
           {isRendering && (
             <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <Loader2 className="h-6 w-6 animate-spin text-spark" />
               <span className="text-xs text-muted-foreground font-medium">Rendering…</span>
             </div>
           )}
@@ -262,14 +262,17 @@ function ProjectCard({
               <div className="mt-3 max-w-sm">
                 {typeof project.renderProgress === "number" ? (
                   <>
-                    <Progress value={project.renderProgress} className="h-2" />
+                    <Progress
+                      value={project.renderProgress}
+                      className="h-2 bg-spark/20 [&>*]:bg-spark"
+                    />
                     <span className="mt-1 block text-xs text-muted-foreground">
                       {project.renderProgress}%
                     </span>
                   </>
                 ) : (
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-primary/20">
-                    <div className="h-full w-1/3 animate-pulse rounded-full bg-primary" />
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-spark/20">
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-spark" />
                   </div>
                 )}
               </div>

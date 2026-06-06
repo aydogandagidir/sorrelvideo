@@ -67,6 +67,14 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
   Pino logging, `@node-rs/argon2` for password hashing
 - **Frontend** (`artifacts/sorrel`): React 19, Vite 7, Wouter, TanStack Query,
   Tailwind v4, Shadcn UI, Framer Motion
+- **Design system ("Sorrel OS")**: tokens live as shadcn HSL CSS vars in
+  `artifacts/sorrel/src/index.css` (ported from the Claude Design handoff) —
+  layered **warm-neutral dark** canvas (subtly green), softer **Sorrel lime**
+  primary (`75 95% 63%`), and a warm **render/live "spark"** (orange,
+  `--spark`/`bg-spark`) that signals rendering (resolving the old lime-vs-orange
+  brand split). Type: **Space Grotesk** display (headings) · **Inter** UI ·
+  **Space Mono** numerals (loaded in `index.html`; `font-display` utility).
+  Changing a token re-skins every shadcn component at once.
 - **Auth**: cookie- and bearer-token sessions stored in Postgres (`sessions`),
   Argon2id-hashed email/password. OAuth (GitHub/Google) is not wired yet
 - **Codegen**: Orval reads `lib/api-spec/openapi.yaml` and writes to
