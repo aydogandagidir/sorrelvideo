@@ -38,6 +38,12 @@ describe("production CORS origin policy", () => {
   beforeAll(async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ALLOWED_ORIGINS", "https://app.example.com");
+    // Force REDIS_URL unset before importing app. This suite exercises only the
+    // CORS layer via /api/healthz, but that readiness probe pings Redis whenever
+    // REDIS_URL is set (routes/health.ts) → 503 against a non-existent broker if
+    // a render test sharing this worker leaked REDIS_URL. "" is falsy, so the
+    // Redis branch is skipped; afterAll's vi.unstubAllEnvs() restores it.
+    vi.stubEnv("REDIS_URL", "");
     vi.resetModules();
     app = (await import("./app")).default;
   });

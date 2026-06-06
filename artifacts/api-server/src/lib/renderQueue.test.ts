@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Shared mock fns (hoisted so the vi.mock factories below can reference them).
 const h = vi.hoisted(() => ({
@@ -72,11 +72,22 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  // Restore any env var a test stubbed (REDIS_URL / RENDER_BACKEND / AWS_*) so a
+  // value set by the LAST test of this file can't bleed into another suite that
+  // shares this worker process. Concretely: app.test.ts's /api/healthz probe
+  // pings Redis whenever REDIS_URL is set (routes/health.ts) and 503s against a
+  // non-existent local broker — a cross-file leak that fails it only in a full
+  // `pnpm test` run. Stubbing via vi.stubEnv (above) + unstub here keeps every
+  // case hermetic regardless of test ordering.
+  vi.unstubAllEnvs();
+});
+
 describe("isQueueEnabled", () => {
   it("reflects REDIS_URL presence", async () => {
     const mod = await import("./renderQueue");
     expect(mod.isQueueEnabled()).toBe(false);
-    process.env.REDIS_URL = "redis://localhost:6379";
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
     expect(mod.isQueueEnabled()).toBe(true);
   });
 });
@@ -91,7 +102,7 @@ describe("enqueueRender", () => {
   });
 
   it("enqueues with jobId=projectId and does not run inline when REDIS_URL is set", async () => {
-    process.env.REDIS_URL = "redis://localhost:6379";
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
     const { enqueueRender } = await import("./renderQueue");
     await enqueueRender(42, "studio", 3, "rj-42");
 
@@ -117,11 +128,10 @@ describe("enqueueRender", () => {
     // (locked) and a fresh add() with the same jobId would be silently
     // dedup-dropped → project stuck "rendering". enqueueRender must instead
     // surface the condition so the route releases the claim + 409s.
-    process.env.REDIS_URL = "redis://localhost:6379";
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
     h.queueRemove.mockResolvedValueOnce(0); // job is locked / active
-    const { enqueueRender, RenderAlreadyActiveError } = await import(
-      "./renderQueue"
-    );
+    const { enqueueRender, RenderAlreadyActiveError } =
+      await import("./renderQueue");
 
     await expect(
       enqueueRender(42, "studio", null, "rj-42b"),
@@ -135,7 +145,7 @@ describe("enqueueRender", () => {
     // Defensive: remove() throwing is swallowed to 1, and any non-0 code means
     // "nothing locked" → the add proceeds. Guards against a future regression
     // where `!removed` (which would wrongly trip on undefined) replaces `=== 0`.
-    process.env.REDIS_URL = "redis://localhost:6379";
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
     h.queueRemove.mockRejectedValueOnce(new Error("connection blip"));
     const { enqueueRender } = await import("./renderQueue");
 
@@ -153,9 +163,9 @@ describe("enqueueRender", () => {
   });
 
   it("routes to the lambda backend when RENDER_BACKEND=lambda, plan=pro, AWS env present", async () => {
-    process.env.RENDER_BACKEND = "lambda";
-    process.env.AWS_REGION = "us-east-1";
-    process.env.HYPERFRAMES_S3_BUCKET = "sorrel-render-dev";
+    vi.stubEnv("RENDER_BACKEND", "lambda");
+    vi.stubEnv("AWS_REGION", "us-east-1");
+    vi.stubEnv("HYPERFRAMES_S3_BUCKET", "sorrel-render-dev");
     const { enqueueRender } = await import("./renderQueue");
 
     await enqueueRender(99, "studio", null, "rj-99", "pro");
@@ -173,9 +183,9 @@ describe("enqueueRender", () => {
   });
 
   it("does NOT route a free plan to lambda even with RENDER_BACKEND=lambda + AWS env", async () => {
-    process.env.RENDER_BACKEND = "lambda";
-    process.env.AWS_REGION = "us-east-1";
-    process.env.HYPERFRAMES_S3_BUCKET = "sorrel-render-dev";
+    vi.stubEnv("RENDER_BACKEND", "lambda");
+    vi.stubEnv("AWS_REGION", "us-east-1");
+    vi.stubEnv("HYPERFRAMES_S3_BUCKET", "sorrel-render-dev");
     const { enqueueRender } = await import("./renderQueue");
 
     await enqueueRender(5, "studio", null, "rj-5", "free");
@@ -186,9 +196,9 @@ describe("enqueueRender", () => {
   });
 
   it("re-throws a LambdaDispatchError so the route can release the claim", async () => {
-    process.env.RENDER_BACKEND = "lambda";
-    process.env.AWS_REGION = "us-east-1";
-    process.env.HYPERFRAMES_S3_BUCKET = "sorrel-render-dev";
+    vi.stubEnv("RENDER_BACKEND", "lambda");
+    vi.stubEnv("AWS_REGION", "us-east-1");
+    vi.stubEnv("HYPERFRAMES_S3_BUCKET", "sorrel-render-dev");
     h.dispatchLambdaRender.mockRejectedValueOnce(
       new LambdaDispatchError("Too many in-flight Lambda renders"),
     );
@@ -207,7 +217,7 @@ describe("hasPendingJob", () => {
   });
 
   it("treats active jobs as pending and completed jobs as not", async () => {
-    process.env.REDIS_URL = "redis://localhost:6379";
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
     const { hasPendingJob } = await import("./renderQueue");
 
     h.getJobState.mockResolvedValueOnce("active");
