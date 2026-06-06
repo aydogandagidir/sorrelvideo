@@ -4,6 +4,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================
+   Sorrel OS — design tokens (ported from the Claude Design handoff)
+   Layered dark product UI. Electric lime primary, coral render-spark.
+   Warm-neutral (subtly green) canvas; Space Grotesk display + Inter UI +
+   Space Mono numerals. Tokens drive every shadcn component at once.
+   ============================================================ */
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -35,9 +42,18 @@
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-accent-border: hsl(var(--accent));
 
+  /* Render / live "spark" — the favicon orange, repurposed as a warm
+     render/live signal (resolves the lime-vs-orange brand split). */
+  --color-spark: hsl(var(--spark));
+  --color-spark-foreground: hsl(var(--spark-foreground));
+  --color-spark-soft: hsl(var(--spark-soft));
+
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-destructive-border: hsl(var(--destructive));
+
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
 
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
@@ -48,8 +64,9 @@
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --font-sans: "Inter", sans-serif;
-  --font-mono: "Space Mono", monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -58,47 +75,57 @@
 }
 
 :root {
-  /* Default to dark theme for this application */
-  --background: 0 0% 4%;
-  --foreground: 0 0% 98%;
+  /* Default to the layered dark theme (the app's signature look). */
+  --background: 160 14% 3%;
+  --foreground: 150 8% 96%;
 
-  --card: 0 0% 6%;
-  --card-foreground: 0 0% 98%;
-  --card-border: 0 0% 12%;
+  --card: 165 13% 6%;
+  --card-foreground: 150 8% 96%;
+  --card-border: 165 10% 14%;
 
-  --popover: 0 0% 6%;
-  --popover-foreground: 0 0% 98%;
-  --popover-border: 0 0% 12%;
+  --popover: 168 12% 8%;
+  --popover-foreground: 150 8% 96%;
+  --popover-border: 165 10% 16%;
 
-  --primary: 75 100% 50%;
-  --primary-foreground: 0 0% 0%;
+  /* Sorrel lime — softer/lighter than the old pure chartreuse. */
+  --primary: 75 95% 63%;
+  --primary-foreground: 90 80% 5%;
 
-  --secondary: 0 0% 12%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: 168 12% 9%;
+  --secondary-foreground: 150 8% 96%;
 
-  --muted: 0 0% 12%;
-  --muted-foreground: 0 0% 60%;
+  --muted: 165 12% 11%;
+  --muted-foreground: 150 6% 64%;
 
-  --accent: 75 100% 50%;
-  --accent-foreground: 0 0% 0%;
+  /* shadcn "accent" = the brand lime (lime-forward hover/highlight, as before). */
+  --accent: 75 95% 63%;
+  --accent-foreground: 90 80% 5%;
 
-  --destructive: 0 84% 60%;
+  /* Warm render/live spark (orange). */
+  --spark: 13 100% 55%;
+  --spark-foreground: 0 0% 100%;
+  --spark-soft: 15 100% 65%;
+
+  --success: 142 71% 58%;
+  --warning: 43 96% 56%;
+
+  --destructive: 0 84% 62%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 0 0% 12%;
-  --input: 0 0% 12%;
-  --ring: 75 100% 50%;
+  --border: 165 10% 14%;
+  --input: 165 10% 16%;
+  --ring: 75 95% 63%;
 
-  --sidebar: 0 0% 6%;
-  --sidebar-foreground: 0 0% 98%;
-  --sidebar-border: 0 0% 12%;
-  --sidebar-primary: 75 100% 50%;
-  --sidebar-primary-foreground: 0 0% 0%;
-  --sidebar-accent: 0 0% 12%;
-  --sidebar-accent-foreground: 0 0% 98%;
-  --sidebar-ring: 75 100% 50%;
+  --sidebar: 163 14% 4%;
+  --sidebar-foreground: 150 7% 90%;
+  --sidebar-border: 165 10% 12%;
+  --sidebar-primary: 75 95% 63%;
+  --sidebar-primary-foreground: 90 80% 5%;
+  --sidebar-accent: 168 12% 10%;
+  --sidebar-accent-foreground: 150 8% 96%;
+  --sidebar-ring: 75 95% 63%;
 
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 }
 
 @layer base {
@@ -108,5 +135,21 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Display type for headings (Space Grotesk), tightened tracking — matches the
+     handoff's type system. Components can opt back to body type with font-sans. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.28);
+    color: hsl(var(--foreground));
   }
 }
