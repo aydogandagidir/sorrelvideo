@@ -271,7 +271,17 @@ from a single account hammering it.
 Tokens are deliberately not stored: AI provider keys live only in env,
 and provider response usage is logged but not persisted.
 
-## Brand Kit
+## Brand DNA (brand kit)
+
+The brand kit is surfaced in the UI as **"Brand DNA"** (Pomelli-style): a rich,
+AI-extracted, editable brand profile. The `brand_kit` table holds both the
+**visual identity** (logo, primary/secondary/accent color, font) and the
+**narrative identity / DNA** (`tagline`, `description`, `valueProposition`,
+`targetAudience`, `industry`, `keywords` jsonb`string[]`, `personality`
+jsonb`string[]`, `imageStyle`) — all nullable, so a pre-DNA / heuristic kit is
+valid. The DNA fields are consumed by the AI copy suggester + the video-idea
+generator; they are NOT injected into compositions, so they need no CSS/attr
+guard (only colors/logo/font do — `assertSafeBrandFields`).
 
 **Many-per-user** (was one-per-user). `brand_kit` carries `name`, `isDefault`,
 and `sourceUrl` (the site a kit was auto-detected from); the old
@@ -290,17 +300,28 @@ null → the user's default at render time (`renderService.loadBrandKit`).
   litters an empty placeholder row (a placeholder would wrongly satisfy
   website→video's "do you have a kit?" check and reimpose the generic look).
 - **Auto-extraction (`brandExtractionService`)**: `captureWebsite({ extractBrand })`
-  scrapes RAW brand signals in-page (CSS custom props, theme-color, the dominant
-  CTA/link/header colors via an area-weighted frequency map, fonts, logo
-  candidates, og:site_name) — `lib/brandColors.ts` (pure, unit-tested) then
-  parses/normalises/dedupes them and `pickBrandColors` makes the deterministic
-  pick. An AI **refine** step (`AiProvider.extractBrand`, Claude/OpenAI vision on
-  the screenshot + signals → canonical primary/secondary/accent + company name +
-  font) runs when configured and within AI quota
-  (`consumeAiUnitIfAvailable`, charges one AI unit), with the heuristic as a hard
-  fallback — so extraction always returns a brand, AI or not. Every extracted
-  value is re-validated (`isSafeCssColor`/`isSafeLogoUrl`/`sanitizeFontFamily`)
-  before it can be saved or rendered.
+  scrapes RAW signals in-page — CSS custom props, theme-color, dominant
+  CTA/link/header colors (area-weighted frequency map), fonts, logo candidates,
+  og:site_name, AND a bounded `textSample` (headings + lead paragraphs).
+  `lib/brandColors.ts` (pure, unit-tested) normalises/dedupes the colors and
+  `pickBrandColors` makes the deterministic pick. An AI **refine** step
+  (`AiProvider.extractBrand`, Claude/OpenAI **vision** on the screenshot +
+  signals + page text) returns the full DNA: visual roles (primary/secondary/
+  accent + company name + font) AND narrative (tagline, description, value prop,
+  audience, industry, keywords, personality, image style). Runs when configured +
+  within AI quota (`consumeAiUnitIfAvailable`, charges one AI unit), with the
+  deterministic heuristic as a hard fallback (narrative fields null/[] without
+  AI) — so extraction always returns a brand. Every value is re-validated
+  (`isSafeCssColor`/`isSafeLogoUrl`/`sanitizeFontFamily`) before save/render.
+- **DNA-grounded generation**: the AI copy suggester (`/ai/suggest`) loads the
+  user's DEFAULT kit and feeds the DNA (description, value prop, audience,
+  keywords, personality, voice) into the system prompt via `buildBrandContext`,
+  so generated copy is on-brand. website→video already stamps `brandKitId`.
+- **Video ideas (Pomelli "campaign ideas")**: `POST /brand-kits/:id/video-ideas`
+  → `AiProvider.generateVideoIdeas(dna)` returns 3–5 ready-to-render concepts
+  ({title, description, module, headline/body/cta}); the Brand DNA page turns one
+  into a project (`POST /projects` with `brandKitId` + `user.*` compositionVars)
+  in one click. AI-only (no heuristic), quota-gated, `aiSuggestLimiter`.
 - **Validation at write**: `assertSafeBrandFields` rejects unsafe colors / logo /
   font on every create+update (colors land UNQUOTED in composition CSS; the
   template layer only escapes `< > &`, not quotes — see `lib/compositionVars.ts`).
@@ -574,10 +595,12 @@ moving it to object storage is still a future optimisation.
   `IDX_session_user` session index, the `stripe_subscriptions` ordering columns +
   `processed_stripe_events` table, the four tenant **cascade FKs**
   (`projects.userId`, `brand_kit.userId`, `render_jobs.userId`+`projectId`), and
-  the **multi-kit brand schema** (`brand_kit` `name`/`is_default`/`source_url`,
-  drop `UQ_brand_kit_user`, add `UQ_brand_kit_default` partial-unique + the
+  the **multi-kit + DNA brand schema** (`brand_kit` `name`/`is_default`/
+  `source_url` + the DNA columns `tagline`/`description`/`value_proposition`/
+  `target_audience`/`industry`/`keywords`/`personality`/`image_style`, drop
+  `UQ_brand_kit_user`, add `UQ_brand_kit_default` partial-unique + the
   `IDX_brand_kit_user` index, `projects.brand_kit_id`). Boot migrations self-heal
-  the billing/render_jobs tables AND the multi-kit brand schema
+  the billing/render_jobs tables AND the multi-kit + DNA brand schema
   (`applyBrandKitMigration`, which also back-fills one default per user), but the
   tenant FKs exist only via `db push`. **The FK push FAILS on prod if orphan rows
   already exist** (a tenant row whose parent was deleted) — clean those up first,

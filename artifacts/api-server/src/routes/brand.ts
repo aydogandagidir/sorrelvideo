@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Response } from "express";
 import type { Logger } from "pino";
+import { getProvider } from "@workspace/ai";
 import {
   GetBrandKitResponse,
   UpdateBrandKitBody,
@@ -22,8 +23,10 @@ import {
 import {
   extractBrandFromUrl,
   consumeAiUnitIfAvailable,
+  isAiConfigured,
 } from "../services/brandExtractionService";
-import { brandExtractLimiter } from "../middlewares/rateLimit";
+import { checkAndIncrementAiCount } from "../services/billingService";
+import { brandExtractLimiter, aiSuggestLimiter } from "../middlewares/rateLimit";
 import { normalizeWebsiteUrl } from "../lib/websiteUrl";
 import { SsrfError } from "../lib/ssrfGuard";
 import { WebsiteCaptureError } from "../services/websiteCaptureService";
@@ -228,5 +231,75 @@ router.delete("/brand-kits/:id", async (req, res): Promise<void> => {
   }
   res.status(204).end();
 });
+
+// POST /brand-kits/:id/video-ideas — Pomelli-style "campaign ideas": turn a saved
+// Brand DNA into a few ready-to-render video concepts. Needs AI (no heuristic
+// fallback here) and consumes one AI unit on success. Rate-limited via the AI
+// limiter (it's an LLM call, no Chrome).
+router.post(
+  "/brand-kits/:id/video-ideas",
+  aiSuggestLimiter,
+  async (req, res): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const id = parseId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ error: "Invalid brand kit id" });
+      return;
+    }
+    const kit = await getBrandKit(req.user.id, id);
+    if (!kit) {
+      res.status(404).json({ error: "Brand kit not found" });
+      return;
+    }
+    if (!isAiConfigured()) {
+      res.status(503).json({ error: "AI is not configured for video ideas" });
+      return;
+    }
+
+    const provider = getProvider();
+    let result: Awaited<ReturnType<typeof provider.generateVideoIdeas>>;
+    try {
+      result = await provider.generateVideoIdeas({
+        dna: {
+          companyName: kit.companyName,
+          tagline: kit.tagline,
+          description: kit.description,
+          valueProposition: kit.valueProposition,
+          targetAudience: kit.targetAudience,
+          industry: kit.industry,
+          keywords: kit.keywords,
+          personality: kit.personality,
+          voice: kit.brandVoice,
+          voiceDescription: kit.voiceDescription,
+        },
+        count: 4,
+      });
+    } catch (err) {
+      req.log.error({ err, provider: provider.name }, "video ideas failed");
+      res.status(502).json({ error: "AI provider could not generate ideas" });
+      return;
+    }
+
+    // Charge quota only after a successful generation (mirrors /ai/suggest).
+    try {
+      await checkAndIncrementAiCount(req.user.id);
+    } catch (err) {
+      const e = err as { reason?: string; message?: string };
+      if (e.reason === "upgrade_required") {
+        res.status(403).json({
+          error: e.message ?? "AI limit reached",
+          reason: "upgrade_required",
+        });
+        return;
+      }
+      throw err;
+    }
+
+    res.status(200).json({ ideas: result.ideas });
+  },
+);
 
 export default router;

@@ -251,6 +251,8 @@ export interface ProjectInput {
   description?: string;
   module: string;
   templateId?: number;
+  /** Brand kit (DNA) to render with. Null/omitted → the user's default. */
+  brandKitId?: number;
   compositionVars?: ProjectInputCompositionVars;
 }
 
@@ -371,6 +373,22 @@ export interface BrandKit {
   brandVoice?: BrandKitBrandVoice;
   /** @nullable */
   voiceDescription?: string | null;
+  /** @nullable */
+  tagline?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  valueProposition?: string | null;
+  /** @nullable */
+  targetAudience?: string | null;
+  /** @nullable */
+  industry?: string | null;
+  /** @nullable */
+  keywords?: string[] | null;
+  /** @nullable */
+  personality?: string[] | null;
+  /** @nullable */
+  imageStyle?: string | null;
   updatedAt: string;
 }
 
@@ -399,6 +417,20 @@ export interface BrandKitInput {
   brandVoice?: BrandKitInputBrandVoice;
   /** @maxLength 500 */
   voiceDescription?: string;
+  /** @maxLength 140 */
+  tagline?: string;
+  /** @maxLength 400 */
+  description?: string;
+  /** @maxLength 280 */
+  valueProposition?: string;
+  /** @maxLength 280 */
+  targetAudience?: string;
+  /** @maxLength 80 */
+  industry?: string;
+  keywords?: string[];
+  personality?: string[];
+  /** @maxLength 280 */
+  imageStyle?: string;
 }
 
 export interface ExtractBrandRequest {
@@ -410,7 +442,7 @@ export interface ExtractBrandRequest {
 }
 
 /**
- * A brand kit detected from a website (review then POST /brand-kits).
+ * A brand DNA detected from a website (review then POST /brand-kits).
  */
 export interface ExtractedBrand {
   /** @nullable */
@@ -424,6 +456,43 @@ export interface ExtractedBrand {
   /** @nullable */
   logoUrl?: string | null;
   sourceUrl: string;
+  /** @nullable */
+  tagline?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  valueProposition?: string | null;
+  /** @nullable */
+  targetAudience?: string | null;
+  /** @nullable */
+  industry?: string | null;
+  keywords: string[];
+  personality: string[];
+  /** @nullable */
+  imageStyle?: string | null;
+}
+
+export type VideoIdeaModule = typeof VideoIdeaModule[keyof typeof VideoIdeaModule];
+
+
+export const VideoIdeaModule = {
+  'product-launch': 'product-launch',
+  'brand-promo': 'brand-promo',
+  'social-teaser': 'social-teaser',
+  studio: 'studio',
+} as const;
+
+export interface VideoIdea {
+  title: string;
+  description: string;
+  module: VideoIdeaModule;
+  headline: string;
+  bodyText: string;
+  ctaText: string;
+}
+
+export interface VideoIdeasResponse {
+  ideas: VideoIdea[];
 }
 
 export type ModuleStatus = typeof ModuleStatus[keyof typeof ModuleStatus];

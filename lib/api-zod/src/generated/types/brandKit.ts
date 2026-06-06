@@ -26,5 +26,21 @@ export interface BrandKit {
   brandVoice?: BrandKitBrandVoice;
   /** @nullable */
   voiceDescription?: string | null;
+  /** @nullable */
+  tagline?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  valueProposition?: string | null;
+  /** @nullable */
+  targetAudience?: string | null;
+  /** @nullable */
+  industry?: string | null;
+  /** @nullable */
+  keywords?: string[] | null;
+  /** @nullable */
+  personality?: string[] | null;
+  /** @nullable */
+  imageStyle?: string | null;
   updatedAt: string;
 }

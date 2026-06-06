@@ -264,6 +264,15 @@ async function resolveBrandKitId(
       logoUrl: extracted.logoUrl,
       sourceUrl: extracted.sourceUrl,
       isDefault: true,
+      // Persist the narrative DNA too, so the auto-created kit is a full Brand DNA.
+      tagline: extracted.tagline,
+      description: extracted.description,
+      valueProposition: extracted.valueProposition,
+      targetAudience: extracted.targetAudience,
+      industry: extracted.industry,
+      keywords: extracted.keywords,
+      personality: extracted.personality,
+      imageStyle: extracted.imageStyle,
     });
     logger.info(
       { userId, brandKitId: created.id, url: cap.url, allowAi },

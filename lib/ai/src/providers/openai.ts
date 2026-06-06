@@ -4,14 +4,19 @@ import {
   buildUserPrompt,
   BRAND_EXTRACT_SYSTEM,
   buildBrandExtractUserText,
+  VIDEO_IDEAS_SYSTEM,
+  buildVideoIdeasUserText,
 } from "../prompt";
 import {
   SuggestOutputSchema,
   ExtractBrandOutputSchema,
+  GenerateVideoIdeasOutputSchema,
   type SuggestInput,
   type SuggestResult,
   type ExtractBrandInput,
   type ExtractBrandResult,
+  type GenerateVideoIdeasInput,
+  type GenerateVideoIdeasResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -51,6 +56,14 @@ const EXTRACT_BRAND_RESPONSE_SCHEMA = {
     "secondaryColor",
     "accentColor",
     "fontFamily",
+    "tagline",
+    "description",
+    "valueProposition",
+    "targetAudience",
+    "industry",
+    "keywords",
+    "personality",
+    "imageStyle",
   ],
   properties: {
     companyName: { type: ["string", "null"] },
@@ -58,6 +71,48 @@ const EXTRACT_BRAND_RESPONSE_SCHEMA = {
     secondaryColor: { type: "string" },
     accentColor: { type: ["string", "null"] },
     fontFamily: { type: ["string", "null"] },
+    tagline: { type: ["string", "null"] },
+    description: { type: ["string", "null"] },
+    valueProposition: { type: ["string", "null"] },
+    targetAudience: { type: ["string", "null"] },
+    industry: { type: ["string", "null"] },
+    keywords: { type: "array", items: { type: "string" } },
+    personality: { type: "array", items: { type: "string" } },
+    imageStyle: { type: ["string", "null"] },
+  },
+} as const;
+
+const VIDEO_IDEAS_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["ideas"],
+  properties: {
+    ideas: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "title",
+          "description",
+          "module",
+          "headline",
+          "bodyText",
+          "ctaText",
+        ],
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          module: {
+            type: "string",
+            enum: ["product-launch", "brand-promo", "social-teaser", "studio"],
+          },
+          headline: { type: "string" },
+          bodyText: { type: "string" },
+          ctaText: { type: "string" },
+        },
+      },
+    },
   },
 } as const;
 
@@ -149,6 +204,48 @@ export const openaiProvider: AiProvider = {
 
     const parsedJson: unknown = JSON.parse(text);
     const output = ExtractBrandOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+        cacheReadInputTokens:
+          response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
+      },
+    };
+  },
+
+  async generateVideoIdeas(
+    input: GenerateVideoIdeasInput,
+  ): Promise<GenerateVideoIdeasResult> {
+    const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+
+    const response = await getClient().chat.completions.create({
+      model,
+      max_tokens: input.maxTokens ?? 1200,
+      messages: [
+        { role: "system", content: VIDEO_IDEAS_SYSTEM },
+        { role: "user", content: buildVideoIdeasUserText(input) },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "video_ideas",
+          strict: true,
+          schema: VIDEO_IDEAS_RESPONSE_SCHEMA,
+        },
+      },
+    });
+
+    const choice = response.choices[0];
+    const text = choice?.message?.content?.trim();
+    if (!text) {
+      throw new Error("OpenAI returned no message content");
+    }
+
+    const parsedJson: unknown = JSON.parse(text);
+    const output = GenerateVideoIdeasOutputSchema.parse(parsedJson);
 
     return {
       ...output,

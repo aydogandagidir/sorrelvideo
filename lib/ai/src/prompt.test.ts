@@ -4,6 +4,7 @@ import {
   buildBrandContext,
   buildSystemPrompt,
   buildUserPrompt,
+  buildVideoIdeasUserText,
 } from "./prompt";
 
 describe("buildSystemPrompt", () => {
@@ -107,5 +108,44 @@ describe("buildBrandContext (the per-brand cache block)", () => {
     expect(full.startsWith(SYSTEM_CORE)).toBe(true);
     expect(ctx).not.toBeNull();
     expect(full).toContain(ctx as string);
+  });
+
+  it("grounds copy in the richer Brand DNA fields when present", () => {
+    const ctx = buildBrandContext({
+      companyName: "Acme",
+      tagline: "Ship faster",
+      description: "Acme builds CI tooling.",
+      valueProposition: "Cut build times in half.",
+      targetAudience: "platform engineers",
+      keywords: ["ci", "devtools"],
+      personality: ["bold", "precise"],
+      voice: "bold",
+      voiceDescription: null,
+    });
+    expect(ctx).toContain("Value proposition: Cut build times in half.");
+    expect(ctx).toContain("Target audience: platform engineers");
+    expect(ctx).toContain("Themes / keywords: ci, devtools");
+    expect(ctx).toContain("Brand personality: bold, precise");
+  });
+});
+
+describe("buildVideoIdeasUserText", () => {
+  it("asks for N ideas and embeds the DNA", () => {
+    const text = buildVideoIdeasUserText({
+      dna: {
+        companyName: "Acme",
+        description: "CI tooling",
+        valueProposition: "Faster builds",
+        targetAudience: null,
+        keywords: ["ci"],
+        personality: ["bold"],
+        voice: "bold",
+        voiceDescription: null,
+      },
+      count: 3,
+    });
+    expect(text).toContain("Propose 3 distinct short-video concepts");
+    expect(text).toContain("Acme");
+    expect(text).toContain("Faster builds");
   });
 });

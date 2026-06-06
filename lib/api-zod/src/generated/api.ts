@@ -293,6 +293,7 @@ export const CreateProjectBody = zod.object({
   "description": zod.string().optional(),
   "module": zod.string(),
   "templateId": zod.number().optional(),
+  "brandKitId": zod.number().optional().describe('Brand kit (DNA) to render with. Null\/omitted → the user\'s default.'),
   "compositionVars": zod.record(zod.string(), zod.string()).optional()
 })
 
@@ -560,6 +561,14 @@ export const GetBrandKitResponse = zod.object({
   "companyName": zod.string().nullish(),
   "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
   "voiceDescription": zod.string().nullish(),
+  "tagline": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "valueProposition": zod.string().nullish(),
+  "targetAudience": zod.string().nullish(),
+  "industry": zod.string().nullish(),
+  "keywords": zod.array(zod.string()).nullish(),
+  "personality": zod.array(zod.string()).nullish(),
+  "imageStyle": zod.string().nullish(),
   "updatedAt": zod.string()
 })
 
@@ -572,6 +581,18 @@ export const updateBrandKitBodyNameMax = 80;
 export const updateBrandKitBodySourceUrlMax = 2048;
 
 export const updateBrandKitBodyVoiceDescriptionMax = 500;
+
+export const updateBrandKitBodyTaglineMax = 140;
+
+export const updateBrandKitBodyDescriptionMax = 400;
+
+export const updateBrandKitBodyValuePropositionMax = 280;
+
+export const updateBrandKitBodyTargetAudienceMax = 280;
+
+export const updateBrandKitBodyIndustryMax = 80;
+
+export const updateBrandKitBodyImageStyleMax = 280;
 
 
 
@@ -586,7 +607,15 @@ export const UpdateBrandKitBody = zod.object({
   "fontFamily": zod.string().optional(),
   "companyName": zod.string().optional(),
   "brandVoice": zod.enum(['professional', 'playful', 'bold', 'minimal']).optional(),
-  "voiceDescription": zod.string().max(updateBrandKitBodyVoiceDescriptionMax).optional()
+  "voiceDescription": zod.string().max(updateBrandKitBodyVoiceDescriptionMax).optional(),
+  "tagline": zod.string().max(updateBrandKitBodyTaglineMax).optional(),
+  "description": zod.string().max(updateBrandKitBodyDescriptionMax).optional(),
+  "valueProposition": zod.string().max(updateBrandKitBodyValuePropositionMax).optional(),
+  "targetAudience": zod.string().max(updateBrandKitBodyTargetAudienceMax).optional(),
+  "industry": zod.string().max(updateBrandKitBodyIndustryMax).optional(),
+  "keywords": zod.array(zod.string()).optional(),
+  "personality": zod.array(zod.string()).optional(),
+  "imageStyle": zod.string().max(updateBrandKitBodyImageStyleMax).optional()
 })
 
 export const UpdateBrandKitResponse = zod.object({
@@ -602,6 +631,14 @@ export const UpdateBrandKitResponse = zod.object({
   "companyName": zod.string().nullish(),
   "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
   "voiceDescription": zod.string().nullish(),
+  "tagline": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "valueProposition": zod.string().nullish(),
+  "targetAudience": zod.string().nullish(),
+  "industry": zod.string().nullish(),
+  "keywords": zod.array(zod.string()).nullish(),
+  "personality": zod.array(zod.string()).nullish(),
+  "imageStyle": zod.string().nullish(),
   "updatedAt": zod.string()
 })
 
@@ -622,6 +659,14 @@ export const ListBrandKitsResponseItem = zod.object({
   "companyName": zod.string().nullish(),
   "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
   "voiceDescription": zod.string().nullish(),
+  "tagline": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "valueProposition": zod.string().nullish(),
+  "targetAudience": zod.string().nullish(),
+  "industry": zod.string().nullish(),
+  "keywords": zod.array(zod.string()).nullish(),
+  "personality": zod.array(zod.string()).nullish(),
+  "imageStyle": zod.string().nullish(),
   "updatedAt": zod.string()
 })
 export const ListBrandKitsResponse = zod.array(ListBrandKitsResponseItem)
@@ -636,6 +681,18 @@ export const createBrandKitBodySourceUrlMax = 2048;
 
 export const createBrandKitBodyVoiceDescriptionMax = 500;
 
+export const createBrandKitBodyTaglineMax = 140;
+
+export const createBrandKitBodyDescriptionMax = 400;
+
+export const createBrandKitBodyValuePropositionMax = 280;
+
+export const createBrandKitBodyTargetAudienceMax = 280;
+
+export const createBrandKitBodyIndustryMax = 80;
+
+export const createBrandKitBodyImageStyleMax = 280;
+
 
 
 export const CreateBrandKitBody = zod.object({
@@ -649,7 +706,15 @@ export const CreateBrandKitBody = zod.object({
   "fontFamily": zod.string().optional(),
   "companyName": zod.string().optional(),
   "brandVoice": zod.enum(['professional', 'playful', 'bold', 'minimal']).optional(),
-  "voiceDescription": zod.string().max(createBrandKitBodyVoiceDescriptionMax).optional()
+  "voiceDescription": zod.string().max(createBrandKitBodyVoiceDescriptionMax).optional(),
+  "tagline": zod.string().max(createBrandKitBodyTaglineMax).optional(),
+  "description": zod.string().max(createBrandKitBodyDescriptionMax).optional(),
+  "valueProposition": zod.string().max(createBrandKitBodyValuePropositionMax).optional(),
+  "targetAudience": zod.string().max(createBrandKitBodyTargetAudienceMax).optional(),
+  "industry": zod.string().max(createBrandKitBodyIndustryMax).optional(),
+  "keywords": zod.array(zod.string()).optional(),
+  "personality": zod.array(zod.string()).optional(),
+  "imageStyle": zod.string().max(createBrandKitBodyImageStyleMax).optional()
 })
 
 
@@ -671,8 +736,16 @@ export const ExtractBrandResponse = zod.object({
   "accentColor": zod.string().nullish(),
   "fontFamily": zod.string().nullish(),
   "logoUrl": zod.string().nullish(),
-  "sourceUrl": zod.string()
-}).describe('A brand kit detected from a website (review then POST \/brand-kits).')
+  "sourceUrl": zod.string(),
+  "tagline": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "valueProposition": zod.string().nullish(),
+  "targetAudience": zod.string().nullish(),
+  "industry": zod.string().nullish(),
+  "keywords": zod.array(zod.string()),
+  "personality": zod.array(zod.string()),
+  "imageStyle": zod.string().nullish()
+}).describe('A brand DNA detected from a website (review then POST \/brand-kits).')
 
 
 /**
@@ -695,6 +768,14 @@ export const GetBrandKitByIdResponse = zod.object({
   "companyName": zod.string().nullish(),
   "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
   "voiceDescription": zod.string().nullish(),
+  "tagline": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "valueProposition": zod.string().nullish(),
+  "targetAudience": zod.string().nullish(),
+  "industry": zod.string().nullish(),
+  "keywords": zod.array(zod.string()).nullish(),
+  "personality": zod.array(zod.string()).nullish(),
+  "imageStyle": zod.string().nullish(),
   "updatedAt": zod.string()
 })
 
@@ -712,6 +793,18 @@ export const updateBrandKitByIdBodySourceUrlMax = 2048;
 
 export const updateBrandKitByIdBodyVoiceDescriptionMax = 500;
 
+export const updateBrandKitByIdBodyTaglineMax = 140;
+
+export const updateBrandKitByIdBodyDescriptionMax = 400;
+
+export const updateBrandKitByIdBodyValuePropositionMax = 280;
+
+export const updateBrandKitByIdBodyTargetAudienceMax = 280;
+
+export const updateBrandKitByIdBodyIndustryMax = 80;
+
+export const updateBrandKitByIdBodyImageStyleMax = 280;
+
 
 
 export const UpdateBrandKitByIdBody = zod.object({
@@ -725,7 +818,15 @@ export const UpdateBrandKitByIdBody = zod.object({
   "fontFamily": zod.string().optional(),
   "companyName": zod.string().optional(),
   "brandVoice": zod.enum(['professional', 'playful', 'bold', 'minimal']).optional(),
-  "voiceDescription": zod.string().max(updateBrandKitByIdBodyVoiceDescriptionMax).optional()
+  "voiceDescription": zod.string().max(updateBrandKitByIdBodyVoiceDescriptionMax).optional(),
+  "tagline": zod.string().max(updateBrandKitByIdBodyTaglineMax).optional(),
+  "description": zod.string().max(updateBrandKitByIdBodyDescriptionMax).optional(),
+  "valueProposition": zod.string().max(updateBrandKitByIdBodyValuePropositionMax).optional(),
+  "targetAudience": zod.string().max(updateBrandKitByIdBodyTargetAudienceMax).optional(),
+  "industry": zod.string().max(updateBrandKitByIdBodyIndustryMax).optional(),
+  "keywords": zod.array(zod.string()).optional(),
+  "personality": zod.array(zod.string()).optional(),
+  "imageStyle": zod.string().max(updateBrandKitByIdBodyImageStyleMax).optional()
 })
 
 export const UpdateBrandKitByIdResponse = zod.object({
@@ -741,6 +842,14 @@ export const UpdateBrandKitByIdResponse = zod.object({
   "companyName": zod.string().nullish(),
   "brandVoice": zod.union([zod.literal('professional'),zod.literal('playful'),zod.literal('bold'),zod.literal('minimal'),zod.literal(null)]).nullish(),
   "voiceDescription": zod.string().nullish(),
+  "tagline": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "valueProposition": zod.string().nullish(),
+  "targetAudience": zod.string().nullish(),
+  "industry": zod.string().nullish(),
+  "keywords": zod.array(zod.string()).nullish(),
+  "personality": zod.array(zod.string()).nullish(),
+  "imageStyle": zod.string().nullish(),
   "updatedAt": zod.string()
 })
 
@@ -750,6 +859,25 @@ export const UpdateBrandKitByIdResponse = zod.object({
  */
 export const DeleteBrandKitParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Generate ready-to-render video ideas from a brand kit's DNA
+ */
+export const GenerateVideoIdeasParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GenerateVideoIdeasResponse = zod.object({
+  "ideas": zod.array(zod.object({
+  "title": zod.string(),
+  "description": zod.string(),
+  "module": zod.enum(['product-launch', 'brand-promo', 'social-teaser', 'studio']),
+  "headline": zod.string(),
+  "bodyText": zod.string(),
+  "ctaText": zod.string()
+}))
 })
 
 

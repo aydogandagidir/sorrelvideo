@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/templates", label: "Templates", icon: Film },
   { href: "/website-to-video", label: "Website → Video", icon: Globe },
-  { href: "/brand", label: "Brand Kit", icon: Palette },
+  { href: "/brand", label: "Brand DNA", icon: Palette },
   { href: "/modules", label: "Modules", icon: Blocks },
   { href: "/bulk", label: "Bulk", icon: Layers },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

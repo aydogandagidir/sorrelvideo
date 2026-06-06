@@ -3,6 +3,7 @@ import {
   text,
   serial,
   boolean,
+  jsonb,
   timestamp,
   index,
   uniqueIndex,
@@ -44,6 +45,19 @@ export const brandKitTable = pgTable(
       enum: ["professional", "playful", "bold", "minimal"],
     }),
     voiceDescription: text("voice_description"),
+    // ── Brand DNA (Pomelli-style): the narrative identity, AI-extracted from the
+    // site and editable. Distinct from the visual identity (colors/font/logo)
+    // above; all nullable so a kit that predates DNA (or a no-AI heuristic
+    // extraction) is still valid. Consumed by the AI copy suggester + video-idea
+    // generator (NOT injected into compositions, so they need no CSS/attr guard).
+    tagline: text("tagline"),
+    description: text("description"),
+    valueProposition: text("value_proposition"),
+    targetAudience: text("target_audience"),
+    industry: text("industry"),
+    keywords: jsonb("keywords").$type<string[]>(),
+    personality: jsonb("personality").$type<string[]>(),
+    imageStyle: text("image_style"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()

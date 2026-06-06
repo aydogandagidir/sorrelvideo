@@ -1,8 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq } from "drizzle-orm";
 import { getProvider, SuggestInputSchema } from "@workspace/ai";
-import { brandKitTable, db } from "@workspace/db";
 import { checkAndIncrementAiCount } from "../services/billingService";
+import { getDefaultBrandKit } from "../services/brandKitService";
 import { aiSuggestLimiter } from "../middlewares/rateLimit";
 import { z } from "zod";
 
@@ -37,10 +36,9 @@ router.post(
       return;
     }
 
-    const [brand] = await db
-      .select()
-      .from(brandKitTable)
-      .where(eq(brandKitTable.userId, req.user.id));
+    // Ground the copy in the user's DEFAULT Brand DNA (multi-kit: pick the
+    // default, not an arbitrary row).
+    const brand = await getDefaultBrandKit(req.user.id);
 
     const provider = getProvider();
 
@@ -50,6 +48,13 @@ router.post(
         prompt: parsed.data.prompt,
         brand: {
           companyName: brand?.companyName ?? null,
+          tagline: brand?.tagline ?? null,
+          description: brand?.description ?? null,
+          valueProposition: brand?.valueProposition ?? null,
+          targetAudience: brand?.targetAudience ?? null,
+          industry: brand?.industry ?? null,
+          keywords: brand?.keywords ?? null,
+          personality: brand?.personality ?? null,
           voice: brand?.brandVoice ?? null,
           voiceDescription: brand?.voiceDescription ?? null,
         },

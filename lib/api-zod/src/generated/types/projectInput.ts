@@ -12,5 +12,7 @@ export interface ProjectInput {
   description?: string;
   module: string;
   templateId?: number;
+  /** Brand kit (DNA) to render with. Null/omitted → the user's default. */
+  brandKitId?: number;
   compositionVars?: ProjectInputCompositionVars;
 }

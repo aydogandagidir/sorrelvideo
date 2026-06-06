@@ -58,6 +58,7 @@ import type {
   TemplateInput,
   UploadUrlRequest,
   UploadUrlResponse,
+  VideoIdeasResponse,
   WebsiteToVideoPreviewRequest,
   WebsiteToVideoPreviewResponse,
   WebsiteToVideoRequest
@@ -2598,6 +2599,76 @@ export const useDeleteBrandKit = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteBrandKitMutationOptions(options));
+    }
+
+export const getGenerateVideoIdeasUrl = (id: number,) => {
+
+
+
+
+  return `/api/brand-kits/${id}/video-ideas`
+}
+
+/**
+ * @summary Generate ready-to-render video ideas from a brand kit's DNA
+ */
+export const generateVideoIdeas = async (id: number, options?: RequestInit): Promise<VideoIdeasResponse> => {
+
+  return customFetch<VideoIdeasResponse>(getGenerateVideoIdeasUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getGenerateVideoIdeasMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateVideoIdeas>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateVideoIdeas>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['generateVideoIdeas'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateVideoIdeas>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  generateVideoIdeas(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateVideoIdeasMutationResult = NonNullable<Awaited<ReturnType<typeof generateVideoIdeas>>>
+
+    export type GenerateVideoIdeasMutationError = ErrorType<void>
+
+    /**
+ * @summary Generate ready-to-render video ideas from a brand kit's DNA
+ */
+export const useGenerateVideoIdeas = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateVideoIdeas>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateVideoIdeas>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getGenerateVideoIdeasMutationOptions(options));
     }
 
 export const getListModulesUrl = () => {

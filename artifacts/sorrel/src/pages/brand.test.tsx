@@ -114,7 +114,7 @@ describe("Brand Kit — multi-kit", () => {
       screen.getByLabelText(/website url to detect/i),
     );
     await user.type(detectInput, "nebula.test");
-    await user.click(screen.getByRole("button", { name: /^detect$/i }));
+    await user.click(screen.getByRole("button", { name: /^analyze$/i }));
 
     // The detected company name lands in the form.
     await waitFor(() =>
@@ -122,7 +122,7 @@ describe("Brand Kit — multi-kit", () => {
     );
 
     // Saving the draft POSTs to /brand-kits with the detected values.
-    await user.click(screen.getByRole("button", { name: /create brand kit/i }));
+    await user.click(screen.getByRole("button", { name: /create brand dna/i }));
     await waitFor(() =>
       expect(lastBody("POST", /\/api\/brand-kits$/)).toBeDefined(),
     );
@@ -145,7 +145,7 @@ describe("Brand Kit — multi-kit", () => {
     const nameInput = await waitFor(() => screen.getByLabelText(/company name/i));
     await user.clear(nameInput);
     await user.type(nameInput, "Acme Galaxy");
-    await user.click(screen.getByRole("button", { name: /save brand kit/i }));
+    await user.click(screen.getByRole("button", { name: /save brand dna/i }));
 
     await waitFor(() =>
       expect(lastBody("PATCH", /\/api\/brand-kits\/\d+$/)).toBeDefined(),

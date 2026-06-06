@@ -7,7 +7,7 @@
  */
 
 /**
- * A brand kit detected from a website (review then POST /brand-kits).
+ * A brand DNA detected from a website (review then POST /brand-kits).
  */
 export interface ExtractedBrand {
   /** @nullable */
@@ -21,4 +21,18 @@ export interface ExtractedBrand {
   /** @nullable */
   logoUrl?: string | null;
   sourceUrl: string;
+  /** @nullable */
+  tagline?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  valueProposition?: string | null;
+  /** @nullable */
+  targetAudience?: string | null;
+  /** @nullable */
+  industry?: string | null;
+  keywords: string[];
+  personality: string[];
+  /** @nullable */
+  imageStyle?: string | null;
 }
