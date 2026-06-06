@@ -27,15 +27,38 @@ jobs:
       GIT_SHA: ${{ github.event.workflow_run.head_sha }}
 
     steps:
+      # Deploy is OPT-IN: it runs only once a RAILWAY_TOKEN secret exists. Until
+      # then (e.g. Railway not provisioned yet — see DEPLOYMENT.md) every step
+      # below is skipped and the job goes GREEN with a notice, instead of failing
+      # red on every merge to main. Adding the secret auto-activates the deploy —
+      # no workflow edit needed.
+      - name: Check Railway is configured
+        id: cfg
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Deploy skipped::RAILWAY_TOKEN is not set. Provision Railway (an 'api' service) and add the RAILWAY_TOKEN repo secret to enable auto-deploy — see DEPLOYMENT.md."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.cfg.outputs.configured == 'true'
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Install Railway CLI
+        if: steps.cfg.outputs.configured == 'true'
+        # Pipe to bash, NOT sh: the install script uses bash-only parameter
+        # expansion (`${value//.../...}`) + `local`, which Ubuntu's /bin/sh (dash)
+        # rejects with "Bad substitution" (exit 2) AFTER copying the binary — so
+        # every deploy died here before reaching Railway. bash runs it cleanly.
         run: |
-          curl -fsSL https://railway.com/install.sh | sh
-          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          curl -fsSL https://railway.com/install.sh | bash
+          echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
 
       # Pin the release SHA Railway uses for THIS build. `railway up` builds the
       # Dockerfile on Railway's builders and has no --build-arg flag — Railway
@@ -46,6 +69,7 @@ jobs:
       # release). The static VITE_SENTRY_DSN / VITE_SENTRY_TRACES_SAMPLE_RATE are
       # operator-managed service variables (see DEPLOYMENT.md), not set here.
       - name: Pin release SHA as build/runtime variables
+        if: steps.cfg.outputs.configured == 'true'
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
@@ -54,6 +78,7 @@ jobs:
             --set "VITE_GIT_SHA=$GIT_SHA"
 
       - name: Deploy
+        if: steps.cfg.outputs.configured == 'true'
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway up --service api --detach

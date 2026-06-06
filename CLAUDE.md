@@ -714,7 +714,13 @@ Vitest (with Postgres testcontainer for integration tests), build.
 
 **Deploy** (`.github/workflows/deploy.yml`): listens for the CI workflow
 to finish on `main`; if green, runs `railway up --service api --detach`
-using a `RAILWAY_TOKEN` secret. Subsequent pushes auto-ship.
+using a `RAILWAY_TOKEN` secret. Subsequent pushes auto-ship. The deploy is
+**opt-in / gated on the secret**: a first guard step skips the Railway steps
+(job stays GREEN with a `::notice::`) whenever `RAILWAY_TOKEN` is unset, so an
+unprovisioned environment doesn't fail the workflow red on every merge — adding
+the secret auto-activates the deploy with no workflow edit. The Railway CLI is
+installed via `curl … | bash` (NOT `sh`: the install script uses bash-only
+`${var//…/…}` + `local`, which dash rejects with "Bad substitution").
 
 **Observability**:
 
