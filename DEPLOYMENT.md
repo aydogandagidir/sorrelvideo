@@ -196,22 +196,30 @@ If any of these break:
 - Sentry → first issue at the top.
 - Better Stack → live tail of structured Pino logs.
 
-## 12. GitHub Actions auto-deploy
+## 12. GitHub Actions auto-deploy (OPTIONAL — native integration is the default)
 
-The `Deploy` workflow is **opt-in**: until you add the `RAILWAY_TOKEN` secret it
-skips the Railway steps and the job stays green (a `::notice::` explains why), so
-it never fails red on an unprovisioned repo. To turn it on, once the first manual
-deploy is green:
+By default the app deploys via **Railway's native GitHub integration** (step 1:
+"Deploy from GitHub repo") — every push to `main` builds + releases. The
+`Deploy` workflow is a **separate, opt-in** CI deploy path that is **gated on the
+`RAILWAY_TOKEN` secret**: until you add it the workflow skips the Railway steps
+and stays green (a `::notice::` explains why), so it never fails red and never
+double-deploys alongside the native integration.
+
+**Only enable it if you want CI to own deploys instead of the native integration**
+— and if so, **first disable native auto-deploy** on the `@workspace/api-server`
+service (Railway → service → Settings → turn off "Deploy on push"), or both will
+fire on every push. Then:
 
 1. [Railway account → Tokens](https://railway.com/account/tokens) →
    create a personal token. **Do not** re-use the project token — it
    doesn't have account-level permissions.
 2. GitHub repo → Settings → Secrets and variables → Actions → New repository
-   secret named `RAILWAY_TOKEN` (paste the token from step 1). You can also do
-   this from the CLI: `gh secret set RAILWAY_TOKEN`.
-3. Push to `main`. CI runs → deploy workflow triggers automatically → the guard
-   sees the secret and `railway up` ships the new image. (The service must be
-   named `api`, matching `railway up --service api` — see step 1's project.)
+   secret named `RAILWAY_TOKEN` (paste the token from step 1). Or from the CLI:
+   `gh secret set RAILWAY_TOKEN`.
+3. Push to `main`. CI runs → the deploy workflow's guard sees the secret →
+   `railway up --service "$RAILWAY_SERVICE"` ships the image. `RAILWAY_SERVICE`
+   defaults to `@workspace/api-server` (the service name in this project); update
+   the workflow env if you rename the service.
 
 ## Rollback
 

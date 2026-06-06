@@ -25,13 +25,18 @@ jobs:
     timeout-minutes: 25
     env:
       GIT_SHA: ${{ github.event.workflow_run.head_sha }}
+      # The Railway service to deploy/pin. Must match the service name in the
+      # project EXACTLY (Railway's monorepo services are named after the package).
+      RAILWAY_SERVICE: "@workspace/api-server"
 
     steps:
-      # Deploy is OPT-IN: it runs only once a RAILWAY_TOKEN secret exists. Until
-      # then (e.g. Railway not provisioned yet — see DEPLOYMENT.md) every step
-      # below is skipped and the job goes GREEN with a notice, instead of failing
-      # red on every merge to main. Adding the secret auto-activates the deploy —
-      # no workflow edit needed.
+      # This Actions deploy is OPT-IN and runs only once a RAILWAY_TOKEN secret
+      # exists. The app ALSO deploys via Railway's native GitHub integration
+      # (Settings → Deploy from repo), which is the active deployer today — so
+      # this path stays dormant (skipped, job GREEN with a notice) rather than
+      # failing red on every merge. Enable it ONLY if you also turn OFF Railway's
+      # native auto-deploy, otherwise both fire and you double-deploy. See
+      # DEPLOYMENT.md.
       - name: Check Railway is configured
         id: cfg
         env:
@@ -39,7 +44,7 @@ jobs:
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Deploy skipped::RAILWAY_TOKEN is not set. Provision Railway (an 'api' service) and add the RAILWAY_TOKEN repo secret to enable auto-deploy — see DEPLOYMENT.md."
+            echo "::notice title=Deploy skipped::RAILWAY_TOKEN not set — this Actions deploy is dormant (the app deploys via Railway's native GitHub integration). To drive deploys from CI instead, add the secret AND disable native auto-deploy. See DEPLOYMENT.md."
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
@@ -73,7 +78,7 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway variables --service api --skip-deploys \
+          railway variables --service "$RAILWAY_SERVICE" --skip-deploys \
             --set "GIT_SHA=$GIT_SHA" \
             --set "VITE_GIT_SHA=$GIT_SHA"
 
@@ -81,4 +86,4 @@ jobs:
         if: steps.cfg.outputs.configured == 'true'
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service api --detach
+        run: railway up --service "$RAILWAY_SERVICE" --detach
