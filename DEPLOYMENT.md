@@ -198,15 +198,20 @@ If any of these break:
 
 ## 12. GitHub Actions auto-deploy
 
-Once the first manual deploy is green:
+The `Deploy` workflow is **opt-in**: until you add the `RAILWAY_TOKEN` secret it
+skips the Railway steps and the job stays green (a `::notice::` explains why), so
+it never fails red on an unprovisioned repo. To turn it on, once the first manual
+deploy is green:
 
 1. [Railway account → Tokens](https://railway.com/account/tokens) →
    create a personal token. **Do not** re-use the project token — it
    doesn't have account-level permissions.
-2. GitHub repo → Settings → Secrets → Actions → new secret
-   `RAILWAY_TOKEN`.
-3. Push to `main`. CI runs → deploy workflow triggers automatically →
-   Railway picks up the new image.
+2. GitHub repo → Settings → Secrets and variables → Actions → New repository
+   secret named `RAILWAY_TOKEN` (paste the token from step 1). You can also do
+   this from the CLI: `gh secret set RAILWAY_TOKEN`.
+3. Push to `main`. CI runs → deploy workflow triggers automatically → the guard
+   sees the secret and `railway up` ships the new image. (The service must be
+   named `api`, matching `railway up --service api` — see step 1's project.)
 
 ## Rollback
 
