@@ -22,6 +22,8 @@ tags:
     description: Platform modules
   - name: stats
     description: Platform statistics
+  - name: analytics
+    description: Render analytics and usage metrics
   - name: billing
     description: Billing and subscription management
   - name: Storage
@@ -1097,6 +1099,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/PlatformStats"
 
+  /analytics/overview:
+    get:
+      operationId: getAnalyticsOverview
+      tags: [analytics]
+      summary: Aggregated render analytics for the current user
+      responses:
+        "200":
+          description: Analytics overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverview"
+
   /compositions/lint:
     post:
       operationId: lintComposition
@@ -2030,3 +2045,98 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Project"
+
+    AnalyticsOverview:
+      type: object
+      required: [totals, activity, formats, topTemplates, recentRenders]
+      properties:
+        totals:
+          type: object
+          required:
+            [
+              totalRenders,
+              succeeded,
+              failed,
+              cancelled,
+              inProgress,
+              totalCostCents,
+              successRate,
+            ]
+          properties:
+            totalRenders:
+              type: integer
+            succeeded:
+              type: integer
+            failed:
+              type: integer
+            cancelled:
+              type: integer
+            inProgress:
+              type: integer
+            successRate:
+              type: ["number", "null"]
+              description: succeeded / (succeeded + failed); null when no render has completed.
+            totalCostCents:
+              type: integer
+        activity:
+          type: array
+          description: Per-day render counts over the last 30 days, oldest first.
+          items:
+            type: object
+            required: [date, ready, failed, total]
+            properties:
+              date:
+                type: string
+                description: UTC day, formatted YYYY-MM-DD.
+              ready:
+                type: integer
+              failed:
+                type: integer
+              total:
+                type: integer
+        formats:
+          type: array
+          description: Render count per output format.
+          items:
+            type: object
+            required: [format, count]
+            properties:
+              format:
+                type: string
+              count:
+                type: integer
+        topTemplates:
+          type: array
+          description: Most-rendered template modules, highest first.
+          items:
+            type: object
+            required: [module, count]
+            properties:
+              module:
+                type: string
+              count:
+                type: integer
+        recentRenders:
+          type: array
+          description: The most recent render attempts, newest first.
+          items:
+            type: object
+            required: [id, projectId, status, createdAt]
+            properties:
+              id:
+                type: string
+              projectId:
+                type: integer
+              projectName:
+                type: ["string", "null"]
+              module:
+                type: ["string", "null"]
+              status:
+                type: string
+              format:
+                type: ["string", "null"]
+              costCents:
+                type: ["integer", "null"]
+              createdAt:
+                type: string
+                format: date-time

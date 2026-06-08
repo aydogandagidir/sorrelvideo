@@ -1084,6 +1084,46 @@ export const GetStatsResponse = zod.object({
 
 
 /**
+ * @summary Aggregated render analytics for the current user
+ */
+export const GetAnalyticsOverviewResponse = zod.object({
+  "totals": zod.object({
+  "totalRenders": zod.number(),
+  "succeeded": zod.number(),
+  "failed": zod.number(),
+  "cancelled": zod.number(),
+  "inProgress": zod.number(),
+  "successRate": zod.number().nullable().describe('succeeded \/ (succeeded + failed); null when no render has completed.'),
+  "totalCostCents": zod.number()
+}),
+  "activity": zod.array(zod.object({
+  "date": zod.string().describe('UTC day, formatted YYYY-MM-DD.'),
+  "ready": zod.number(),
+  "failed": zod.number(),
+  "total": zod.number()
+})).describe('Per-day render counts over the last 30 days, oldest first.'),
+  "formats": zod.array(zod.object({
+  "format": zod.string(),
+  "count": zod.number()
+})).describe('Render count per output format.'),
+  "topTemplates": zod.array(zod.object({
+  "module": zod.string(),
+  "count": zod.number()
+})).describe('Most-rendered template modules, highest first.'),
+  "recentRenders": zod.array(zod.object({
+  "id": zod.string(),
+  "projectId": zod.number(),
+  "projectName": zod.string().nullish(),
+  "module": zod.string().nullish(),
+  "status": zod.string(),
+  "format": zod.string().nullish(),
+  "costCents": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})).describe('The most recent render attempts, newest first.')
+})
+
+
+/**
  * @summary Lint composition HTML and report findings (non-blocking)
  */
 export const LintCompositionBody = zod.object({

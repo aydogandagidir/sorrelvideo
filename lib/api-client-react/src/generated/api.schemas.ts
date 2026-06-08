@@ -717,6 +717,65 @@ export interface PlatformStats {
   recentProjects?: Project[];
 }
 
+export type AnalyticsOverviewTotals = {
+  totalRenders: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+  inProgress: number;
+  /**
+     * succeeded / (succeeded + failed); null when no render has completed.
+     * @nullable
+     */
+  successRate: number | null;
+  totalCostCents: number;
+};
+
+export type AnalyticsOverviewActivityItem = {
+  /** UTC day, formatted YYYY-MM-DD. */
+  date: string;
+  ready: number;
+  failed: number;
+  total: number;
+};
+
+export type AnalyticsOverviewFormatsItem = {
+  format: string;
+  count: number;
+};
+
+export type AnalyticsOverviewTopTemplatesItem = {
+  module: string;
+  count: number;
+};
+
+export type AnalyticsOverviewRecentRendersItem = {
+  id: string;
+  projectId: number;
+  /** @nullable */
+  projectName?: string | null;
+  /** @nullable */
+  module?: string | null;
+  status: string;
+  /** @nullable */
+  format?: string | null;
+  /** @nullable */
+  costCents?: number | null;
+  createdAt: string;
+};
+
+export interface AnalyticsOverview {
+  totals: AnalyticsOverviewTotals;
+  /** Per-day render counts over the last 30 days, oldest first. */
+  activity: AnalyticsOverviewActivityItem[];
+  /** Render count per output format. */
+  formats: AnalyticsOverviewFormatsItem[];
+  /** Most-rendered template modules, highest first. */
+  topTemplates: AnalyticsOverviewTopTemplatesItem[];
+  /** The most recent render attempts, newest first. */
+  recentRenders: AnalyticsOverviewRecentRendersItem[];
+}
+
 /**
  * Opaque session token — `Bearer <sid>`.
  */

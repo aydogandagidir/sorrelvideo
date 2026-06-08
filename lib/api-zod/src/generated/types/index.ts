@@ -8,6 +8,12 @@
 
 export * from './aiSuggestRequest';
 export * from './aiSuggestResult';
+export * from './analyticsOverview';
+export * from './analyticsOverviewActivityItem';
+export * from './analyticsOverviewFormatsItem';
+export * from './analyticsOverviewRecentRendersItem';
+export * from './analyticsOverviewTopTemplatesItem';
+export * from './analyticsOverviewTotals';
 export * from './authorizationSessionHeaderParameter';
 export * from './authUser';
 export * from './authUserEnvelope';
