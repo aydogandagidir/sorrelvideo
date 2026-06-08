@@ -392,8 +392,10 @@ function ProjectDetail({
         <div className="grid md:h-[80vh] md:grid-cols-[1fr_360px]">
           {/* Cinematic stage: one large, height-driven player on a dark
               pasteboard, letterboxed (object-contain) so the portrait video
-              glows — never a crop. */}
-          <div className="flex min-h-[55vh] items-center justify-center bg-[#0b0f0d] p-6 md:min-h-0 md:p-8">
+              glows — never a crop. min-w-0 stops a real <video>'s 1920px
+              intrinsic width from blowing out the 1fr track (which would push
+              the info panel past the modal's clipped edge). */}
+          <div className="flex min-h-[55vh] min-w-0 items-center justify-center overflow-hidden bg-[#0b0f0d] p-6 md:min-h-0 md:p-8">
             {isReady ? (
               <video
                 src={videoSrc}
@@ -419,7 +421,7 @@ function ProjectDetail({
             )}
           </div>
           {/* Meta + actions (scrolls independently on short viewports) */}
-          <div className="flex flex-col gap-4 overflow-y-auto p-6 md:max-h-[80vh]">
+          <div className="flex min-w-0 flex-col gap-4 overflow-y-auto p-6 md:max-h-[80vh]">
             <div className="pr-8">
               <div className="mb-2">
                 <StatusDot status={project.status} />
