@@ -110,15 +110,18 @@ export default function LoginPage() {
     "w-full rounded-md border border-border bg-black/40 px-4 py-3 text-sm text-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground/60 focus:border-primary focus:shadow-[0_0_12px_hsl(var(--primary)/0.2)]";
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-black text-foreground">
-      {/* Background: blurred 3D tech graphic + dim overlay + drifting accent glows. */}
+    <div className="relative flex min-h-screen flex-col overflow-hidden text-foreground">
+      {/* Background stack (all behind content): dark canvas → blurred 3D tech
+          graphic → dim overlay → drifting accent glows. The canvas lives on its
+          own fixed layer (NOT the root) so it sits BEHIND the image. */}
+      <div className="fixed inset-0 z-[-3] bg-background" aria-hidden="true" />
       <div
         className="fixed inset-0 z-[-2] bg-cover bg-center"
-        style={{ backgroundImage: `url(${loginBg})`, filter: "blur(8px) brightness(0.4)" }}
+        style={{ backgroundImage: `url(${loginBg})`, filter: "blur(6px) brightness(0.6)" }}
         aria-hidden="true"
       />
       <div
-        className="fixed inset-0 z-[-1] bg-background/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[-1] bg-background/40 backdrop-blur-sm"
         aria-hidden="true"
       />
       <div className="login-glow login-glow-tl" aria-hidden="true" />
