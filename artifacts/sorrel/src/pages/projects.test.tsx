@@ -68,7 +68,7 @@ describe("Projects — list states", () => {
     fetchMock = installApiFetchMock([]);
     fetchMock.mock.mockImplementation(() => new Promise(() => {}));
 
-    const { container } = renderWithProviders(<Projects />);
+    const { container } = renderWithProviders(<Projects />, { route: "/projects" });
 
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
       0,
@@ -84,7 +84,7 @@ describe("Projects — list states", () => {
       { url: "/api/projects", method: "GET", status: 500, json: {} },
     ]);
 
-    renderWithProviders(<Projects />);
+    renderWithProviders(<Projects />, { route: "/projects" });
 
     await waitFor(() =>
       expect(screen.getByText(/failed to load projects/i)).toBeInTheDocument(),
@@ -95,7 +95,7 @@ describe("Projects — list states", () => {
   it("renders the empty-state CTA when there are no projects", async () => {
     fetchMock = installApiFetchMock([...LAYOUT_ROUTES, listRoute([])]);
 
-    renderWithProviders(<Projects />);
+    renderWithProviders(<Projects />, { route: "/projects" });
 
     await waitFor(() =>
       expect(
@@ -115,7 +115,7 @@ describe("Projects — card → detail controls", () => {
       listRoute([draftProject({ name: "Draft One" })]),
     ]);
 
-    renderWithProviders(<Projects />);
+    renderWithProviders(<Projects />, { route: "/projects" });
     const dialog = await openDetail("Draft One");
 
     expect(
@@ -136,7 +136,7 @@ describe("Projects — card → detail controls", () => {
       listRoute([draftProject({ id: 2, name: "Ready One", status: "ready" })]),
     ]);
 
-    renderWithProviders(<Projects />);
+    renderWithProviders(<Projects />, { route: "/projects" });
     const dialog = await openDetail("Ready One");
 
     expect(
@@ -163,7 +163,7 @@ describe("Projects — card → detail controls", () => {
       ]),
     ]);
 
-    renderWithProviders(<Projects />);
+    renderWithProviders(<Projects />, { route: "/projects" });
     // The card shows a "Rendering" status before we open anything.
     await waitFor(() =>
       expect(screen.getByText("Rendering One")).toBeInTheDocument(),
@@ -188,7 +188,7 @@ describe("Projects — delete confirmation AlertDialog", () => {
       { url: "/api/projects", method: "GET", json: [] },
     ]);
 
-    renderWithProviders(<Projects />);
+    renderWithProviders(<Projects />, { route: "/projects" });
     const dialog = await openDetail("Doomed");
 
     // Trash only arms the AlertDialog — no DELETE yet.
@@ -213,7 +213,7 @@ describe("Projects — delete confirmation AlertDialog", () => {
       { url: "/api/projects/9", method: "DELETE", status: 204, json: {} },
     ]);
 
-    renderWithProviders(<Projects />);
+    renderWithProviders(<Projects />, { route: "/projects" });
     const dialog = await openDetail("Spared");
 
     await user.click(

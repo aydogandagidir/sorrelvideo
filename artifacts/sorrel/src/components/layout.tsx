@@ -30,6 +30,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { RenderTray } from "@/components/render-tray";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@workspace/auth-web";
 import { cn } from "@/lib/utils";
@@ -432,6 +433,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <RenderTray />
     </div>
   );
 }
