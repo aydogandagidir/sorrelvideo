@@ -7,10 +7,20 @@ import {
   RenderCancelledError,
 } from "@hyperframes/producer";
 import { eq } from "drizzle-orm";
-import { db, projectsTable, type RenderFormat } from "@workspace/db";
+import {
+  db,
+  projectsTable,
+  type RenderFormat,
+  type RenderResolution,
+  type RenderSettings,
+} from "@workspace/db";
 import { logger } from "../lib/logger";
 import { getBrandKit, getDefaultBrandKit } from "./brandKitService";
-import { resolveSettings, toEngineConfig } from "./renderSettingsService";
+import {
+  resolveSettings,
+  toEngineConfig,
+  resolveDimensions,
+} from "./renderSettingsService";
 import { decrementRenderCount } from "./billingService";
 import {
   getJobById,
@@ -91,6 +101,14 @@ const STUDIO_FALLBACKS = {
   "user.bodyText":
     "Sorrel turns a template, your brand kit, and a few sentences into branded video — ready to ship.",
   "user.ctaText": "Try it free",
+  // Per-render canvas dimensions + aspect class. Default = the authored portrait
+  // canvas, so a no-vars / null-settings render is byte-identical to before.
+  // buildCompositionHtml overrides these from the project's render resolution so
+  // the composition authors itself at the SAME aspect the engine outputs — which
+  // is what stops the engine's aspect-mismatch throw for landscape/square picks.
+  "layout.width": "1080",
+  "layout.height": "1920",
+  "layout.aspect": "portrait",
   // website-showcase reads {{duration}} (data-duration + the GSAP timeline). New
   // captures always set it from the user's choice; this default keeps a legacy
   // website-showcase project (created before duration was selectable) rendering at
@@ -314,6 +332,7 @@ export async function buildCompositionHtml(project: {
   compositionVars: Record<string, string> | null;
   compositionHtml?: string | null;
   brandKitId?: number | null;
+  renderSettings?: RenderSettings | null;
 }): Promise<string> {
   if (
     typeof project.compositionHtml === "string" &&
@@ -330,6 +349,24 @@ export async function buildCompositionHtml(project: {
 
   const brand = await loadBrandKit(project.userId, project.brandKitId);
   const vars = buildVarMap(brand, project.compositionVars);
+
+  // Author the composition canvas at the BASE pixel dimensions of the chosen
+  // aspect (4K is realized by the engine's deviceScaleFactor, so strip the
+  // `-4k`). The composition's CSS reads these as {{layout.*}} and reflows; the
+  // engine's outputResolution shares this exact aspect, so its cross-multiply
+  // aspect guard passes instead of throwing. Null settings → portrait (the
+  // authored default) → byte-identical to the pre-aspect render.
+  const settings = resolveSettings(project.renderSettings ?? null);
+  const baseResolution = settings.resolution.replace(
+    /-4k$/,
+    "",
+  ) as RenderResolution;
+  const { width, height } = resolveDimensions(baseResolution);
+  vars["layout.width"] = String(width);
+  vars["layout.height"] = String(height);
+  vars["layout.aspect"] =
+    width > height ? "landscape" : width < height ? "portrait" : "square";
+
   return renderCompositionTemplate(source, vars);
 }
 
@@ -351,6 +388,7 @@ async function prepareCompositionFor(
     compositionVars: Record<string, string> | null;
     compositionHtml?: string | null;
     brandKitId?: number | null;
+    renderSettings?: RenderSettings | null;
   },
   options: { watermark: boolean } = { watermark: true },
 ): Promise<{ dir: string; file: string }> {

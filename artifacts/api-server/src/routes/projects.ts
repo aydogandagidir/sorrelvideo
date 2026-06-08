@@ -739,6 +739,9 @@ router.get("/projects/:id/composition", async (req, res): Promise<void> => {
     module: project.module,
     compositionVars: mergedVars,
     brandKitId: project.brandKitId,
+    // Lay the preview out at the project's chosen aspect, so what you see here
+    // matches the rendered mp4 (and the Studio editor seed below).
+    renderSettings: project.renderSettings,
   });
 
   // Preview must reflect live edits, never a cached copy.
