@@ -163,3 +163,76 @@
     background-position: 200% 0;
   }
 }
+
+/* Premium login (Stitch "Ultra" port) — card entrance, drifting accent glows,
+   and a slow glow-pulse on the primary CTA. */
+@keyframes loginRise {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes loginDrift1 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(40px, 20px);
+  }
+}
+@keyframes loginDrift2 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-30px, -40px);
+  }
+}
+@keyframes loginGlowPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px hsl(var(--primary) / 0.55);
+  }
+}
+.login-glow {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 9999px;
+}
+.login-glow-tl {
+  top: -20%;
+  left: -10%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(
+    circle,
+    hsl(var(--primary) / 0.08) 0%,
+    transparent 70%
+  );
+  animation: loginDrift1 20s ease-in-out infinite;
+}
+.login-glow-br {
+  bottom: -20%;
+  right: -10%;
+  width: 70vw;
+  height: 70vw;
+  background: radial-gradient(
+    circle,
+    hsl(var(--primary) / 0.05) 0%,
+    transparent 70%
+  );
+  animation: loginDrift2 25s ease-in-out infinite;
+}
+.login-cta {
+  animation: loginGlowPulse 3s infinite;
+}
