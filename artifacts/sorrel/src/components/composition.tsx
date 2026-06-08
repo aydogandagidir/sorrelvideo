@@ -356,6 +356,8 @@ export function CompositionPlayer({
   bg,
   layout,
   autoplay = true,
+  aspect = "9 / 16",
+  ratioLabel = "9:16",
 }: {
   vars: CompositionVars;
   brand: CompositionBrand;
@@ -363,6 +365,10 @@ export function CompositionPlayer({
   bg: string;
   layout?: CompositionLayout;
   autoplay?: boolean;
+  /** CSS aspect-ratio for the frame, e.g. "9 / 16" | "16 / 9" | "1 / 1". */
+  aspect?: string;
+  /** Badge label for the aspect, e.g. "9:16". */
+  ratioLabel?: string;
 }) {
   const DUR = 8;
   // Start on a composed frame so the first paint shows the full composition.
@@ -397,7 +403,7 @@ export function CompositionPlayer({
           {
             position: "relative",
             width: "100%",
-            aspectRatio: "9 / 16",
+            aspectRatio: aspect,
             borderRadius: 18,
             overflow: "hidden",
             border: "1px solid hsl(var(--border))",
@@ -454,7 +460,7 @@ export function CompositionPlayer({
             borderRadius: 6,
           }}
         >
-          9:16
+          {ratioLabel}
         </span>
       </div>
 

@@ -7,11 +7,18 @@ import {
   useCreateProject,
   useDeleteProject,
   useStartProjectRender,
+  useUpdateProjectRenderSettings,
   useGetBrandKit,
   getListProjectsQueryKey,
   type Project,
   type BrandKit,
 } from "@workspace/api-client-react";
+import {
+  ASPECT_PRESETS,
+  aspectRatioFor,
+  baseAspect,
+  DEFAULT_RENDER_SETTINGS,
+} from "@/lib/render-settings";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -273,6 +280,7 @@ function ProjectDetail({
   const queryClient = useQueryClient();
   const deleteProject = useDeleteProject();
   const renderMutation = useStartProjectRender();
+  const updateSettings = useUpdateProjectRenderSettings();
   const { toast } = useToast();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<
@@ -283,6 +291,13 @@ function ProjectDetail({
   const isRendering = project.status === "rendering";
   const videoSrc = project.videoUrl ?? `/api/projects/${project.id}/video`;
   const v = project.compositionVars ?? {};
+
+  // Aspect ratio / publishing format (the project's render resolution).
+  const settings = project.renderSettings ?? DEFAULT_RENDER_SETTINGS;
+  const aspect = aspectRatioFor(settings.resolution);
+  const selectedAspect = baseAspect(settings.resolution);
+  const ratioLabel =
+    ASPECT_PRESETS.find((p) => p.value === selectedAspect)?.ratio ?? "9:16";
   const downloadName = `${
     (project.name || "video")
       .replace(/[^a-z0-9-_]+/gi, "-")
@@ -340,6 +355,36 @@ function ProjectDetail({
     }
   };
 
+  const changeAspect = (value: typeof settings.resolution) => {
+    if (value === selectedAspect || updateSettings.isPending) return;
+    updateSettings.mutate(
+      { id: project.id, data: { ...settings, resolution: value } },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({
+            title: "Format updated",
+            description: isReady
+              ? "Re-render to produce the new aspect ratio."
+              : "Applied to your next render.",
+          });
+        },
+        onError: () =>
+          toast({
+            title: "Couldn't change the format",
+            description: "Please try again.",
+          }),
+      },
+    );
+  };
+
+  // Portrait + square fit by height; landscape fits by width — so every aspect
+  // lands as large as possible on the stage without distortion.
+  const heightDriven = aspect !== "16 / 9";
+  const playerSize = heightDriven
+    ? "h-auto w-full max-w-[280px] md:h-full md:max-h-[74vh] md:w-auto md:max-w-none"
+    : "h-auto w-full max-w-full";
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-[1040px] gap-0 overflow-hidden p-0">
@@ -355,10 +400,20 @@ function ProjectDetail({
                 controls
                 autoPlay
                 playsInline
-                className="aspect-[9/16] h-auto w-full max-w-[280px] rounded-[16px] border border-primary/15 object-contain shadow-[0_24px_70px_rgba(0,0,0,.6)] md:h-full md:max-h-[74vh] md:w-auto md:max-w-none"
+                style={{ aspectRatio: aspect }}
+                className={cn(
+                  "rounded-[16px] border border-primary/15 object-contain shadow-[0_24px_70px_rgba(0,0,0,.6)]",
+                  playerSize,
+                )}
               />
             ) : (
-              <div className="relative aspect-[9/16] h-auto w-full max-w-[280px] overflow-hidden rounded-[16px] border border-primary/15 shadow-[0_24px_70px_rgba(0,0,0,.6)] md:h-full md:max-h-[74vh] md:w-auto">
+              <div
+                style={{ aspectRatio: aspect }}
+                className={cn(
+                  "relative overflow-hidden rounded-[16px] border border-primary/15 shadow-[0_24px_70px_rgba(0,0,0,.6)]",
+                  playerSize,
+                )}
+              >
                 <CompositionThumb {...thumbProps(project, brand)} chrome />
               </div>
             )}
@@ -376,6 +431,108 @@ function ProjectDetail({
                 <span className="capitalize">{project.module}</span>
               </p>
             </div>
+
+            {/* Format / platform — pick where this will be posted; sets the
+                project's render aspect ratio. */}
+            <div>
+              <div className="mb-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground/70">
+                Format
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {ASPECT_PRESETS.map((p) => {
+                  const on = p.value === selectedAspect;
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => changeAspect(p.value)}
+                      disabled={updateSettings.isPending}
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-center transition-colors disabled:opacity-60",
+                        on
+                          ? "border-primary bg-primary/10"
+                          : "hover:border-primary/40",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "rounded-[3px] border-2",
+                          on ? "border-primary" : "border-muted-foreground/50",
+                          p.value === "portrait"
+                            ? "h-5 w-3"
+                            : p.value === "landscape"
+                              ? "h-3 w-5"
+                              : "h-4 w-4",
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "font-mono text-[11px] font-semibold",
+                          on && "text-primary",
+                        )}
+                      >
+                        {p.ratio}
+                      </span>
+                      <span className="text-[9px] leading-tight text-muted-foreground">
+                        {p.platforms}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Render-settings summary */}
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                ratioLabel,
+                `${settings.fps} fps`,
+                settings.quality.replace(/^\w/, (c) => c.toUpperCase()),
+                settings.format.toUpperCase(),
+              ].map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-md border bg-secondary/40 px-2 py-1 text-[10.5px] font-medium text-muted-foreground"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+
+            {/* Brand */}
+            {brand && (brand.companyName || brand.name) && (
+              <div className="flex items-center gap-2.5 border-t pt-3">
+                <span
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[13px] font-bold"
+                  style={{
+                    background: brand.primaryColor || "#cdfb45",
+                    color: "#0b0f0d",
+                  }}
+                >
+                  {(brand.companyName || brand.name || "S").charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[12.5px] font-semibold">
+                    {brand.companyName || brand.name}
+                  </div>
+                  <div className="mt-1 flex gap-1">
+                    {[
+                      brand.primaryColor,
+                      brand.secondaryColor,
+                      brand.accentColor,
+                    ]
+                      .filter(Boolean)
+                      .map((c, i) => (
+                        <span
+                          key={i}
+                          className="h-3 w-3 rounded-full border border-white/10"
+                          style={{ background: c as string }}
+                        />
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {(v["user.headline"] || v["user.bodyText"] || v["user.ctaText"]) && (
               <div>
