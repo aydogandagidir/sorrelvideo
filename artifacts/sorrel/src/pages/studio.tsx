@@ -22,8 +22,12 @@ import { CompositionPlayer } from "@/components/composition";
 import {
   DEFAULT_RENDER_SETTINGS,
   proViolations,
+  ASPECT_PRESETS,
+  aspectRatioFor,
+  baseAspect,
   type RenderSettings,
 } from "@/lib/render-settings";
+import { cn } from "@/lib/utils";
 import { useBillingInfo } from "@/hooks/useBilling";
 
 const DEFAULT_ACCENT = "#cdfb45";
@@ -78,6 +82,15 @@ export default function StudioPage() {
     companyName: company,
     logoMark: company.charAt(0).toUpperCase(),
   };
+
+  // Aspect ratio / publishing format drives both the render resolution and the
+  // live preview frame, so the user sees exactly the shape they'll publish.
+  const previewAspect = aspectRatioFor(renderSettings.resolution);
+  const selectedAspect = baseAspect(renderSettings.resolution);
+  const ratioLabel =
+    ASPECT_PRESETS.find((p) => p.value === selectedAspect)?.ratio ?? "9:16";
+  const pickAspect = (value: RenderSettings["resolution"]) =>
+    setRenderSettings((s) => ({ ...s, resolution: value }));
 
   async function handleAiSuggest() {
     setAiError(null);
@@ -384,6 +397,50 @@ export default function StudioPage() {
                     studio
                   </span>
                 </div>
+                {/* Format / platform — sets the render aspect AND the preview shape */}
+                <div className="flex flex-wrap justify-center gap-2">
+                  {ASPECT_PRESETS.map((p) => {
+                    const on = p.value === selectedAspect;
+                    return (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => pickAspect(p.value)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-left transition-colors",
+                          on
+                            ? "border-primary bg-primary/10"
+                            : "hover:border-primary/40",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "rounded-[2px] border-2",
+                            on ? "border-primary" : "border-muted-foreground/50",
+                            p.value === "portrait"
+                              ? "h-4 w-2.5"
+                              : p.value === "landscape"
+                                ? "h-2.5 w-4"
+                                : "h-3.5 w-3.5",
+                          )}
+                        />
+                        <span className="leading-tight">
+                          <span
+                            className={cn(
+                              "block font-mono text-[11px] font-semibold",
+                              on && "text-primary",
+                            )}
+                          >
+                            {p.ratio}
+                          </span>
+                          <span className="block text-[9px] text-muted-foreground">
+                            {p.label}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="mx-auto w-full max-w-[300px] md:max-w-[380px] lg:max-w-[420px]">
                   <CompositionPlayer
                     vars={{ headline, body: bodyText, cta: ctaText }}
@@ -391,6 +448,8 @@ export default function StudioPage() {
                     accent={accent}
                     bg={COMP_BG}
                     layout="center"
+                    aspect={previewAspect}
+                    ratioLabel={ratioLabel}
                   />
                 </div>
                 <p className="m-0 text-center text-[11.5px] text-muted-foreground">

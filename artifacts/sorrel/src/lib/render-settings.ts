@@ -109,6 +109,58 @@ export const RESOLUTION_OPTIONS: ReadonlyArray<Option<RenderResolution>> = [
 ];
 
 /**
+ * Aspect-ratio / publishing-target presets. The three base (non-4K) resolutions,
+ * framed as "where will you post this" — the platform-led mental model real video
+ * tools use (CapCut/Veed "resize for"). Maps a friendly platform choice to the
+ * project's render `resolution` and a CSS aspect-ratio for framing previews.
+ */
+export interface AspectPreset {
+  value: RenderResolution;
+  ratio: string; // "9:16"
+  label: string; // "Portrait"
+  platforms: string; // "TikTok · Reels · Shorts"
+  aspect: string; // CSS aspect-ratio, e.g. "9 / 16"
+}
+
+export const ASPECT_PRESETS: ReadonlyArray<AspectPreset> = [
+  {
+    value: RenderSettingsResolution.portrait,
+    ratio: "9:16",
+    label: "Portrait",
+    platforms: "TikTok · Reels · Shorts",
+    aspect: "9 / 16",
+  },
+  {
+    value: RenderSettingsResolution.landscape,
+    ratio: "16:9",
+    label: "Landscape",
+    platforms: "YouTube · Web",
+    aspect: "16 / 9",
+  },
+  {
+    value: RenderSettingsResolution.square,
+    ratio: "1:1",
+    label: "Square",
+    platforms: "Instagram · Feed",
+    aspect: "1 / 1",
+  },
+];
+
+/** CSS aspect-ratio for any resolution preset (4K variants share their base aspect). */
+export function aspectRatioFor(resolution: RenderResolution): string {
+  if (resolution.startsWith("landscape")) return "16 / 9";
+  if (resolution.startsWith("square")) return "1 / 1";
+  return "9 / 16";
+}
+
+/** The base (non-4K) aspect a resolution belongs to — used to highlight the selected pill. */
+export function baseAspect(resolution: RenderResolution): RenderResolution {
+  if (resolution.startsWith("landscape")) return RenderSettingsResolution.landscape;
+  if (resolution.startsWith("square")) return RenderSettingsResolution.square;
+  return RenderSettingsResolution.portrait;
+}
+
+/**
  * The 15 shader transition names (verified @hyperframes/core 0.6.6). A row in
  * the transition picker maps `shader` to one of these.
  */
