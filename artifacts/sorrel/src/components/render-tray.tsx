@@ -150,7 +150,7 @@ export function RenderTray() {
                 onClick={() => setLocation(`/projects?focus=${p.id}`)}
                 className="flex items-center gap-3 rounded-lg border bg-background p-2 text-left transition-colors hover:border-primary/40"
               >
-                <div className="relative h-[60px] w-[34px] shrink-0 overflow-hidden rounded-md border bg-[#0d1110]">
+                <div className="relative aspect-[9/16] h-16 shrink-0 overflow-hidden rounded-md border bg-[#0d1110]">
                   <CompositionThumb {...thumbProps(p, brand)} frame={0.62} />
                   {done && (
                     <div className="absolute inset-0 grid place-items-center bg-black/45 duration-300 animate-in fade-in">

@@ -424,8 +424,8 @@ export function CompositionPlayer({
           {!playing && (
             <span
               style={{
-                width: 56,
-                height: 56,
+                width: 72,
+                height: 72,
                 borderRadius: 99,
                 background: "rgba(0,0,0,.45)",
                 backdropFilter: "blur(6px)",
@@ -435,7 +435,7 @@ export function CompositionPlayer({
                 border: "1px solid rgba(255,255,255,.25)",
               }}
             >
-              <Play size={22} fill="currentColor" />
+              <Play size={28} fill="currentColor" />
             </span>
           )}
         </button>
@@ -445,12 +445,12 @@ export function CompositionPlayer({
             position: "absolute",
             top: 12,
             right: 12,
-            fontSize: 10.5,
+            fontSize: 12,
             fontWeight: 700,
             letterSpacing: ".08em",
-            color: "rgba(255,255,255,.7)",
-            background: "rgba(0,0,0,.4)",
-            padding: "3px 7px",
+            color: "rgba(255,255,255,.8)",
+            background: "rgba(0,0,0,.55)",
+            padding: "3px 8px",
             borderRadius: 6,
           }}
         >
@@ -459,15 +459,16 @@ export function CompositionPlayer({
       </div>
 
       {/* transport */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button
           onClick={() => setPlaying((p) => !p)}
           aria-label={playing ? "Pause" : "Play"}
           style={{
-            width: 34,
-            height: 34,
+            width: 40,
+            height: 40,
             borderRadius: 99,
             flexShrink: 0,
+            fontWeight: 600,
             border: "1px solid hsl(var(--border))",
             background: "hsl(var(--secondary))",
             color: "hsl(var(--foreground))",
@@ -476,11 +477,11 @@ export function CompositionPlayer({
             cursor: "pointer",
           }}
         >
-          {playing ? <Pause size={15} /> : <Play size={15} fill="currentColor" />}
+          {playing ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}
         </button>
         <span
           className="font-mono tabular-nums"
-          style={{ fontSize: 11.5, color: "hsl(var(--muted-foreground))", width: 30 }}
+          style={{ fontSize: 11.5, color: "hsl(var(--foreground))", width: 30 }}
         >
           {tc(t)}
         </span>
@@ -494,12 +495,12 @@ export function CompositionPlayer({
             setPlaying(false);
             setT(parseFloat(e.target.value));
           }}
-          style={{ flex: 1, accentColor: "hsl(var(--primary))", height: 4 }}
+          style={{ flex: 1, accentColor: "hsl(var(--primary))", height: 6 }}
           aria-label="Scrub preview"
         />
         <span
           className="font-mono tabular-nums"
-          style={{ fontSize: 11.5, color: "hsl(var(--muted-foreground))", width: 30 }}
+          style={{ fontSize: 11.5, color: "hsl(var(--foreground))", width: 30 }}
         >
           0:08
         </span>

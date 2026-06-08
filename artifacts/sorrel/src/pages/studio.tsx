@@ -7,7 +7,9 @@ import {
   useGetBrandKit,
   useStartProjectRender,
   useUpdateProjectRenderSettings,
+  getListProjectsQueryKey,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,6 +39,7 @@ export default function StudioPage() {
   const { data: billing } = useBillingInfo();
   const createProject = useCreateProject();
   const startRender = useStartProjectRender();
+  const queryClient = useQueryClient();
   const updateRenderSettings = useUpdateProjectRenderSettings();
   const aiSuggest = useAiSuggest();
 
@@ -131,6 +134,11 @@ export default function StudioPage() {
         data: renderSettings,
       });
       await startRender.mutateAsync({ id: project.id });
+      // Prime the shared project cache so the global RenderTray's poll wakes
+      // immediately (it only starts polling once it sees a rendering project).
+      await queryClient.invalidateQueries({
+        queryKey: getListProjectsQueryKey(),
+      });
       setLocation(`/projects?focus=${project.id}`);
     } catch (err) {
       const anyErr = err as {
@@ -376,7 +384,7 @@ export default function StudioPage() {
                     studio
                   </span>
                 </div>
-                <div className="mx-auto w-full max-w-[260px]">
+                <div className="mx-auto w-full max-w-[300px] md:max-w-[380px] lg:max-w-[420px]">
                   <CompositionPlayer
                     vars={{ headline, body: bodyText, cta: ctaText }}
                     brand={brandForComp}
