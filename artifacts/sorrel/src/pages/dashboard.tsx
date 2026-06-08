@@ -16,6 +16,7 @@ import {
   CompositionThumb,
   type CompositionLayout,
 } from "@/components/composition";
+import { HoverPlayVideo } from "@/components/hover-play-video";
 import {
   Film,
   Video,
@@ -109,13 +110,19 @@ function ProjectThumb({
   const layout = LAYOUTS[index % LAYOUTS.length];
   return (
     <Link href="/projects" className="group block">
-      <div className="relative aspect-[9/16] overflow-hidden rounded-xl border bg-[#0d1110] transition-colors group-hover:border-primary/40">
-        {showImg ? (
-          <img
-            src={project.thumbnailUrl ?? undefined}
-            alt={project.name}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
+      <div className="relative aspect-[9/16] overflow-hidden rounded-xl border bg-[#0d1110] transition-all duration-200 group-hover:-translate-y-1 group-hover:border-primary/40 group-hover:shadow-xl">
+        {project.status === "ready" ? (
+          <HoverPlayVideo videoSrc={`/api/projects/${project.id}/video`}>
+            {showImg ? (
+              <img
+                src={project.thumbnailUrl ?? undefined}
+                alt={project.name}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              <CompositionThumb {...props} layout={layout} />
+            )}
+          </HoverPlayVideo>
         ) : (
           <CompositionThumb {...props} layout={layout} />
         )}
@@ -129,7 +136,14 @@ function ProjectThumb({
             </div>
           </div>
         )}
-        <div className="absolute left-2 top-2">
+        {project.status === "ready" && (
+          <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/60 to-transparent pb-3 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg">
+              <Play className="h-4 w-4" fill="currentColor" />
+            </span>
+          </div>
+        )}
+        <div className="pointer-events-none absolute left-2 top-2">
           <StatusDot status={project.status} />
         </div>
       </div>
@@ -448,7 +462,7 @@ export default function Dashboard() {
                 <CardContent className="p-4">
                   <h2 className="mb-3 text-[15px]">Latest render</h2>
                   <div className="flex items-center gap-3">
-                    <div className="relative aspect-[9/16] w-[54px] shrink-0 overflow-hidden rounded-lg border bg-[#0d1110]">
+                    <div className="relative aspect-[9/16] w-[84px] shrink-0 overflow-hidden rounded-lg border bg-[#0d1110]">
                       {latestReady.thumbnailUrl ? (
                         <img
                           src={latestReady.thumbnailUrl}

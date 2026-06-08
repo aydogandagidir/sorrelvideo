@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompositionThumb } from "@/components/composition";
+import { HoverPlayVideo } from "@/components/hover-play-video";
 import {
   AlertCircle,
   Film,
@@ -192,13 +193,22 @@ function ProjectCard({
           highlight && "rounded-xl ring-2 ring-primary ring-offset-2 ring-offset-background",
         )}
       >
-        <div className="relative aspect-[9/16] overflow-hidden rounded-xl border bg-[#0d1110] transition-all group-hover/card:-translate-y-0.5 group-hover/card:border-primary/40 group-hover/card:shadow-lg">
-          {showImg ? (
-            <img
-              src={project.thumbnailUrl ?? undefined}
-              alt={project.name}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
+        <div className="relative aspect-[9/16] overflow-hidden rounded-xl border bg-[#0d1110] transition-all duration-200 group-hover/card:-translate-y-1 group-hover/card:border-primary/40 group-hover/card:shadow-xl">
+          {project.status === "ready" ? (
+            <HoverPlayVideo videoSrc={`/api/projects/${project.id}/video`}>
+              {showImg ? (
+                <img
+                  src={project.thumbnailUrl ?? undefined}
+                  alt={project.name}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <CompositionThumb
+                  {...thumbProps(project, brand)}
+                  layout={layouts[index % layouts.length]}
+                />
+              )}
+            </HoverPlayVideo>
           ) : (
             <CompositionThumb
               {...thumbProps(project, brand)}
@@ -223,18 +233,18 @@ function ProjectCard({
             </div>
           )}
           {project.status === "ready" && (
-            <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent pb-3.5 opacity-0 transition-opacity group-hover/card:opacity-100">
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground">
-                <Play className="h-4 w-4" fill="currentColor" />
+            <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent pb-4 opacity-0 transition-opacity group-hover/card:opacity-100">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg">
+                <Play className="h-5 w-5" fill="currentColor" />
               </span>
             </div>
           )}
 
-          <div className="absolute left-2 top-2">
+          <div className="pointer-events-none absolute left-2 top-2">
             <StatusDot status={project.status} />
           </div>
           {project.duration ? (
-            <div className="absolute right-2 top-2 rounded bg-black/45 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white/85">
+            <div className="pointer-events-none absolute right-2 top-2 rounded bg-black/45 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white/85">
               {project.duration}s
             </div>
           ) : null}
@@ -332,27 +342,29 @@ function ProjectDetail({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[820px] gap-0 overflow-hidden p-0">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-[1040px] gap-0 overflow-hidden p-0">
         <DialogTitle className="sr-only">{project.name}</DialogTitle>
-        <div className="grid md:grid-cols-[300px_1fr]">
-          {/* Preview */}
-          <div className="border-b bg-[#0d1110] p-5 md:border-b-0 md:border-r">
+        <div className="grid md:h-[80vh] md:grid-cols-[1fr_360px]">
+          {/* Cinematic stage: one large, height-driven player on a dark
+              pasteboard, letterboxed (object-contain) so the portrait video
+              glows — never a crop. */}
+          <div className="flex min-h-[55vh] items-center justify-center bg-[#0b0f0d] p-6 md:min-h-0 md:p-8">
             {isReady ? (
               <video
                 src={videoSrc}
                 controls
-                className="mx-auto aspect-[9/16] w-full max-w-[240px] rounded-[14px] border"
+                autoPlay
+                playsInline
+                className="aspect-[9/16] h-auto w-full max-w-[280px] rounded-[16px] border border-primary/15 object-contain shadow-[0_24px_70px_rgba(0,0,0,.6)] md:h-full md:max-h-[74vh] md:w-auto md:max-w-none"
               />
             ) : (
-              <div className="relative mx-auto aspect-[9/16] w-full max-w-[240px] overflow-hidden rounded-[14px] border">
+              <div className="relative aspect-[9/16] h-auto w-full max-w-[280px] overflow-hidden rounded-[16px] border border-primary/15 shadow-[0_24px_70px_rgba(0,0,0,.6)] md:h-full md:max-h-[74vh] md:w-auto">
                 <CompositionThumb {...thumbProps(project, brand)} chrome />
               </div>
             )}
           </div>
-          {/* Meta + actions */}
-          <div className="flex flex-col gap-4 p-6">
-            {/* The shadcn DialogContent renders its own close button (top-right);
-                pad the title so it clears it — no second X. */}
+          {/* Meta + actions (scrolls independently on short viewports) */}
+          <div className="flex flex-col gap-4 overflow-y-auto p-6 md:max-h-[80vh]">
             <div className="pr-8">
               <div className="mb-2">
                 <StatusDot status={project.status} />
@@ -662,7 +674,7 @@ export default function Projects() {
 
         {/* Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="aspect-[9/16] w-full rounded-xl" />
             ))}
@@ -670,7 +682,7 @@ export default function Projects() {
         ) : filtered.length ? (
           <div
             data-testid="projects-grid"
-            className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5"
+            className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5"
           >
             {filtered.map((p, i) => (
               <ProjectCard
