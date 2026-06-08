@@ -55,11 +55,15 @@ function listRoute(projects: unknown[]): ApiFetchRoute {
   return { url: "/api/projects", method: "GET", json: projects };
 }
 
-/** Open a project's detail modal by clicking its card (by project name). */
+/**
+ * Open a project's detail modal by clicking its card (by project name). Scoped
+ * to the grid so it never matches the global RenderTray (which also lists a
+ * rendering project by name).
+ */
 async function openDetail(name: string) {
   const user = userEvent.setup();
-  await waitFor(() => expect(screen.getByText(name)).toBeInTheDocument());
-  await user.click(screen.getByText(name));
+  const grid = await screen.findByTestId("projects-grid");
+  await user.click(within(grid).getByText(name));
   return screen.findByRole("dialog");
 }
 
@@ -164,10 +168,10 @@ describe("Projects — card → detail controls", () => {
     ]);
 
     renderWithProviders(<Projects />, { route: "/projects" });
-    // The card shows a "Rendering" status before we open anything.
-    await waitFor(() =>
-      expect(screen.getByText("Rendering One")).toBeInTheDocument(),
-    );
+    // The card shows a "Rendering" status before we open anything (scoped to the
+    // grid — the global RenderTray also lists the rendering project by name).
+    const grid = await screen.findByTestId("projects-grid");
+    expect(within(grid).getByText("Rendering One")).toBeInTheDocument();
     expect(screen.getAllByText(/rendering/i).length).toBeGreaterThan(0);
 
     const dialog = await openDetail("Rendering One");
