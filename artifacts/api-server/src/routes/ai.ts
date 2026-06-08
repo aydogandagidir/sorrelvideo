@@ -62,13 +62,27 @@ router.post(
 
       result = await provider.suggest(input);
     } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const status =
+        typeof (err as { status?: unknown }).status === "number"
+          ? (err as { status: number }).status
+          : undefined;
+      // Put the real cause in the message itself — structured `err` is attached
+      // too, but log drains often surface only the message line.
       req.log.error(
-        { err, provider: provider.name },
-        "AI suggest provider call failed",
+        { err, provider: provider.name, status },
+        `AI suggest provider call failed: ${detail}`,
       );
-      res
-        .status(502)
-        .json({ error: "AI provider could not generate a suggestion" });
+      // A missing/invalid provider key is an operator config problem, not a
+      // transient failure — return a distinct, actionable message + status so
+      // the UI shows a real reason instead of a generic "try again".
+      const notConfigured =
+        /API_KEY is not set|not configured/i.test(detail) || status === 401;
+      res.status(notConfigured ? 503 : 502).json({
+        error: notConfigured
+          ? "AI isn't configured on the server yet. An admin needs to set ANTHROPIC_API_KEY (or OPENAI_API_KEY)."
+          : "AI provider could not generate a suggestion",
+      });
       return;
     }
 
