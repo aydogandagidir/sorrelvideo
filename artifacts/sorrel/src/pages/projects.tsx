@@ -27,7 +27,6 @@ import {
   Clapperboard,
   Download,
   Share2,
-  X,
   RotateCcw,
   Search,
   PencilRuler,
@@ -352,26 +351,18 @@ function ProjectDetail({
           </div>
           {/* Meta + actions */}
           <div className="flex flex-col gap-4 p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="mb-2">
-                  <StatusDot status={project.status} />
-                </div>
-                <h2 className="text-[22px] font-semibold">{project.name}</h2>
-                <p className="mt-1 text-[12.5px] text-muted-foreground">
-                  Updated {new Date(project.updatedAt).toLocaleDateString()}
-                  {project.duration ? ` · ${project.duration}s` : ""} ·{" "}
-                  <span className="capitalize">{project.module}</span>
-                </p>
+            {/* The shadcn DialogContent renders its own close button (top-right);
+                pad the title so it clears it — no second X. */}
+            <div className="pr-8">
+              <div className="mb-2">
+                <StatusDot status={project.status} />
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="grid h-8 w-8 place-items-center rounded-lg border bg-secondary text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <h2 className="text-[22px] font-semibold">{project.name}</h2>
+              <p className="mt-1 text-[12.5px] text-muted-foreground">
+                Updated {new Date(project.updatedAt).toLocaleDateString()}
+                {project.duration ? ` · ${project.duration}s` : ""} ·{" "}
+                <span className="capitalize">{project.module}</span>
+              </p>
             </div>
 
             {(v["user.headline"] || v["user.bodyText"] || v["user.ctaText"]) && (
@@ -677,7 +668,10 @@ export default function Projects() {
             ))}
           </div>
         ) : filtered.length ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div
+            data-testid="projects-grid"
+            className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5"
+          >
             {filtered.map((p, i) => (
               <ProjectCard
                 key={p.id}

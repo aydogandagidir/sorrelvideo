@@ -46,7 +46,7 @@ function thumbProps(project: Project, brand?: BrandKit) {
  * in Projects.
  */
 export function RenderTray() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { data: projects } = useListProjects();
   const { data: brand } = useGetBrandKit();
@@ -100,8 +100,6 @@ export function RenderTray() {
     return true;
   });
 
-  // Redundant on the Projects page, which already lists every render in full.
-  if (location.startsWith("/projects")) return null;
   if (items.length === 0) return null;
 
   return (
