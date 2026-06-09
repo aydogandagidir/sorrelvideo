@@ -20,6 +20,8 @@ import { logger } from "../lib/logger";
 export interface LiveAvatarSessionToken {
   sessionToken: string;
   sessionId: string;
+  /** Whether the session was created in sandbox mode (no credit consumption). */
+  sandbox: boolean;
 }
 
 /** No LiveAvatar API key configured → the route maps this to 503. */
@@ -108,5 +110,9 @@ export async function mintSessionToken(
   };
   const sessionToken = data.data?.session_token;
   if (!sessionToken) throw new LiveAvatarError("Avatar session token missing");
-  return { sessionToken, sessionId: data.data?.session_id ?? "" };
+  return {
+    sessionToken,
+    sessionId: data.data?.session_id ?? "",
+    sandbox: isSandbox,
+  };
 }

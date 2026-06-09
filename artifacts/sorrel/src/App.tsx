@@ -1,4 +1,4 @@
-import { type ComponentType } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -23,7 +23,6 @@ import Modules from "./pages/modules";
 import Bulk from "./pages/bulk";
 import Analytics from "./pages/analytics";
 import Collab from "./pages/collab";
-import Avatar from "./pages/avatar";
 import Settings from "./pages/settings";
 import Terms from "./pages/terms";
 import Privacy from "./pages/privacy";
@@ -64,6 +63,26 @@ function ProtectedRoute({
   }
 
   return <Component />;
+}
+
+// Lazy-loaded: the LiveAvatar SDK (LiveKit/WebRTC) is ~440KB — keep it out of the
+// main bundle so it only loads when the user actually opens the avatar page.
+const Avatar = lazy(() => import("./pages/avatar"));
+
+function AvatarRoute() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="animate-pulse text-sm text-muted-foreground">
+            Loading…
+          </div>
+        </div>
+      }
+    >
+      <Avatar />
+    </Suspense>
+  );
 }
 
 function Router() {
@@ -110,7 +129,7 @@ function Router() {
         <ProtectedRoute component={Collab} />
       </Route>
       <Route path="/avatar">
-        <ProtectedRoute component={Avatar} />
+        <ProtectedRoute component={AvatarRoute} />
       </Route>
       <Route path="/settings">
         <ProtectedRoute component={Settings} />
