@@ -1017,6 +1017,25 @@ export const AiSuggestResponse = zod.object({
 
 
 /**
+ * @summary Generate word-timed captions from an uploaded audio object (Pro)
+ */
+
+
+
+export const GenerateCaptionsBody = zod.object({
+  "audioObjectPath": zod.string().min(1).describe('\/objects\/... path of the user\'s uploaded audio object.')
+})
+
+export const GenerateCaptionsResponse = zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+})
+
+
+/**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
 export const CreateCheckoutSessionBody = zod.object({

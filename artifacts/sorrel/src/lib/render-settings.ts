@@ -39,7 +39,8 @@ export type ProGatedField =
   | "transparent"
   | "watermark"
   | "transitions"
-  | "backgroundAudio";
+  | "backgroundAudio"
+  | "captions";
 
 interface Option<T> {
   value: T;
@@ -293,6 +294,9 @@ export function isProOnly(field: ProGatedField, value: unknown): boolean {
     case "backgroundAudio":
       // Any attached background audio track is a Pro feature.
       return value != null;
+    case "captions":
+      // Any captions are a Pro feature.
+      return value != null;
     default:
       return false;
   }
@@ -320,6 +324,8 @@ export function proViolations(settings: RenderSettings): string[] {
     violations.push("Multiple transitions");
   if (isProOnly("backgroundAudio", settings.backgroundAudio ?? null))
     violations.push("Background audio");
+  if (isProOnly("captions", settings.captions ?? null))
+    violations.push("Captions");
   return violations;
 }
 

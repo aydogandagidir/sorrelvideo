@@ -14,10 +14,11 @@
  * which tracks assertRenderSettingsAllowed). This is an eager UX gate only; the
  * PATCH endpoint remains authoritative.
  */
-import { useRef, type ChangeEvent } from "react";
-import { Plus, Trash2, Sparkles, Music } from "lucide-react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Plus, Trash2, Sparkles, Music, Captions } from "lucide-react";
 import { useUpload } from "@workspace/object-storage-web";
 import {
+  useGenerateCaptions,
   type RenderSettings,
   type RenderTransition,
 } from "@workspace/api-client-react";
@@ -155,6 +156,43 @@ export function RenderSettingsForm({
     if (!value.backgroundAudio) return;
     patch({ backgroundAudio: { ...value.backgroundAudio, volume: next } });
   }
+
+  // Auto-captions (Track E2): upload a voiceover → Whisper transcribes it to
+  // word-timed captions → store on settings.captions (the render burns them in).
+  const captionInputRef = useRef<HTMLInputElement>(null);
+  const [captionError, setCaptionError] = useState<string | null>(null);
+  const generateCaptions = useGenerateCaptions();
+  const { uploadFile: uploadCaptionAudio, isUploading: captionUploading } =
+    useUpload({
+      onSuccess: async (res) => {
+        setCaptionError(null);
+        try {
+          const result = await generateCaptions.mutateAsync({
+            data: { audioObjectPath: res.objectPath },
+          });
+          patch({ captions: { words: result.words } });
+        } catch (err) {
+          const e = err as { status?: number; data?: { error?: string } };
+          if (e.status === 403) onUpgrade?.();
+          else if (e.status === 503)
+            setCaptionError("Auto-captions aren't enabled on this server.");
+          else setCaptionError(e.data?.error ?? "Could not generate captions.");
+        }
+      },
+      onError: () => setCaptionError("Audio upload failed."),
+    });
+  function pickCaptionAudio() {
+    if (gate(isProOnly("captions", true))) return;
+    setCaptionError(null);
+    captionInputRef.current?.click();
+  }
+  async function onCaptionAudioFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (file) await uploadCaptionAudio(file);
+  }
+  const captionWordCount = value.captions?.words?.length ?? 0;
+  const captionBusy = captionUploading || generateCaptions.isPending;
 
   function addTransition() {
     const nextLen = transitions.length + 1;
@@ -438,6 +476,68 @@ export function RenderSettingsForm({
               )}
               <p className="text-xs text-muted-foreground">
                 MP3, WAV, or M4A — plays under your video.
+              </p>
+            </div>
+          )}
+        </fieldset>
+
+        {/* Captions (Pro) — auto-generated from a voiceover via Whisper */}
+        <fieldset
+          className="space-y-3 rounded-lg border p-4"
+          disabled={disabled}
+        >
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Captions className="h-4 w-4 text-primary" />
+              Captions
+              {isFree && <ProBadge />}
+            </Label>
+            {captionWordCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => patch({ captions: null })}
+                aria-label="Remove captions"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <input
+            ref={captionInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={onCaptionAudioFile}
+          />
+
+          {captionWordCount > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {captionWordCount} words captioned — revealed word by word, in sync.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={pickCaptionAudio}
+                disabled={disabled || captionBusy}
+              >
+                <Captions className="h-4 w-4" />
+                {captionUploading
+                  ? "Uploading…"
+                  : generateCaptions.isPending
+                    ? "Transcribing…"
+                    : "Auto-caption from audio"}
+              </Button>
+              {captionError && (
+                <p className="text-xs text-destructive">{captionError}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Upload a voiceover — we transcribe it to word-timed captions.
               </p>
             </div>
           )}

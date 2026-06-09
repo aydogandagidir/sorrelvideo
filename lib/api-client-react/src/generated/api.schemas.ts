@@ -610,6 +610,24 @@ export interface BillingInfo {
   stripeCustomerId?: string | null;
 }
 
+export interface GenerateCaptionsRequest {
+  /**
+     * /objects/... path of the user's uploaded audio object.
+     * @minLength 1
+     */
+  audioObjectPath: string;
+}
+
+export type GenerateCaptionsResultWordsItem = {
+  text: string;
+  start: number;
+  end: number;
+};
+
+export interface GenerateCaptionsResult {
+  words: GenerateCaptionsResultWordsItem[];
+}
+
 export interface AiSuggestRequest {
   /**
      * @minLength 3

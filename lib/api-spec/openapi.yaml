@@ -892,6 +892,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /captions/generate:
+    post:
+      operationId: generateCaptions
+      tags: [ai]
+      summary: Generate word-timed captions from an uploaded audio object (Pro)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateCaptionsRequest"
+      responses:
+        "200":
+          description: Captions generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateCaptionsResult"
+        "400":
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Pro plan required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "413":
+          description: Audio exceeds the transcription size limit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: Transcription failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Transcription is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /billing/checkout:
     post:
       operationId: createCheckoutSession
@@ -1887,6 +1942,31 @@ components:
           type: ["string", "null"]
         stripeCustomerId:
           type: ["string", "null"]
+
+    GenerateCaptionsRequest:
+      type: object
+      required: [audioObjectPath]
+      properties:
+        audioObjectPath:
+          type: string
+          minLength: 1
+          description: "/objects/... path of the user's uploaded audio object."
+    GenerateCaptionsResult:
+      type: object
+      required: [words]
+      properties:
+        words:
+          type: array
+          items:
+            type: object
+            required: [text, start, end]
+            properties:
+              text:
+                type: string
+              start:
+                type: number
+              end:
+                type: number
 
     AiSuggestRequest:
       type: object
