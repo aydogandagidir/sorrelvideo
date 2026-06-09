@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { applyBillingMigration } from "./lib/applyBillingMigration";
 import { applyRenderJobsMigration } from "./lib/applyRenderJobsMigration";
 import { applyBrandKitMigration } from "./lib/applyBrandKitMigration";
+import { applyAvatarSessionsMigration } from "./lib/applyAvatarSessionsMigration";
 import { closeRenderQueue, startRenderWorker } from "./lib/renderQueue";
 import { recoverStuckRenders } from "./lib/recoverStuckRenders";
 import {
@@ -64,6 +65,22 @@ async function initBrandKits(): Promise<void> {
   }
 }
 
+async function initAvatarSessions(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    logger.warn("DATABASE_URL not set — skipping avatar-sessions migration");
+    return;
+  }
+
+  try {
+    await applyAvatarSessionsMigration();
+  } catch (err) {
+    logger.warn(
+      { err },
+      "Avatar-sessions migration failed — avatar usage won't be logged",
+    );
+  }
+}
+
 async function initTemplates(): Promise<void> {
   if (!process.env.DATABASE_URL) {
     logger.warn("DATABASE_URL not set — skipping platform template seed");
@@ -95,6 +112,7 @@ if (Number.isNaN(port) || port <= 0) {
 await initBilling();
 await initRenderJobs();
 await initBrandKits();
+await initAvatarSessions();
 await initTemplates();
 
 // Boot the render worker before recovery so any jobs already persisted in Redis

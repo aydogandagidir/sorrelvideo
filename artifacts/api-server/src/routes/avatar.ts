@@ -10,6 +10,7 @@ import {
   LiveAvatarNotConfiguredError,
   LiveAvatarError,
 } from "../services/liveAvatarService";
+import { recordAvatarSession } from "../services/avatarSessionsService";
 
 const router: IRouter = Router();
 
@@ -66,6 +67,14 @@ router.post(
       const token = await mintSessionToken({
         pushToTalk: parsed.data.pushToTalk,
       });
+      // Best-effort usage log (Track F billing foundation) — never fail the mint.
+      void recordAvatarSession(
+        req.user.id,
+        token.sessionId,
+        token.sandbox,
+      ).catch((err) =>
+        req.log.warn({ err }, "Could not record avatar session usage"),
+      );
       req.log.info(
         { userId: req.user.id, sessionId: token.sessionId },
         "LiveAvatar session token minted",

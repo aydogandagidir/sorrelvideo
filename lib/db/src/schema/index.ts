@@ -5,3 +5,4 @@ export * from "./projects";
 export * from "./brand";
 export * from "./modules";
 export * from "./render";
+export * from "./avatar";

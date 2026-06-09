@@ -50,6 +50,41 @@ describe("resolveSettings", () => {
     const t = [{ time: 1, shader: "whip-pan", duration: 0.5, ease: "power2.inOut" }];
     expect(resolveSettings({ transitions: t }).transitions).toEqual(t);
   });
+
+  it("keeps a well-formed backgroundAudio (clamps volume); drops malformed", () => {
+    expect(
+      resolveSettings({
+        backgroundAudio: { objectPath: "/objects/uploads/a", volume: 250 },
+      }).backgroundAudio,
+    ).toEqual({ objectPath: "/objects/uploads/a", volume: 100 });
+    // A non-"/objects/" path is dropped (the route/render-time ACL is the real gate).
+    expect(
+      resolveSettings({
+        backgroundAudio: { objectPath: "http://evil/x", volume: 50 },
+      }).backgroundAudio,
+    ).toBeUndefined();
+    expect(resolveSettings({}).backgroundAudio).toBeUndefined();
+  });
+
+  it("keeps well-formed captions and drops malformed words", () => {
+    const out = resolveSettings({
+      captions: {
+        words: [
+          { text: "hello", start: 0, end: 1 },
+          { text: "", start: 1, end: 2 }, // empty text → dropped
+          { text: "bad", start: 2, end: 2 }, // end <= start → dropped
+          { text: "world", start: 2, end: 3 },
+        ],
+      },
+    });
+    expect(out.captions?.words).toEqual([
+      { text: "hello", start: 0, end: 1 },
+      { text: "world", start: 2, end: 3 },
+    ]);
+    // No valid words → no captions at all.
+    expect(resolveSettings({ captions: { words: [] } }).captions).toBeUndefined();
+    expect(resolveSettings({}).captions).toBeUndefined();
+  });
 });
 
 describe("assertRenderSettingsAllowed", () => {
@@ -76,6 +111,11 @@ describe("assertRenderSettingsAllowed", () => {
     ["non-mp4 format", { format: "mov" as const }],
     ["transparency", { transparent: true }],
     ["watermark removal", { watermark: false }],
+    [
+      "background audio",
+      { backgroundAudio: { objectPath: "/objects/uploads/x", volume: 50 } },
+    ],
+    ["captions", { captions: { words: [{ text: "hi", start: 0, end: 1 }] } }],
   ])("rejects %s for Free with upgrade_required", (_label, partial) => {
     const settings = resolveSettings({ ...partial });
     let thrown: unknown;
