@@ -22,6 +22,15 @@ import type { AiProvider } from "./types";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 
+// gpt-5-family models reject the legacy `max_tokens` on chat.completions and
+// require `max_completion_tokens`; the newer name is also accepted by gpt-4o
+// models, so we use it unconditionally. These caps include any hidden reasoning
+// tokens, so they're set generously (cost is billed by ACTUAL usage, not the
+// cap) — a tight cap can be fully consumed by reasoning and yield empty content.
+// `store: true` matches OpenAI's free-tier example (Responses/quickstart) and is
+// harmless on paid usage.
+const TOKENS = { suggest: 2048, extractBrand: 2048, videoIdeas: 4096 } as const;
+
 let client: OpenAI | null = null;
 function getClient(): OpenAI {
   if (!client) {
@@ -126,7 +135,8 @@ export const openaiProvider: AiProvider = {
 
     const response = await getClient().chat.completions.create({
       model,
-      max_tokens: input.maxTokens ?? 400,
+      max_completion_tokens: input.maxTokens ?? TOKENS.suggest,
+      store: true,
       messages: [
         { role: "system", content: system },
         { role: "user", content: userPrompt },
@@ -181,7 +191,8 @@ export const openaiProvider: AiProvider = {
 
     const response = await getClient().chat.completions.create({
       model,
-      max_tokens: input.maxTokens ?? 300,
+      max_completion_tokens: input.maxTokens ?? TOKENS.extractBrand,
+      store: true,
       messages: [
         { role: "system", content: BRAND_EXTRACT_SYSTEM },
         { role: "user", content: userContent },
@@ -223,7 +234,8 @@ export const openaiProvider: AiProvider = {
 
     const response = await getClient().chat.completions.create({
       model,
-      max_tokens: input.maxTokens ?? 1200,
+      max_completion_tokens: input.maxTokens ?? TOKENS.videoIdeas,
+      store: true,
       messages: [
         { role: "system", content: VIDEO_IDEAS_SYSTEM },
         { role: "user", content: buildVideoIdeasUserText(input) },

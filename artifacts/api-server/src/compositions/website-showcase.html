@@ -1,8 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html
+  lang="en"
+  data-aspect="{{layout.aspect}}"
+  style="--vw: {{layout.width}}; --vh: {{layout.height}}"
+>
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1920, height=1080" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Website Showcase</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=block"
@@ -17,8 +21,10 @@
       }
       html,
       body {
-        width: 1920px;
-        height: 1080px;
+        /* Authored per-render from the chosen aspect; default 1920×1080 keeps the
+           landscape showcase (what website→video pins) byte-identical. */
+        width: calc(var(--vw, 1920) * 1px);
+        height: calc(var(--vh, 1080) * 1px);
         overflow: hidden;
         background: #07070b;
         font-family: "Inter", sans-serif;
@@ -29,8 +35,8 @@
     <div
       id="website-showcase"
       data-composition-id="website-showcase"
-      data-width="1920"
-      data-height="1080"
+      data-width="{{layout.width}}"
+      data-height="{{layout.height}}"
       data-start="0"
       data-duration="{{duration}}"
     >
@@ -63,8 +69,8 @@
 
       <style>
         [data-composition-id="website-showcase"] .stage {
-          width: 1920px;
-          height: 1080px;
+          width: 100%;
+          height: 100%;
           position: relative;
           overflow: hidden;
           background:
@@ -78,7 +84,10 @@
 
         [data-composition-id="website-showcase"] .browser {
           position: absolute;
-          left: 310px;
+          /* Center horizontally for any canvas width. At 1920 this resolves to
+             310px (byte-identical to the authored landscape); narrower aspects
+             keep the browser centered instead of pinned off to one side. */
+          left: calc((100% - 1300px) / 2);
           top: 120px;
           width: 1300px;
           height: 800px;

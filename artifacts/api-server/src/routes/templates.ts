@@ -94,6 +94,12 @@ const PREVIEW_FALLBACKS: Record<string, string> = {
   "user.bodyText":
     "Sorrel turns a template, your brand kit, and a few sentences into branded video — ready to ship.",
   "user.ctaText": "Try it free",
+  // Canvas dims for the brand-neutral gallery preview (portrait default, matching
+  // studio-default's authored aspect) so {{layout.*}} placeholders resolve to a
+  // valid canvas instead of leaking into the CSS.
+  "layout.width": "1080",
+  "layout.height": "1920",
+  "layout.aspect": "portrait",
 };
 
 // Authenticated users can see platform templates (userId IS NULL) + their own
