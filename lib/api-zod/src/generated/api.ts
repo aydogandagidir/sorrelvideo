@@ -1036,6 +1036,19 @@ export const GenerateCaptionsResponse = zod.object({
 
 
 /**
+ * @summary Mint a short-lived LiveAvatar session token (Pro)
+ */
+export const CreateAvatarSessionTokenBody = zod.object({
+  "pushToTalk": zod.boolean().optional().describe('Use push-to-talk interactivity instead of open-mic.')
+})
+
+export const CreateAvatarSessionTokenResponse = zod.object({
+  "sessionToken": zod.string(),
+  "sessionId": zod.string()
+})
+
+
+/**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
 export const CreateCheckoutSessionBody = zod.object({
