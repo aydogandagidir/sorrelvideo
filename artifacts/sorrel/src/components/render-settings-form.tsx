@@ -14,7 +14,9 @@
  * which tracks assertRenderSettingsAllowed). This is an eager UX gate only; the
  * PATCH endpoint remains authoritative.
  */
-import { Plus, Trash2, Sparkles } from "lucide-react";
+import { useRef, type ChangeEvent } from "react";
+import { Plus, Trash2, Sparkles, Music } from "lucide-react";
+import { useUpload } from "@workspace/object-storage-web";
 import {
   type RenderSettings,
   type RenderTransition,
@@ -87,6 +89,19 @@ export function RenderSettingsForm({
   const transitions = value.transitions ?? [];
   const alphaSupported = formatSupportsAlpha(value.format);
 
+  // Background audio (Track C): the 2-phase presigned upload, then store the
+  // resulting objectPath on the settings; the render pipeline resolves + injects
+  // it as an <audio> the engine muxes.
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const {
+    uploadFile: uploadAudio,
+    isUploading: audioUploading,
+    error: audioError,
+  } = useUpload({
+    onSuccess: (res) =>
+      patch({ backgroundAudio: { objectPath: res.objectPath, volume: 50 } }),
+  });
+
   // A Free user clicking a locked option: nudge to upgrade rather than mutate.
   const gate = (locked: boolean): boolean => {
     if (locked && isFree) {
@@ -124,6 +139,21 @@ export function RenderSettingsForm({
     // watermark=false is the Pro action (removing it).
     if (gate(isProOnly("watermark", nextWatermark))) return;
     patch({ watermark: nextWatermark });
+  }
+
+  function pickAudio() {
+    // Background audio is a Pro feature in its entirety.
+    if (gate(isProOnly("backgroundAudio", true))) return;
+    audioInputRef.current?.click();
+  }
+  async function onAudioFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file after a remove
+    if (file) await uploadAudio(file);
+  }
+  function setAudioVolume(next: number) {
+    if (!value.backgroundAudio) return;
+    patch({ backgroundAudio: { ...value.backgroundAudio, volume: next } });
   }
 
   function addTransition() {
@@ -337,6 +367,81 @@ export function RenderSettingsForm({
             />
           </div>
         </div>
+
+        {/* Background audio (Pro) */}
+        <fieldset
+          className="space-y-3 rounded-lg border p-4"
+          disabled={disabled}
+        >
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Music className="h-4 w-4 text-primary" />
+              Background audio
+              {isFree && <ProBadge />}
+            </Label>
+            {value.backgroundAudio && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => patch({ backgroundAudio: null })}
+                aria-label="Remove background audio"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <input
+            ref={audioInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={onAudioFile}
+          />
+
+          {value.backgroundAudio ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Music track attached — looped and trimmed to your video length.
+              </p>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rs-audio-volume">Volume</Label>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {value.backgroundAudio.volume}%
+                </span>
+              </div>
+              <Slider
+                id="rs-audio-volume"
+                min={0}
+                max={100}
+                step={1}
+                value={[value.backgroundAudio.volume]}
+                onValueChange={([v]) => setAudioVolume(v)}
+                aria-label="Background audio volume"
+              />
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={pickAudio}
+                disabled={disabled || audioUploading}
+              >
+                <Plus className="h-4 w-4" />
+                {audioUploading ? "Uploading…" : "Upload music"}
+              </Button>
+              {audioError && (
+                <p className="text-xs text-destructive">{audioError.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                MP3, WAV, or M4A — plays under your video.
+              </p>
+            </div>
+          )}
+        </fieldset>
 
         {/* Transitions */}
         <fieldset className="space-y-3" disabled={disabled}>

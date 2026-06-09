@@ -77,6 +77,7 @@ const SAMPLE_VARS = {
   "user.headline": "Sorrel render check",
   "user.bodyText": "Placeholder substitution verified.",
   "user.ctaText": "Ship it",
+  duration: "9",
 };
 
 /** @param {string} html */
@@ -209,12 +210,31 @@ async function main() {
 
   fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
   const manifest = JSON.parse(fs.readFileSync(MANIFEST, "utf-8"));
+
+  // Hand-authored showcase templates (Track B) live alongside the vendored
+  // registry blocks but aren't in the manifest. They render through the exact
+  // same path, so just append them to the batch. Keep `slug`/`duration` in sync
+  // with HAND_AUTHORED_TEMPLATES in services/platformTemplatesService.ts.
+  const HAND_AUTHORED = [
+    { slug: "product-3d", duration: 7 },
+    { slug: "lottie-reveal", duration: 6 },
+    { slug: "video-spotlight", duration: 9 },
+  ];
+
+  // Optional CLI filter: `node scripts/generate-thumbnails.mjs <slug> [<slug>…]`
+  // regenerates only the named templates (e.g. after adding one) instead of the
+  // whole batch. No args → every template.
+  const only = process.argv.slice(2);
+  const templates = [...manifest, ...HAND_AUTHORED].filter(
+    (t) => only.length === 0 || only.includes(t.slug),
+  );
+
   const { createRenderJob, executeRenderJob } = await import(
     "@hyperframes/producer"
   );
 
   const results = [];
-  for (const t of manifest) {
+  for (const t of templates) {
     const compFile = path.join(COMPOSITIONS_DIR, `${t.slug}.html`);
     const dir = path.join(WORK, t.slug);
     fs.rmSync(dir, { recursive: true, force: true });

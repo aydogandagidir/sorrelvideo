@@ -7,7 +7,13 @@ import {
   RenderCancelledError,
 } from "@hyperframes/producer";
 import { eq } from "drizzle-orm";
-import { db, projectsTable, type RenderFormat } from "@workspace/db";
+import {
+  db,
+  projectsTable,
+  type RenderFormat,
+  type RenderAudioTrack,
+  type RenderCaptions,
+} from "@workspace/db";
 import { logger } from "../lib/logger";
 import { getBrandKit, getDefaultBrandKit } from "./brandKitService";
 import { resolveSettings, toEngineConfig } from "./renderSettingsService";
@@ -24,6 +30,8 @@ import {
 } from "./renderJobsService";
 import { generateThumbnail } from "./thumbnailService";
 import { REGISTRY_COMPOSITION_MAP } from "./registryTemplates";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { ObjectPermission } from "../lib/objectAcl";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +79,11 @@ const COMPOSITION_MAP: Record<string, string> = {
   // website→video: the captured screenshot is injected via compositionVars
   // (capture.image data URI + capture.height/title/url) by websiteToVideoService.
   "website-showcase": "website-showcase.html",
+  // Hand-authored showcase templates (M-features Track B): exercise the engine's
+  // Three.js/WebGL and Lottie adapters, which no template used before.
+  "product-3d": "product-3d.html",
+  "lottie-reveal": "lottie-reveal.html",
+  "video-spotlight": "video-spotlight.html",
   // Vendored Hyperframes registry blocks (Apache-2.0): each platform template's
   // `module` is its slug, resolving to the same-named <slug>.html composition.
   ...REGISTRY_COMPOSITION_MAP,
@@ -224,6 +237,153 @@ export function injectWatermark(html: string): string {
   return html.slice(0, idx) + WATERMARK_HTML + html.slice(idx);
 }
 
+/** Insert `snippet` immediately before the last `</body>` (mirrors injectWatermark). */
+function injectBeforeBodyEnd(html: string, snippet: string): string {
+  const idx = html.toLowerCase().lastIndexOf("</body>");
+  if (idx === -1) return html + snippet;
+  return html.slice(0, idx) + snippet + html.slice(idx);
+}
+
+/** Map an uploaded audio object's content-type to a file extension. */
+function audioExtForContentType(contentType: string | undefined): string {
+  switch ((contentType ?? "").toLowerCase()) {
+    case "audio/mpeg":
+    case "audio/mp3":
+      return "mp3";
+    case "audio/mp4":
+    case "audio/aac":
+      return "m4a";
+    case "audio/wav":
+    case "audio/x-wav":
+      return "wav";
+    case "audio/ogg":
+      return "ogg";
+    default:
+      return "mp3";
+  }
+}
+
+/**
+ * Resolve a project's background-audio track into an `<audio>` tag for the
+ * engine to mux. The user-uploaded object is DOWNLOADED into the render dir as a
+ * sibling file — the proven, ffmpeg-readable form (a `data:` URI is NOT muxed,
+ * verified against 0.6.6) — then referenced relatively so the engine's serve
+ * stage hosts it for the audio mix. Ownership is re-checked here (defense in
+ * depth); ANY failure (missing/!owned object, GCS unconfigured, download error)
+ * logs and returns null so the render proceeds SILENTLY instead of failing.
+ *
+ * `data-duration` matches the composition's declared duration (the first
+ * `data-duration` in the doc is the root composition's); the engine's
+ * `audioPadTrim` then pads/trims the mixed audio to the exact video length.
+ */
+async function resolveBackgroundAudioTag(
+  userId: string,
+  audio: RenderAudioTrack,
+  dir: string,
+  compositionHtml: string,
+): Promise<string | null> {
+  try {
+    const storage = new ObjectStorageService();
+    const file = await storage.getObjectEntityFile(audio.objectPath);
+    const canRead = await storage.canAccessObjectEntity({
+      userId,
+      objectFile: file,
+      requestedPermission: ObjectPermission.READ,
+    });
+    if (!canRead) {
+      logger.warn(
+        { userId, objectPath: audio.objectPath },
+        "Background audio not owned by user; rendering silent",
+      );
+      return null;
+    }
+    const [meta] = await file.getMetadata();
+    const filename = `bg-audio.${audioExtForContentType(
+      meta.contentType as string | undefined,
+    )}`;
+    await file.download({ destination: path.join(dir, filename) });
+    const volume = Math.max(0, Math.min(1, (audio.volume ?? 50) / 100)).toFixed(
+      3,
+    );
+    const compDuration =
+      compositionHtml.match(/data-duration="([\d.]+)"/)?.[1] ?? "30";
+    return `<audio src="${filename}" data-start="0" data-duration="${compDuration}" data-track-index="0" data-volume="${volume}" loop></audio>`;
+  } catch (err) {
+    logger.warn(
+      { err, userId, objectPath: audio.objectPath },
+      "Background audio unavailable; rendering silent",
+    );
+    return null;
+  }
+}
+
+/**
+ * Download a project's spotlight clip (the "/objects/..." path pinned in
+ * `compositionVars["capture.videoObject"]`) into the render dir as the fixed
+ * sibling `spotlight-video.mp4` the video-spotlight template references (the
+ * engine composites it — verified on 0.6.6). Ownership is re-checked; ANY
+ * failure logs and returns so the composition still renders its branded frame
+ * WITHOUT the clip rather than failing the render.
+ */
+async function downloadSpotlightVideo(
+  userId: string,
+  objectPath: string,
+  dir: string,
+): Promise<boolean> {
+  try {
+    const storage = new ObjectStorageService();
+    const file = await storage.getObjectEntityFile(objectPath);
+    const canRead = await storage.canAccessObjectEntity({
+      userId,
+      objectFile: file,
+      requestedPermission: ObjectPermission.READ,
+    });
+    if (!canRead) {
+      logger.warn(
+        { userId, objectPath },
+        "Spotlight video not owned by user; rendering without it",
+      );
+      return false;
+    }
+    await file.download({ destination: path.join(dir, "spotlight-video.mp4") });
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err, userId, objectPath },
+      "Spotlight video unavailable; rendering without it",
+    );
+    return false;
+  }
+}
+
+/**
+ * Build a caption overlay (Track E): absolutely-positioned word spans (only the
+ * active word is opacity 1) + a script that appends opacity tweens to the
+ * composition's ROOT timeline so words reveal in sync. The engine only seeks the
+ * root timeline (+ element-matched sub-timelines), so a standalone timeline would
+ * never play — appending to the root (which our script grabs by data-composition-id)
+ * is the verified approach. Word text is HTML-escaped; time windows are numbers.
+ * Returns "" when there are no words.
+ */
+function buildCaptionOverlay(
+  words: { text: string; start: number; end: number }[],
+): string {
+  if (words.length === 0) return "";
+  const spans = words
+    .map(
+      (w) =>
+        `<span class="__cap" style="position:absolute;left:0;right:0;text-align:center;opacity:0;">${escapeHtml(
+          w.text,
+        )}</span>`,
+    )
+    .join("");
+  const windows = JSON.stringify(words.map((w) => [w.start, w.end]));
+  return (
+    `<div data-sorrel-captions style="position:fixed;left:0;right:0;bottom:9%;z-index:2147483646;pointer-events:none;padding:0 6%;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-weight:800;font-size:5.2vh;line-height:1.15;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,0.85);">${spans}</div>` +
+    `<script>(function(){var C=document.querySelector('[data-sorrel-captions]');if(!C)return;var r=document.querySelector('[data-composition-id]');var id=r&&r.getAttribute('data-composition-id');var tl=(window.__timelines||{})[id];if(!tl||!tl.to)return;var W=${windows};var s=C.querySelectorAll('.__cap');for(var i=0;i<s.length&&i<W.length;i++){tl.to(s[i],{opacity:1,duration:0.08,ease:'none'},W[i][0]);tl.to(s[i],{opacity:0,duration:0.08,ease:'none'},W[i][1]);}})();</script>`
+  );
+}
+
 interface BrandKitSnapshot {
   companyName: string | null;
   primaryColor: string | null;
@@ -352,13 +512,59 @@ async function prepareCompositionFor(
     compositionHtml?: string | null;
     brandKitId?: number | null;
   },
-  options: { watermark: boolean } = { watermark: true },
+  options: {
+    watermark: boolean;
+    backgroundAudio?: RenderAudioTrack | null;
+    captions?: RenderCaptions | null;
+  } = {
+    watermark: true,
+  },
 ): Promise<{ dir: string; file: string }> {
   let rendered = await buildCompositionHtml(project);
   if (options.watermark) rendered = injectWatermark(rendered);
 
   const dir = path.join(RENDERS_DIR, String(project.id));
   fs.mkdirSync(dir, { recursive: true });
+
+  // Video spotlight (Track D): replace the HERO_VIDEO marker with a <video> ONLY
+  // when an uploaded clip is present + downloads OK. The engine HARD-FAILS if a
+  // <video> can't decode its first frame, so a clip-less project must carry no
+  // <video> at all — we strip the marker instead.
+  if (rendered.includes("<!--HERO_VIDEO-->")) {
+    const videoObject = project.compositionVars?.["capture.videoObject"];
+    let heroTag = "";
+    if (typeof videoObject === "string" && videoObject.startsWith("/objects/")) {
+      const ok = await downloadSpotlightVideo(project.userId, videoObject, dir);
+      if (ok) {
+        const compDuration =
+          rendered.match(/data-duration="([\d.]+)"/)?.[1] ?? "9";
+        heroTag = `<video class="hero-video" src="spotlight-video.mp4" muted playsinline data-start="0" data-duration="${compDuration}"></video>`;
+      }
+    }
+    rendered = rendered.replace("<!--HERO_VIDEO-->", heroTag);
+  }
+
+  // Background audio (Track C): download the uploaded object into `dir` as a
+  // sibling file and inject an <audio> the engine muxes. AFTER the template
+  // merge + watermark (so it's never substituted/escaped) and inside `dir` so
+  // the engine serves it for the ffmpeg mix. Best-effort → silent on failure.
+  if (options.backgroundAudio?.objectPath) {
+    const tag = await resolveBackgroundAudioTag(
+      project.userId,
+      options.backgroundAudio,
+      dir,
+      rendered,
+    );
+    if (tag) rendered = injectBeforeBodyEnd(rendered, tag);
+  }
+
+  // Captions (Track E): an overlay whose opacity tweens append to the root
+  // timeline. After the composition's own script (so the root timeline exists).
+  if (options.captions?.words?.length) {
+    const overlay = buildCaptionOverlay(options.captions.words);
+    if (overlay) rendered = injectBeforeBodyEnd(rendered, overlay);
+  }
+
   const file = "composition.html";
   fs.writeFileSync(path.join(dir, file), rendered, "utf-8");
   return { dir, file };
@@ -418,6 +624,8 @@ export async function executeRender(
     // Free — the monetization lever; removable on Pro).
     const { dir, file } = await prepareCompositionFor(project, {
       watermark: settings.watermark,
+      backgroundAudio: settings.backgroundAudio,
+      captions: settings.captions,
     });
 
     const format = settings.format;

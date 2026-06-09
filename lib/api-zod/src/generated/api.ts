@@ -245,6 +245,9 @@ export const UseTemplateParams = zod.object({
 /**
  * @summary List video projects
  */
+export const listProjectsResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
+export const listProjectsResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
+
 export const listProjectsResponseRenderProgressMin = 0;
 export const listProjectsResponseRenderProgressMax = 100;
 
@@ -275,7 +278,18 @@ export const ListProjectsResponseItem = zod.object({
   "shader": zod.string(),
   "duration": zod.number(),
   "ease": zod.string()
-})).optional()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(listProjectsResponseRenderSettingsOneBackgroundAudioVolumeMin).max(listProjectsResponseRenderSettingsOneBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+}).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(listProjectsResponseRenderProgressMin).max(listProjectsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -304,6 +318,9 @@ export const CreateProjectBody = zod.object({
 export const GetProjectParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const getProjectResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
+export const getProjectResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
 
 export const getProjectResponseRenderProgressMin = 0;
 export const getProjectResponseRenderProgressMax = 100;
@@ -335,7 +352,18 @@ export const GetProjectResponse = zod.object({
   "shader": zod.string(),
   "duration": zod.number(),
   "ease": zod.string()
-})).optional()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(getProjectResponseRenderSettingsOneBackgroundAudioVolumeMin).max(getProjectResponseRenderSettingsOneBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+}).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(getProjectResponseRenderProgressMin).max(getProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -356,6 +384,9 @@ export const UpdateProjectBody = zod.object({
   "description": zod.string().optional(),
   "compositionVars": zod.record(zod.string(), zod.string()).optional()
 })
+
+export const updateProjectResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
+export const updateProjectResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
 
 export const updateProjectResponseRenderProgressMin = 0;
 export const updateProjectResponseRenderProgressMax = 100;
@@ -387,7 +418,18 @@ export const UpdateProjectResponse = zod.object({
   "shader": zod.string(),
   "duration": zod.number(),
   "ease": zod.string()
-})).optional()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(updateProjectResponseRenderSettingsOneBackgroundAudioVolumeMin).max(updateProjectResponseRenderSettingsOneBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+}).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(updateProjectResponseRenderProgressMin).max(updateProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -419,6 +461,9 @@ export const CancelProjectRenderParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const cancelProjectRenderResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
+export const cancelProjectRenderResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
+
 export const cancelProjectRenderResponseRenderProgressMin = 0;
 export const cancelProjectRenderResponseRenderProgressMax = 100;
 
@@ -449,7 +494,18 @@ export const CancelProjectRenderResponse = zod.object({
   "shader": zod.string(),
   "duration": zod.number(),
   "ease": zod.string()
-})).optional()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(cancelProjectRenderResponseRenderSettingsOneBackgroundAudioVolumeMin).max(cancelProjectRenderResponseRenderSettingsOneBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+}).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(cancelProjectRenderResponseRenderProgressMin).max(cancelProjectRenderResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -491,6 +547,11 @@ export const UpdateProjectRenderSettingsParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateProjectRenderSettingsBodyBackgroundAudioVolumeMin = 0;
+export const updateProjectRenderSettingsBodyBackgroundAudioVolumeMax = 100;
+
+
+
 export const UpdateProjectRenderSettingsBody = zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]).optional(),
   "quality": zod.enum(['draft', 'standard', 'high']).optional(),
@@ -503,8 +564,22 @@ export const UpdateProjectRenderSettingsBody = zod.object({
   "shader": zod.string(),
   "duration": zod.number(),
   "ease": zod.string()
-})).optional()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(updateProjectRenderSettingsBodyBackgroundAudioVolumeMin).max(updateProjectRenderSettingsBodyBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+}).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }).describe('Partial render settings; omitted fields keep their current value.')
+
+export const updateProjectRenderSettingsResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
+export const updateProjectRenderSettingsResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
 
 export const updateProjectRenderSettingsResponseRenderProgressMin = 0;
 export const updateProjectRenderSettingsResponseRenderProgressMax = 100;
@@ -536,7 +611,18 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
   "shader": zod.string(),
   "duration": zod.number(),
   "ease": zod.string()
-})).optional()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(updateProjectRenderSettingsResponseRenderSettingsOneBackgroundAudioVolumeMin).max(updateProjectRenderSettingsResponseRenderSettingsOneBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+}).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(updateProjectRenderSettingsResponseRenderProgressMin).max(updateProjectRenderSettingsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -1038,6 +1124,9 @@ export const GetStorageObjectParams = zod.object({
 /**
  * @summary Get platform usage statistics
  */
+export const getStatsResponseRecentProjectsItemRenderSettingsOneBackgroundAudioVolumeMin = 0;
+export const getStatsResponseRecentProjectsItemRenderSettingsOneBackgroundAudioVolumeMax = 100;
+
 export const getStatsResponseRecentProjectsItemRenderProgressMin = 0;
 export const getStatsResponseRecentProjectsItemRenderProgressMax = 100;
 
@@ -1073,7 +1162,18 @@ export const GetStatsResponse = zod.object({
   "shader": zod.string(),
   "duration": zod.number(),
   "ease": zod.string()
-})).optional()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(getStatsResponseRecentProjectsItemRenderSettingsOneBackgroundAudioVolumeMin).max(getStatsResponseRecentProjectsItemRenderSettingsOneBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+}))
+}).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(getStatsResponseRecentProjectsItemRenderProgressMin).max(getStatsResponseRecentProjectsItemRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),

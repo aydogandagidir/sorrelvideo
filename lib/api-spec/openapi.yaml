@@ -1545,6 +1545,35 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RenderTransition"
+        backgroundAudio:
+          type: [object, "null"]
+          description: Optional background audio track (Pro). null → silent output.
+          required: [objectPath, volume]
+          properties:
+            objectPath:
+              type: string
+              description: "/objects/... path of the user's uploaded audio object."
+            volume:
+              type: integer
+              minimum: 0
+              maximum: 100
+        captions:
+          type: [object, "null"]
+          description: Optional word-timed captions (Pro). null → none.
+          required: [words]
+          properties:
+            words:
+              type: array
+              items:
+                type: object
+                required: [text, start, end]
+                properties:
+                  text:
+                    type: string
+                  start:
+                    type: number
+                  end:
+                    type: number
 
     RenderSettingsInput:
       type: object
@@ -1570,6 +1599,35 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RenderTransition"
+        backgroundAudio:
+          type: [object, "null"]
+          description: Optional background audio track (Pro). null → silent output.
+          required: [objectPath, volume]
+          properties:
+            objectPath:
+              type: string
+              description: "/objects/... path of the user's uploaded audio object."
+            volume:
+              type: integer
+              minimum: 0
+              maximum: 100
+        captions:
+          type: [object, "null"]
+          description: Optional word-timed captions (Pro). null → none.
+          required: [words]
+          properties:
+            words:
+              type: array
+              items:
+                type: object
+                required: [text, start, end]
+                properties:
+                  text:
+                    type: string
+                  start:
+                    type: number
+                  end:
+                    type: number
 
     LintMessage:
       type: object

@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useState, useRef, type FormEvent, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
-import { Loader2, Sparkles, Rocket } from "lucide-react";
+import { Loader2, Sparkles, Rocket, Film, Trash2 } from "lucide-react";
+import { useUpload } from "@workspace/object-storage-web";
 import {
   useAiSuggest,
   useCreateProject,
@@ -70,6 +71,37 @@ export default function StudioPage() {
   >("ai_limit");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Optional spotlight clip (Track D): when attached, the project is created
+  // from the video-spotlight template with the clip pinned as
+  // compositionVars["capture.videoObject"]; the render path composites it.
+  const [spotlightClip, setSpotlightClip] = useState<{
+    objectPath: string;
+    name: string;
+  } | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const {
+    uploadFile: uploadClip,
+    isUploading: clipUploading,
+    error: clipError,
+  } = useUpload({
+    onSuccess: (res) =>
+      setSpotlightClip({ objectPath: res.objectPath, name: res.metadata.name }),
+  });
+  function pickClip() {
+    // Video spotlight is a Pro (premium template) feature.
+    if (plan !== "pro") {
+      setUpgradeReason("premium_template");
+      setShowUpgrade(true);
+      return;
+    }
+    videoInputRef.current?.click();
+  }
+  async function onClipFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (file) await uploadClip(file);
+  }
+
   const compositionVars: Record<string, string> = {
     "user.headline": headline,
     "user.bodyText": bodyText,
@@ -132,14 +164,24 @@ export default function StudioPage() {
       setShowUpgrade(true);
       return;
     }
+    if (spotlightClip && plan !== "pro") {
+      setUpgradeReason("premium_template");
+      setShowUpgrade(true);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const project = await createProject.mutateAsync({
         data: {
           name: name.trim() || "Untitled Studio Project",
-          module: "studio",
-          compositionVars,
+          module: spotlightClip ? "video-spotlight" : "studio",
+          compositionVars: spotlightClip
+            ? {
+                ...compositionVars,
+                "capture.videoObject": spotlightClip.objectPath,
+              }
+            : compositionVars,
         },
       });
       await updateRenderSettings.mutateAsync({
@@ -332,6 +374,72 @@ export default function StudioPage() {
                       maxLength={48}
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Spotlight clip (optional, Pro — Track D) */}
+              <Card>
+                <CardContent className="flex flex-col gap-3 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Film className="h-4 w-4 text-primary" />
+                      <h2 className="text-[15px]">Spotlight clip</h2>
+                      {plan !== "pro" && (
+                        <span className="rounded border px-1.5 py-0 text-[10px] font-semibold text-muted-foreground">
+                          Pro
+                        </span>
+                      )}
+                    </div>
+                    {spotlightClip && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSpotlightClip(null)}
+                        aria-label="Remove clip"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/mp4,video/quicktime,video/webm"
+                    className="hidden"
+                    onChange={onClipFile}
+                  />
+                  {spotlightClip ? (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        {spotlightClip.name}
+                      </span>{" "}
+                      — rendered as the hero behind your headline. Uses the Video
+                      Spotlight template.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={pickClip}
+                        disabled={isSubmitting || clipUploading}
+                      >
+                        <Film className="h-4 w-4" />
+                        {clipUploading ? "Uploading…" : "Upload a clip"}
+                      </Button>
+                      {clipError && (
+                        <p className="text-xs text-destructive">
+                          {clipError.message}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Optional. MP4/MOV/WebM — your footage becomes the hero,
+                        framed with your brand.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

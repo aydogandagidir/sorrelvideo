@@ -192,6 +192,32 @@ export interface RenderTransition {
   ease: string;
 }
 
+/**
+ * Optional background audio track (Pro). null → silent output.
+ * @nullable
+ */
+export type RenderSettingsBackgroundAudio = {
+  /** /objects/... path of the user's uploaded audio object. */
+  objectPath: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  volume: number;
+} | null | null;
+
+/**
+ * Optional word-timed captions (Pro). null → none.
+ * @nullable
+ */
+export type RenderSettingsCaptions = {
+  words: {
+  text: string;
+  start: number;
+  end: number;
+}[];
+} | null;
+
 export interface RenderSettings {
   fps: RenderSettingsFps;
   quality: RenderSettingsQuality;
@@ -200,6 +226,16 @@ export interface RenderSettings {
   transparent: boolean;
   watermark: boolean;
   transitions?: RenderTransition[];
+  /**
+     * Optional background audio track (Pro). null → silent output.
+     * @nullable
+     */
+  backgroundAudio?: RenderSettingsBackgroundAudio;
+  /**
+     * Optional word-timed captions (Pro). null → none.
+     * @nullable
+     */
+  captions?: RenderSettingsCaptions;
 }
 
 export interface Project {
@@ -305,6 +341,32 @@ export const RenderSettingsInputResolution = {
 } as const;
 
 /**
+ * Optional background audio track (Pro). null → silent output.
+ * @nullable
+ */
+export type RenderSettingsInputBackgroundAudio = {
+  /** /objects/... path of the user's uploaded audio object. */
+  objectPath: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  volume: number;
+} | null | null;
+
+/**
+ * Optional word-timed captions (Pro). null → none.
+ * @nullable
+ */
+export type RenderSettingsInputCaptions = {
+  words: {
+  text: string;
+  start: number;
+  end: number;
+}[];
+} | null;
+
+/**
  * Partial render settings; omitted fields keep their current value.
  */
 export interface RenderSettingsInput {
@@ -315,6 +377,16 @@ export interface RenderSettingsInput {
   transparent?: boolean;
   watermark?: boolean;
   transitions?: RenderTransition[];
+  /**
+     * Optional background audio track (Pro). null → silent output.
+     * @nullable
+     */
+  backgroundAudio?: RenderSettingsInputBackgroundAudio;
+  /**
+     * Optional word-timed captions (Pro). null → none.
+     * @nullable
+     */
+  captions?: RenderSettingsInputCaptions;
 }
 
 export type LintMessageSeverity = typeof LintMessageSeverity[keyof typeof LintMessageSeverity];

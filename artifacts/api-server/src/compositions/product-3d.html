@@ -1,0 +1,246 @@
+<!--
+  product-3d — hand-authored Sorrel composition (Track B, M-features).
+  A self-contained Three.js/WebGL 3D scene: a brand-coloured faceted gem orbits
+  under soft studio lighting while a headline/company name reveal animates in.
+
+  Determinism: all motion is driven from a single PAUSED GSAP timeline registered
+  on window.__timelines. The Three.js scene is re-rendered on the timeline's
+  onUpdate (NOT requestAnimationFrame / wall-clock time), so the Hyperframes
+  BeginFrame engine gets byte-identical frames for a given seek.
+
+  Brand-aware: {{brand.primaryColor}} / {{brand.accentColor}} / {{brand.companyName}}
+  / {{user.headline}} are substituted by renderService.renderCompositionTemplate.
+  Three.js (r128) loads from CDN, exactly like the GSAP/D3 the other compositions use.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Product 3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=block"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #07070b;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="product-3d"
+      data-composition-id="product-3d"
+      data-width="1080"
+      data-height="1920"
+      data-start="0"
+      data-duration="7"
+    >
+      <div class="stage">
+        <canvas id="gl"></canvas>
+        <div class="vignette"></div>
+        <div class="copy">
+          <div class="eyebrow">{{brand.companyName}}</div>
+          <h1 class="headline">{{user.headline}}</h1>
+          <div class="cta">{{user.ctaText}}</div>
+        </div>
+      </div>
+
+      <style>
+        [data-composition-id="product-3d"] .stage {
+          position: relative;
+          width: 1080px;
+          height: 1920px;
+          background: radial-gradient(
+            120% 90% at 50% 32%,
+            #15151f 0%,
+            #07070b 62%
+          );
+          font-family: "Inter", sans-serif;
+          overflow: hidden;
+        }
+        [data-composition-id="product-3d"] #gl {
+          position: absolute;
+          inset: 0;
+          width: 1080px;
+          height: 1920px;
+          display: block;
+        }
+        [data-composition-id="product-3d"] .vignette {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+            70% 50% at 50% 38%,
+            rgba(0, 0, 0, 0) 40%,
+            rgba(0, 0, 0, 0.55) 100%
+          );
+          z-index: 2;
+        }
+        [data-composition-id="product-3d"] .copy {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 220px;
+          z-index: 3;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          padding: 0 90px;
+        }
+        [data-composition-id="product-3d"] .eyebrow {
+          font-size: 26px;
+          font-weight: 600;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          color: {{brand.accentColor}};
+          opacity: 0;
+          margin-bottom: 26px;
+        }
+        [data-composition-id="product-3d"] .headline {
+          font-family: "Space Grotesk", sans-serif;
+          font-size: 84px;
+          line-height: 1.02;
+          font-weight: 700;
+          color: #fff;
+          opacity: 0;
+          max-width: 900px;
+        }
+        [data-composition-id="product-3d"] .cta {
+          margin-top: 40px;
+          font-size: 30px;
+          font-weight: 600;
+          color: #0a0a0f;
+          background: {{brand.primaryColor}};
+          padding: 18px 40px;
+          border-radius: 9999px;
+          opacity: 0;
+        }
+      </style>
+
+      <script>
+        (function () {
+          const root = document.querySelector('[data-composition-id="product-3d"]');
+          const canvas = root.querySelector("#gl");
+          const W = 1080;
+          const H = 1920;
+
+          // --- Three.js scene (no animation loop — rendered on GSAP seek) ---
+          const renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            alpha: false,
+            preserveDrawingBuffer: true,
+          });
+          renderer.setPixelRatio(1);
+          renderer.setSize(W, H, false);
+          renderer.setClearColor(0x000000, 0);
+
+          const scene = new THREE.Scene();
+          const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
+          camera.position.set(0, 0, 6.2);
+
+          const brandColor = new THREE.Color("{{brand.primaryColor}}");
+          const accentColor = new THREE.Color("{{brand.accentColor}}");
+
+          // Faceted "gem": a low-poly icosahedron with a flat-shaded brand material
+          // plus a subtle wireframe overlay so the facets read clearly on video.
+          const geo = new THREE.IcosahedronGeometry(1.55, 1);
+          const mat = new THREE.MeshStandardMaterial({
+            color: brandColor,
+            metalness: 0.35,
+            roughness: 0.28,
+            flatShading: true,
+          });
+          const gem = new THREE.Mesh(geo, mat);
+          scene.add(gem);
+
+          const wire = new THREE.LineSegments(
+            new THREE.WireframeGeometry(geo),
+            new THREE.LineBasicMaterial({
+              color: 0xffffff,
+              transparent: true,
+              opacity: 0.12,
+            }),
+          );
+          gem.add(wire);
+
+          // Lighting: a warm key, a brand-accent rim, and soft ambient fill.
+          const key = new THREE.DirectionalLight(0xffffff, 1.5);
+          key.position.set(4, 6, 5);
+          scene.add(key);
+          const rim = new THREE.DirectionalLight(accentColor.getHex(), 2.2);
+          rim.position.set(-5, -2, 2);
+          scene.add(rim);
+          scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+          function draw() {
+            renderer.render(scene, camera);
+          }
+
+          // --- Single paused GSAP timeline drives everything ---
+          const state = { spin: 0, lift: 0 };
+          const tl = gsap.timeline({ paused: true });
+
+          // Continuous orbit + a gentle settling lift over the whole clip.
+          tl.to(state, { spin: 1, duration: 7, ease: "none" }, 0);
+          tl.fromTo(
+            state,
+            { lift: -0.6 },
+            { lift: 0, duration: 2.2, ease: "power3.out" },
+            0,
+          );
+          // Re-render the WebGL scene on every seek/update so capture is exact.
+          tl.eventCallback("onUpdate", function () {
+            gem.rotation.y = state.spin * Math.PI * 3;
+            gem.rotation.x = Math.sin(state.spin * Math.PI * 2) * 0.25;
+            gem.position.y = state.lift;
+            draw();
+          });
+
+          // Copy reveal, sequenced over the orbit.
+          tl.fromTo(
+            root.querySelector(".eyebrow"),
+            { opacity: 0, y: 24 },
+            { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+            2.4,
+          );
+          tl.fromTo(
+            root.querySelector(".headline"),
+            { opacity: 0, y: 34 },
+            { opacity: 1, y: 0, duration: 1.0, ease: "power3.out" },
+            2.8,
+          );
+          tl.fromTo(
+            root.querySelector(".cta"),
+            { opacity: 0, y: 22, scale: 0.94 },
+            { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "back.out(1.7)" },
+            3.6,
+          );
+
+          // Initial paint so frame 0 isn't blank before the engine seeks.
+          draw();
+
+          window.__timelines = window.__timelines || {};
+          window.__timelines["product-3d"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>

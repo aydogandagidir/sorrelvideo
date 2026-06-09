@@ -13,6 +13,7 @@ import {
   Users,
   Globe,
   Film,
+  Clapperboard,
   Search,
   Bell,
   ChevronRight,
@@ -41,11 +42,22 @@ interface NavEntry {
   icon: LucideIcon;
   kbd?: string;
   soon?: boolean;
+  /**
+   * The target lives OUTSIDE the SPA (e.g. the same-origin `/editor/` mount,
+   * a separately-built @hyperframes/studio app served by express.static). Such
+   * entries render a plain `<a>` for a real browser navigation instead of a
+   * wouter client-side route — a `<Link>` would try to client-route and hit the
+   * SPA's NotFound.
+   */
+  external?: boolean;
 }
 
 const NAV: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/studio", label: "Studio", icon: Wand2, kbd: "S" },
+  // The full timeline editor (@hyperframes/studio) is a separate same-origin
+  // build mounted at /editor/ — open it with a real navigation, not a route.
+  { href: "/editor/", label: "Editor", icon: Clapperboard, external: true },
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/templates", label: "Templates", icon: Film },
   { href: "/brand", label: "Brand DNA", icon: Palette },
@@ -106,17 +118,14 @@ function NavItem({
   active: boolean;
   onNavigate?: () => void;
 }) {
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      className={cn(
-        "relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors",
-        active
-          ? "bg-primary/[0.13] font-semibold text-primary"
-          : "font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
-      )}
-    >
+  const className = cn(
+    "relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors",
+    active
+      ? "bg-primary/[0.13] font-semibold text-primary"
+      : "font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
+  );
+  const inner = (
+    <>
       {active && (
         <span className="absolute -left-3 top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-full bg-primary" />
       )}
@@ -131,6 +140,20 @@ function NavItem({
           {item.kbd}
         </span>
       ) : null}
+    </>
+  );
+  // External entries (e.g. the /editor/ mount) leave the SPA — use a real anchor
+  // so the browser navigates instead of wouter client-routing into NotFound.
+  if (item.external) {
+    return (
+      <a href={item.href} onClick={onNavigate} className={className}>
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link href={item.href} onClick={onNavigate} className={className}>
+      {inner}
     </Link>
   );
 }
@@ -317,9 +340,14 @@ function CommandPalette({
   onOpenChange: (o: boolean) => void;
 }) {
   const [, setLocation] = useLocation();
-  const go = (href: string) => {
+  const go = (item: NavEntry) => {
     onOpenChange(false);
-    setLocation(href);
+    // External entries (/editor/) need a real navigation, not a client route.
+    if (item.external) {
+      window.location.href = item.href;
+    } else {
+      setLocation(item.href);
+    }
   };
   const all = [...NAV, ...MODULES];
   return (
@@ -332,7 +360,7 @@ function CommandPalette({
             <CommandItem
               key={item.href}
               value={item.label}
-              onSelect={() => go(item.href)}
+              onSelect={() => go(item)}
             >
               <item.icon className="mr-2 h-4 w-4" />
               {item.label}

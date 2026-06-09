@@ -38,7 +38,8 @@ export type ProGatedField =
   | "resolution"
   | "transparent"
   | "watermark"
-  | "transitions";
+  | "transitions"
+  | "backgroundAudio";
 
 interface Option<T> {
   value: T;
@@ -289,6 +290,9 @@ export function isProOnly(field: ProGatedField, value: unknown): boolean {
       return value === false;
     case "transitions":
       return (typeof value === "number" ? value : 0) > FREE_MAX_TRANSITIONS;
+    case "backgroundAudio":
+      // Any attached background audio track is a Pro feature.
+      return value != null;
     default:
       return false;
   }
@@ -314,6 +318,8 @@ export function proViolations(settings: RenderSettings): string[] {
     violations.push("Watermark removal");
   if (isProOnly("transitions", settings.transitions?.length ?? 0))
     violations.push("Multiple transitions");
+  if (isProOnly("backgroundAudio", settings.backgroundAudio ?? null))
+    violations.push("Background audio");
   return violations;
 }
 
