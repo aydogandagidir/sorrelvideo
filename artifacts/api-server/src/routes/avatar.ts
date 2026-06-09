@@ -7,10 +7,14 @@ import { aiSuggestLimiter } from "../middlewares/rateLimit";
 import {
   mintSessionToken,
   isLiveAvatarConfigured,
+  isLiveAvatarSandbox,
   LiveAvatarNotConfiguredError,
   LiveAvatarError,
 } from "../services/liveAvatarService";
-import { recordAvatarSession } from "../services/avatarSessionsService";
+import {
+  recordAvatarSession,
+  getAvatarSessionUsage,
+} from "../services/avatarSessionsService";
 
 const router: IRouter = Router();
 
@@ -61,6 +65,20 @@ router.post(
         reason: "upgrade_required",
       });
       return;
+    }
+
+    // Cost-control cap (LIVE only — sandbox sessions consume no credits). Pro
+    // includes a monthly avatar-session allotment; beyond it, 403 avatar_limit
+    // until the month resets. (Per-minute metering/charging is a follow-up.)
+    if (!isLiveAvatarSandbox()) {
+      const usage = await getAvatarSessionUsage(req.user.id);
+      if (usage.used >= usage.limit) {
+        res.status(403).json({
+          error: "You've reached your monthly avatar session limit",
+          reason: "avatar_limit",
+        });
+        return;
+      }
     }
 
     try {

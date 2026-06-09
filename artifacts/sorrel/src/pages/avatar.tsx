@@ -44,8 +44,19 @@ export default function AvatarPage() {
       });
       await session.start();
     } catch (err) {
-      const e = err as { status?: number; data?: { error?: string } };
+      const e = err as {
+        status?: number;
+        data?: { error?: string; reason?: string };
+      };
       sessionRef.current = null;
+      if (e.data?.reason === "avatar_limit") {
+        setError(
+          e.data?.error ??
+            "You've reached your monthly avatar session limit — it resets next month.",
+        );
+        setStatus("error");
+        return;
+      }
       if (e.status === 403) {
         setShowUpgrade(true);
         setStatus("idle");
