@@ -24,6 +24,8 @@ import type {
   AiSuggestResult,
   AnalyticsOverview,
   AuthUserEnvelope,
+  AvatarSessionTokenRequest,
+  AvatarSessionTokenResult,
   BeginBrowserLoginParams,
   BillingInfo,
   BrandKit,
@@ -2968,6 +2970,77 @@ export const useGenerateCaptions = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getGenerateCaptionsMutationOptions(options));
+    }
+
+export const getCreateAvatarSessionTokenUrl = () => {
+
+
+
+
+  return `/api/avatar/session-token`
+}
+
+/**
+ * @summary Mint a short-lived LiveAvatar session token (Pro)
+ */
+export const createAvatarSessionToken = async (avatarSessionTokenRequest?: AvatarSessionTokenRequest, options?: RequestInit): Promise<AvatarSessionTokenResult> => {
+
+  return customFetch<AvatarSessionTokenResult>(getCreateAvatarSessionTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      avatarSessionTokenRequest,)
+  }
+);}
+
+
+
+
+export const getCreateAvatarSessionTokenMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAvatarSessionToken>>, TError,{data?: BodyType<AvatarSessionTokenRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAvatarSessionToken>>, TError,{data?: BodyType<AvatarSessionTokenRequest>}, TContext> => {
+
+const mutationKey = ['createAvatarSessionToken'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAvatarSessionToken>>, {data?: BodyType<AvatarSessionTokenRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAvatarSessionToken(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAvatarSessionTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createAvatarSessionToken>>>
+    export type CreateAvatarSessionTokenMutationBody = BodyType<AvatarSessionTokenRequest> | undefined
+    export type CreateAvatarSessionTokenMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Mint a short-lived LiveAvatar session token (Pro)
+ */
+export const useCreateAvatarSessionToken = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAvatarSessionToken>>, TError,{data?: BodyType<AvatarSessionTokenRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAvatarSessionToken>>,
+        TError,
+        {data?: BodyType<AvatarSessionTokenRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateAvatarSessionTokenMutationOptions(options));
     }
 
 export const getCreateCheckoutSessionUrl = () => {

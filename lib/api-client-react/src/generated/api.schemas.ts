@@ -610,6 +610,16 @@ export interface BillingInfo {
   stripeCustomerId?: string | null;
 }
 
+export interface AvatarSessionTokenRequest {
+  /** Use push-to-talk interactivity instead of open-mic. */
+  pushToTalk?: boolean;
+}
+
+export interface AvatarSessionTokenResult {
+  sessionToken: string;
+  sessionId: string;
+}
+
 export interface GenerateCaptionsRequest {
   /**
      * /objects/... path of the user's uploaded audio object.

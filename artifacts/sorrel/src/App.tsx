@@ -23,6 +23,7 @@ import Modules from "./pages/modules";
 import Bulk from "./pages/bulk";
 import Analytics from "./pages/analytics";
 import Collab from "./pages/collab";
+import Avatar from "./pages/avatar";
 import Settings from "./pages/settings";
 import Terms from "./pages/terms";
 import Privacy from "./pages/privacy";
@@ -107,6 +108,9 @@ function Router() {
       </Route>
       <Route path="/collab">
         <ProtectedRoute component={Collab} />
+      </Route>
+      <Route path="/avatar">
+        <ProtectedRoute component={Avatar} />
       </Route>
       <Route path="/settings">
         <ProtectedRoute component={Settings} />

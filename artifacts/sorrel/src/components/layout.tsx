@@ -14,6 +14,7 @@ import {
   Globe,
   Film,
   Clapperboard,
+  Bot,
   Search,
   Bell,
   ChevronRight,
@@ -66,6 +67,7 @@ const NAV: NavEntry[] = [
 // Website → Video is shipped (no "soon"); the rest are partial/planned modules.
 const MODULES: NavEntry[] = [
   { href: "/website-to-video", label: "Website → Video", icon: Globe },
+  { href: "/avatar", label: "Live Avatar", icon: Bot },
   { href: "/bulk", label: "Bulk", icon: Layers, soon: true },
   { href: "/analytics", label: "Analytics", icon: BarChart3, soon: true },
   { href: "/collab", label: "Collab", icon: Users, soon: true },
@@ -78,6 +80,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/templates": "Templates",
   "/brand": "Brand DNA",
   "/website-to-video": "Website → Video",
+  "/avatar": "Live Avatar",
   "/bulk": "Bulk",
   "/analytics": "Analytics",
   "/collab": "Collab",
