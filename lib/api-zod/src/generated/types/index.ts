@@ -19,6 +19,7 @@ export * from './authUser';
 export * from './authUserEnvelope';
 export * from './avatarSessionTokenRequest';
 export * from './avatarSessionTokenResult';
+export * from './avatarUsageResult';
 export * from './beginBrowserLoginParams';
 export * from './billingInfo';
 export * from './billingInfoPlan';

@@ -7,10 +7,14 @@ import { aiSuggestLimiter } from "../middlewares/rateLimit";
 import {
   mintSessionToken,
   isLiveAvatarConfigured,
+  isLiveAvatarSandbox,
   LiveAvatarNotConfiguredError,
   LiveAvatarError,
 } from "../services/liveAvatarService";
-import { recordAvatarSession } from "../services/avatarSessionsService";
+import {
+  recordAvatarSession,
+  getAvatarSessionUsage,
+} from "../services/avatarSessionsService";
 
 const router: IRouter = Router();
 
@@ -63,6 +67,20 @@ router.post(
       return;
     }
 
+    // Cost-control cap (LIVE only — sandbox sessions consume no credits). Pro
+    // includes a monthly avatar-session allotment; beyond it, 403 avatar_limit
+    // until the month resets. (Per-minute metering/charging is a follow-up.)
+    if (!isLiveAvatarSandbox()) {
+      const usage = await getAvatarSessionUsage(req.user.id);
+      if (usage.used >= usage.limit) {
+        res.status(403).json({
+          error: "You've reached your monthly avatar session limit",
+          reason: "avatar_limit",
+        });
+        return;
+      }
+    }
+
     try {
       const token = await mintSessionToken({
         pushToTalk: parsed.data.pushToTalk,
@@ -94,6 +112,27 @@ router.post(
       req.log.error({ err }, "LiveAvatar token mint failed");
       res.status(500).json({ error: "Could not start an avatar session" });
     }
+  },
+);
+
+/**
+ * GET /api/avatar/usage — this month's avatar-session usage + the cap, so the UI
+ * can show the Pro allotment transparently (only meaningful in live mode; sandbox
+ * is free + uncapped). Auth-only; no Pro gate so the page can render the state.
+ */
+router.get(
+  "/avatar/usage",
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const usage = await getAvatarSessionUsage(req.user.id);
+    res.status(200).json({
+      used: usage.used,
+      limit: usage.limit,
+      sandbox: isLiveAvatarSandbox(),
+    });
   },
 );
 

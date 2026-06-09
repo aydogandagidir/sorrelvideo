@@ -49,6 +49,11 @@ export function isLiveAvatarConfigured(): boolean {
   return Boolean(process.env.LIVEAVATAR_API_KEY);
 }
 
+/** Whether sessions run in sandbox mode (no credit consumption) — the default. */
+export function isLiveAvatarSandbox(): boolean {
+  return (process.env.LIVEAVATAR_SANDBOX ?? "true") !== "false";
+}
+
 const DEFAULT_API_URL = "https://api.liveavatar.com";
 // Reference sandbox avatar/voice/context (liveavatar-web-sdk demo) so a fresh
 // LIVEAVATAR_API_KEY works immediately in sandbox; override via env for prod.
@@ -76,7 +81,7 @@ export async function mintSessionToken(
   const contextId = process.env.LIVEAVATAR_CONTEXT_ID ?? DEFAULT_CONTEXT_ID;
   const language = process.env.LIVEAVATAR_LANGUAGE ?? "en";
   // Sandbox by default (no credit consumption); set LIVEAVATAR_SANDBOX=false for live.
-  const isSandbox = (process.env.LIVEAVATAR_SANDBOX ?? "true") !== "false";
+  const isSandbox = isLiveAvatarSandbox();
 
   let res: Awaited<ReturnType<typeof fetch>>;
   try {

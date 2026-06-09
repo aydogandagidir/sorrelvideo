@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { LiveAvatarSession, SessionEvent } from "@heygen/liveavatar-web-sdk";
 import { Bot, Loader2, Mic, PhoneOff, Sparkles } from "lucide-react";
-import { useCreateAvatarSessionToken } from "@workspace/api-client-react";
+import {
+  useCreateAvatarSessionToken,
+  useGetAvatarUsage,
+} from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +29,7 @@ export default function AvatarPage() {
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const createToken = useCreateAvatarSessionToken();
+  const { data: usage } = useGetAvatarUsage();
 
   async function start() {
     setError(null);
@@ -44,8 +48,19 @@ export default function AvatarPage() {
       });
       await session.start();
     } catch (err) {
-      const e = err as { status?: number; data?: { error?: string } };
+      const e = err as {
+        status?: number;
+        data?: { error?: string; reason?: string };
+      };
       sessionRef.current = null;
+      if (e.data?.reason === "avatar_limit") {
+        setError(
+          e.data?.error ??
+            "You've reached your monthly avatar session limit — it resets next month.",
+        );
+        setStatus("error");
+        return;
+      }
       if (e.status === 403) {
         setShowUpgrade(true);
         setStatus("idle");
@@ -168,8 +183,9 @@ export default function AvatarPage() {
             )}
 
             <p className="text-center text-[11.5px] text-muted-foreground">
-              Runs in sandbox mode. A live, metered avatar (per-minute) is coming
-              with billing.
+              {usage?.sandbox === false
+                ? `${usage.used} of ${usage.limit} sessions used this month.`
+                : "Sandbox mode — free and unlimited."}
             </p>
           </CardContent>
         </Card>
