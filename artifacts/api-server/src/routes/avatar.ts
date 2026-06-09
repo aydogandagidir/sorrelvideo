@@ -115,4 +115,25 @@ router.post(
   },
 );
 
+/**
+ * GET /api/avatar/usage — this month's avatar-session usage + the cap, so the UI
+ * can show the Pro allotment transparently (only meaningful in live mode; sandbox
+ * is free + uncapped). Auth-only; no Pro gate so the page can render the state.
+ */
+router.get(
+  "/avatar/usage",
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const usage = await getAvatarSessionUsage(req.user.id);
+    res.status(200).json({
+      used: usage.used,
+      limit: usage.limit,
+      sandbox: isLiveAvatarSandbox(),
+    });
+  },
+);
+
 export default router;

@@ -620,6 +620,12 @@ export interface AvatarSessionTokenResult {
   sessionId: string;
 }
 
+export interface AvatarUsageResult {
+  used: number;
+  limit: number;
+  sandbox: boolean;
+}
+
 export interface GenerateCaptionsRequest {
   /**
      * /objects/... path of the user's uploaded audio object.

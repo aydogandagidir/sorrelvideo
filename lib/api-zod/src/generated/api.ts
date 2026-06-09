@@ -1049,6 +1049,16 @@ export const CreateAvatarSessionTokenResponse = zod.object({
 
 
 /**
+ * @summary This month's avatar-session usage + the monthly cap
+ */
+export const GetAvatarUsageResponse = zod.object({
+  "used": zod.number(),
+  "limit": zod.number(),
+  "sandbox": zod.boolean()
+})
+
+
+/**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
 export const CreateCheckoutSessionBody = zod.object({

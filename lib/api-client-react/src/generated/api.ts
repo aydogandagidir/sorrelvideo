@@ -26,6 +26,7 @@ import type {
   AuthUserEnvelope,
   AvatarSessionTokenRequest,
   AvatarSessionTokenResult,
+  AvatarUsageResult,
   BeginBrowserLoginParams,
   BillingInfo,
   BrandKit,
@@ -3042,6 +3043,83 @@ export const useCreateAvatarSessionToken = <TError = ErrorType<ErrorEnvelope>,
       > => {
       return useMutation(getCreateAvatarSessionTokenMutationOptions(options));
     }
+
+export const getGetAvatarUsageUrl = () => {
+
+
+
+
+  return `/api/avatar/usage`
+}
+
+/**
+ * @summary This month's avatar-session usage + the monthly cap
+ */
+export const getAvatarUsage = async ( options?: RequestInit): Promise<AvatarUsageResult> => {
+
+  return customFetch<AvatarUsageResult>(getGetAvatarUsageUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAvatarUsageQueryKey = () => {
+    return [
+    `/api/avatar/usage`
+    ] as const;
+    }
+
+
+export const getGetAvatarUsageQueryOptions = <TData = Awaited<ReturnType<typeof getAvatarUsage>>, TError = ErrorType<ErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvatarUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAvatarUsageQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAvatarUsage>>> = ({ signal }) => getAvatarUsage({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAvatarUsage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAvatarUsageQueryResult = NonNullable<Awaited<ReturnType<typeof getAvatarUsage>>>
+export type GetAvatarUsageQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary This month's avatar-session usage + the monthly cap
+ */
+
+export function useGetAvatarUsage<TData = Awaited<ReturnType<typeof getAvatarUsage>>, TError = ErrorType<ErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAvatarUsage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAvatarUsageQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getCreateCheckoutSessionUrl = () => {
 
