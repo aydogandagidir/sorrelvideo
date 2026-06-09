@@ -29,6 +29,10 @@ COPY lib/auth-web/package.json lib/auth-web/
 COPY lib/object-storage-web/package.json lib/object-storage-web/
 COPY lib/ai/package.json lib/ai/
 COPY scripts/package.json scripts/
+# pnpm applies `patchedDependencies` (package.json) at install time, so the patch
+# files must be in the build context BEFORE `pnpm install` — otherwise pnpm aborts
+# with `ENOENT: ... patches/@hyperframes__producer@…​.patch` (exit 254).
+COPY patches/ patches/
 # NOTE: no BuildKit `--mount=type=cache` here — Railway's Metal builder rejects
 # cache mounts whose `id` lacks its per-service prefix ("missing the cacheKey
 # prefix"). The pnpm store cache is only a build-speed optimization, so we drop
