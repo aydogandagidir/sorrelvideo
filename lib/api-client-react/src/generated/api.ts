@@ -37,6 +37,8 @@ import type {
   FinalizeUploadRequest,
   FinalizeUploadResult,
   ForgotPasswordRequest,
+  GenerateCaptionsRequest,
+  GenerateCaptionsResult,
   GenericSuccess,
   HealthStatus,
   LintRequest,
@@ -2895,6 +2897,77 @@ export const useAiSuggest = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getAiSuggestMutationOptions(options));
+    }
+
+export const getGenerateCaptionsUrl = () => {
+
+
+
+
+  return `/api/captions/generate`
+}
+
+/**
+ * @summary Generate word-timed captions from an uploaded audio object (Pro)
+ */
+export const generateCaptions = async (generateCaptionsRequest: GenerateCaptionsRequest, options?: RequestInit): Promise<GenerateCaptionsResult> => {
+
+  return customFetch<GenerateCaptionsResult>(getGenerateCaptionsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateCaptionsRequest,)
+  }
+);}
+
+
+
+
+export const getGenerateCaptionsMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCaptions>>, TError,{data: BodyType<GenerateCaptionsRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateCaptions>>, TError,{data: BodyType<GenerateCaptionsRequest>}, TContext> => {
+
+const mutationKey = ['generateCaptions'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateCaptions>>, {data: BodyType<GenerateCaptionsRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateCaptions(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateCaptionsMutationResult = NonNullable<Awaited<ReturnType<typeof generateCaptions>>>
+    export type GenerateCaptionsMutationBody = BodyType<GenerateCaptionsRequest>
+    export type GenerateCaptionsMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Generate word-timed captions from an uploaded audio object (Pro)
+ */
+export const useGenerateCaptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCaptions>>, TError,{data: BodyType<GenerateCaptionsRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateCaptions>>,
+        TError,
+        {data: BodyType<GenerateCaptionsRequest>},
+        TContext
+      > => {
+      return useMutation(getGenerateCaptionsMutationOptions(options));
     }
 
 export const getCreateCheckoutSessionUrl = () => {

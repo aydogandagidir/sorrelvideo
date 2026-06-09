@@ -54,6 +54,28 @@ export interface RenderTransition {
   ease: string;
 }
 
+/** A background audio track for a render (Track C — background music). */
+export interface RenderAudioTrack {
+  /** "/objects/..." path of the user's uploaded private audio object. */
+  objectPath: string;
+  /** Playback volume 0–100 (mapped to the engine's data-volume 0–1 at render). */
+  volume: number;
+}
+
+/** A single caption word with its on-screen time window (Track E). */
+export interface RenderCaptionWord {
+  text: string;
+  /** Seconds from the start of the video. */
+  start: number;
+  /** Seconds from the start of the video. */
+  end: number;
+}
+
+/** Word-timed captions burned into the render (Track E). */
+export interface RenderCaptions {
+  words: RenderCaptionWord[];
+}
+
 export interface RenderSettings {
   fps: RenderFps;
   quality: RenderQuality;
@@ -65,6 +87,19 @@ export interface RenderSettings {
   watermark: boolean;
   /** Optional shader transitions (M8). Absent/empty → no transitions. */
   transitions?: RenderTransition[];
+  /**
+   * Optional background audio track (Pro — Track C). `objectPath` is a
+   * user-uploaded private object; at render time it's downloaded into the render
+   * dir as a sibling file and injected as an <audio> element the engine muxes.
+   * Absent/null → silent output, exactly today's behaviour.
+   */
+  backgroundAudio?: RenderAudioTrack | null;
+  /**
+   * Optional word-timed captions (Pro — Track E) burned in as an overlay whose
+   * opacity tweens are appended to the composition's ROOT timeline (the only one
+   * the engine seeks for a top-level composition). Absent/null → no captions.
+   */
+  captions?: RenderCaptions | null;
 }
 
 /**

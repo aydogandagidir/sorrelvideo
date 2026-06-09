@@ -14,8 +14,11 @@
  * which tracks assertRenderSettingsAllowed). This is an eager UX gate only; the
  * PATCH endpoint remains authoritative.
  */
-import { Plus, Trash2, Sparkles } from "lucide-react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Plus, Trash2, Sparkles, Music, Captions } from "lucide-react";
+import { useUpload } from "@workspace/object-storage-web";
 import {
+  useGenerateCaptions,
   type RenderSettings,
   type RenderTransition,
 } from "@workspace/api-client-react";
@@ -87,6 +90,19 @@ export function RenderSettingsForm({
   const transitions = value.transitions ?? [];
   const alphaSupported = formatSupportsAlpha(value.format);
 
+  // Background audio (Track C): the 2-phase presigned upload, then store the
+  // resulting objectPath on the settings; the render pipeline resolves + injects
+  // it as an <audio> the engine muxes.
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const {
+    uploadFile: uploadAudio,
+    isUploading: audioUploading,
+    error: audioError,
+  } = useUpload({
+    onSuccess: (res) =>
+      patch({ backgroundAudio: { objectPath: res.objectPath, volume: 50 } }),
+  });
+
   // A Free user clicking a locked option: nudge to upgrade rather than mutate.
   const gate = (locked: boolean): boolean => {
     if (locked && isFree) {
@@ -125,6 +141,58 @@ export function RenderSettingsForm({
     if (gate(isProOnly("watermark", nextWatermark))) return;
     patch({ watermark: nextWatermark });
   }
+
+  function pickAudio() {
+    // Background audio is a Pro feature in its entirety.
+    if (gate(isProOnly("backgroundAudio", true))) return;
+    audioInputRef.current?.click();
+  }
+  async function onAudioFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file after a remove
+    if (file) await uploadAudio(file);
+  }
+  function setAudioVolume(next: number) {
+    if (!value.backgroundAudio) return;
+    patch({ backgroundAudio: { ...value.backgroundAudio, volume: next } });
+  }
+
+  // Auto-captions (Track E2): upload a voiceover → Whisper transcribes it to
+  // word-timed captions → store on settings.captions (the render burns them in).
+  const captionInputRef = useRef<HTMLInputElement>(null);
+  const [captionError, setCaptionError] = useState<string | null>(null);
+  const generateCaptions = useGenerateCaptions();
+  const { uploadFile: uploadCaptionAudio, isUploading: captionUploading } =
+    useUpload({
+      onSuccess: async (res) => {
+        setCaptionError(null);
+        try {
+          const result = await generateCaptions.mutateAsync({
+            data: { audioObjectPath: res.objectPath },
+          });
+          patch({ captions: { words: result.words } });
+        } catch (err) {
+          const e = err as { status?: number; data?: { error?: string } };
+          if (e.status === 403) onUpgrade?.();
+          else if (e.status === 503)
+            setCaptionError("Auto-captions aren't enabled on this server.");
+          else setCaptionError(e.data?.error ?? "Could not generate captions.");
+        }
+      },
+      onError: () => setCaptionError("Audio upload failed."),
+    });
+  function pickCaptionAudio() {
+    if (gate(isProOnly("captions", true))) return;
+    setCaptionError(null);
+    captionInputRef.current?.click();
+  }
+  async function onCaptionAudioFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (file) await uploadCaptionAudio(file);
+  }
+  const captionWordCount = value.captions?.words?.length ?? 0;
+  const captionBusy = captionUploading || generateCaptions.isPending;
 
   function addTransition() {
     const nextLen = transitions.length + 1;
@@ -337,6 +405,143 @@ export function RenderSettingsForm({
             />
           </div>
         </div>
+
+        {/* Background audio (Pro) */}
+        <fieldset
+          className="space-y-3 rounded-lg border p-4"
+          disabled={disabled}
+        >
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Music className="h-4 w-4 text-primary" />
+              Background audio
+              {isFree && <ProBadge />}
+            </Label>
+            {value.backgroundAudio && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => patch({ backgroundAudio: null })}
+                aria-label="Remove background audio"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <input
+            ref={audioInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={onAudioFile}
+          />
+
+          {value.backgroundAudio ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Music track attached — looped and trimmed to your video length.
+              </p>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rs-audio-volume">Volume</Label>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {value.backgroundAudio.volume}%
+                </span>
+              </div>
+              <Slider
+                id="rs-audio-volume"
+                min={0}
+                max={100}
+                step={1}
+                value={[value.backgroundAudio.volume]}
+                onValueChange={([v]) => setAudioVolume(v)}
+                aria-label="Background audio volume"
+              />
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={pickAudio}
+                disabled={disabled || audioUploading}
+              >
+                <Plus className="h-4 w-4" />
+                {audioUploading ? "Uploading…" : "Upload music"}
+              </Button>
+              {audioError && (
+                <p className="text-xs text-destructive">{audioError.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                MP3, WAV, or M4A — plays under your video.
+              </p>
+            </div>
+          )}
+        </fieldset>
+
+        {/* Captions (Pro) — auto-generated from a voiceover via Whisper */}
+        <fieldset
+          className="space-y-3 rounded-lg border p-4"
+          disabled={disabled}
+        >
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Captions className="h-4 w-4 text-primary" />
+              Captions
+              {isFree && <ProBadge />}
+            </Label>
+            {captionWordCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => patch({ captions: null })}
+                aria-label="Remove captions"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <input
+            ref={captionInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={onCaptionAudioFile}
+          />
+
+          {captionWordCount > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {captionWordCount} words captioned — revealed word by word, in sync.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={pickCaptionAudio}
+                disabled={disabled || captionBusy}
+              >
+                <Captions className="h-4 w-4" />
+                {captionUploading
+                  ? "Uploading…"
+                  : generateCaptions.isPending
+                    ? "Transcribing…"
+                    : "Auto-caption from audio"}
+              </Button>
+              {captionError && (
+                <p className="text-xs text-destructive">{captionError}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Upload a voiceover — we transcribe it to word-timed captions.
+              </p>
+            </div>
+          )}
+        </fieldset>
 
         {/* Transitions */}
         <fieldset className="space-y-3" disabled={disabled}>

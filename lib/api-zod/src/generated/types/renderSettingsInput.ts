@@ -5,6 +5,8 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { RenderSettingsInputBackgroundAudio } from './renderSettingsInputBackgroundAudio';
+import type { RenderSettingsInputCaptions } from './renderSettingsInputCaptions';
 import type { RenderSettingsInputFormat } from './renderSettingsInputFormat';
 import type { RenderSettingsInputFps } from './renderSettingsInputFps';
 import type { RenderSettingsInputQuality } from './renderSettingsInputQuality';
@@ -22,4 +24,14 @@ export interface RenderSettingsInput {
   transparent?: boolean;
   watermark?: boolean;
   transitions?: RenderTransition[];
+  /**
+     * Optional background audio track (Pro). null → silent output.
+     * @nullable
+     */
+  backgroundAudio?: RenderSettingsInputBackgroundAudio;
+  /**
+     * Optional word-timed captions (Pro). null → none.
+     * @nullable
+     */
+  captions?: RenderSettingsInputCaptions;
 }

@@ -16,6 +16,7 @@ import {
   type RenderQuality,
   type RenderFormat,
   type RenderFps,
+  type RenderCaptionWord,
 } from "@workspace/db";
 
 const QUALITIES: readonly RenderQuality[] = ["draft", "standard", "high"];
@@ -71,10 +72,47 @@ export class RenderSettingsUpgradeError extends Error {
  * valid `RenderSettings`. Unknown/invalid fields fall back to the defaults, so a
  * null column reproduces today's render output exactly.
  */
+/** Clamp a raw volume to the 0–100 integer range (default 50). */
+function clampAudioVolume(v: unknown): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : 50;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/**
+ * Coerce a raw captions blob into a clean `{ words }` (or undefined). Keeps only
+ * well-formed words (non-empty text, finite end > start ≥ 0), caps the count to
+ * bound the injected overlay, and drops everything else. Untrusted text is
+ * HTML-escaped later at injection (renderService), not here.
+ */
+function sanitizeCaptions(
+  raw: unknown,
+): { words: RenderCaptionWord[] } | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const words = (raw as { words?: unknown }).words;
+  if (!Array.isArray(words)) return undefined;
+  const clean: RenderCaptionWord[] = [];
+  for (const w of words) {
+    if (!w || typeof w !== "object") continue;
+    const ww = w as { text?: unknown; start?: unknown; end?: unknown };
+    const text = typeof ww.text === "string" ? ww.text.slice(0, 200) : "";
+    const start =
+      typeof ww.start === "number" && Number.isFinite(ww.start)
+        ? Math.max(0, ww.start)
+        : 0;
+    const end =
+      typeof ww.end === "number" && Number.isFinite(ww.end)
+        ? Math.max(0, ww.end)
+        : 0;
+    if (text.length > 0 && end > start) clean.push({ text, start, end });
+  }
+  return clean.length > 0 ? { words: clean.slice(0, 2000) } : undefined;
+}
+
 export function resolveSettings(
   raw: Partial<RenderSettings> | null | undefined,
 ): RenderSettings {
   const r = raw ?? {};
+  const captions = sanitizeCaptions(r.captions);
   return {
     fps: FPS_VALUES.includes(r.fps as RenderFps)
       ? (r.fps as RenderFps)
@@ -97,6 +135,20 @@ export function resolveSettings(
         ? r.watermark
         : DEFAULT_RENDER_SETTINGS.watermark,
     ...(Array.isArray(r.transitions) ? { transitions: r.transitions } : {}),
+    // Background audio (Track C): keep only a well-formed, "/objects/"-shaped
+    // path. Ownership is enforced at the route AND re-checked at render time
+    // (which skips silently on any failure); volume is clamped 0–100.
+    ...(r.backgroundAudio &&
+    typeof r.backgroundAudio.objectPath === "string" &&
+    r.backgroundAudio.objectPath.startsWith("/objects/")
+      ? {
+          backgroundAudio: {
+            objectPath: r.backgroundAudio.objectPath,
+            volume: clampAudioVolume(r.backgroundAudio.volume),
+          },
+        }
+      : {}),
+    ...(captions ? { captions } : {}),
   };
 }
 
@@ -120,6 +172,8 @@ export function assertRenderSettingsAllowed(
   if (!settings.watermark) proOnly.push("Watermark removal");
   if ((settings.transitions?.length ?? 0) > 1)
     proOnly.push("Multiple transitions");
+  if (settings.backgroundAudio) proOnly.push("Background audio");
+  if (settings.captions?.words?.length) proOnly.push("Captions");
 
   if (proOnly.length > 0) {
     throw new RenderSettingsUpgradeError(

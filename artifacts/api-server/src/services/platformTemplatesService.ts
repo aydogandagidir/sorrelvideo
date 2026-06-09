@@ -2,11 +2,82 @@ import { and, inArray, isNull } from "drizzle-orm";
 import { db, templatesTable } from "@workspace/db";
 import { REGISTRY_TEMPLATES } from "./registryTemplates";
 
+/** Normalised shape for a platform-template seed row (keyed by `module`). */
+interface SeedTemplate {
+  module: string;
+  name: string;
+  description: string | null;
+  category: string;
+  thumbnailUrl: string;
+  duration: number;
+  isPremium: boolean;
+  tags: string[];
+}
+
 /**
- * Idempotently seed the vendored Hyperframes registry templates as PLATFORM
- * templates (userId = null → visible to every authenticated user). Insert-if-
- * missing, keyed by `module` (the registry slug), so existing rows and re-runs
- * are left untouched and metadata edits to a live row are never clobbered.
+ * Hand-authored platform templates that are NOT vendored from the registry
+ * manifest (M-features Track B): the Three.js/WebGL "Product 3D" and the
+ * lottie-web "Lottie Reveal", which exercise engine adapters no other template
+ * used. Authored portrait 1080×1920 so the default (portrait) render matches
+ * their native canvas with no letterboxing. Their thumbnail PNGs are produced by
+ * scripts/generate-thumbnails.mjs (see THUMBNAIL_SLUGS in routes/templates.ts).
+ */
+const HAND_AUTHORED_TEMPLATES: SeedTemplate[] = [
+  {
+    module: "product-3d",
+    name: "Product 3D",
+    description:
+      "A brand-coloured faceted 3D gem orbits under studio lighting while your headline reveals. Portrait 9:16.",
+    category: "3D",
+    thumbnailUrl: "/api/templates/thumbnails/product-3d.png",
+    duration: 7,
+    isPremium: true,
+    tags: ["3d", "webgl", "product", "portrait"],
+  },
+  {
+    module: "lottie-reveal",
+    name: "Lottie Reveal",
+    description:
+      "An animated Lottie ring accents a clean brand headline reveal. Portrait 9:16.",
+    category: "Motion",
+    thumbnailUrl: "/api/templates/thumbnails/lottie-reveal.png",
+    duration: 6,
+    isPremium: false,
+    tags: ["lottie", "motion", "intro", "portrait"],
+  },
+  {
+    module: "video-spotlight",
+    name: "Video Spotlight",
+    description:
+      "Your uploaded clip as the hero, framed with your brand — logo, headline, and CTA over a cinematic scrim. Portrait 9:16.",
+    category: "Video",
+    thumbnailUrl: "/api/templates/thumbnails/video-spotlight.png",
+    duration: 9,
+    isPremium: true,
+    tags: ["video", "b-roll", "spotlight", "portrait"],
+  },
+];
+
+/** The vendored registry manifest, projected onto the seed shape. */
+function registryAsSeed(): SeedTemplate[] {
+  return REGISTRY_TEMPLATES.map((t) => ({
+    module: t.slug,
+    name: t.name,
+    description: t.description || null,
+    category: t.category,
+    thumbnailUrl: t.thumbnailUrl,
+    duration: t.duration,
+    isPremium: t.isPremium,
+    tags: t.tags,
+  }));
+}
+
+/**
+ * Idempotently seed the platform templates (userId = null → visible to every
+ * authenticated user): the vendored Hyperframes registry blocks PLUS the
+ * hand-authored showcase templates. Insert-if-missing, keyed by `module`, so
+ * existing rows and re-runs are left untouched and metadata edits to a live row
+ * are never clobbered.
  *
  * Runs on boot (see index.ts) rather than as a manual script: the gallery is the
  * storefront, and a fresh environment with an empty gallery is the same as
@@ -16,27 +87,28 @@ import { REGISTRY_TEMPLATES } from "./registryTemplates";
  * Returns the number of templates inserted (0 when already seeded).
  */
 export async function seedPlatformTemplates(): Promise<number> {
-  if (REGISTRY_TEMPLATES.length === 0) return 0;
+  const all: SeedTemplate[] = [...registryAsSeed(), ...HAND_AUTHORED_TEMPLATES];
+  if (all.length === 0) return 0;
 
-  const slugs = REGISTRY_TEMPLATES.map((t) => t.slug);
+  const modules = all.map((t) => t.module);
   const existing = await db
     .select({ module: templatesTable.module })
     .from(templatesTable)
     .where(
-      and(isNull(templatesTable.userId), inArray(templatesTable.module, slugs)),
+      and(isNull(templatesTable.userId), inArray(templatesTable.module, modules)),
     );
   const present = new Set(existing.map((r) => r.module));
 
-  const missing = REGISTRY_TEMPLATES.filter((t) => !present.has(t.slug));
+  const missing = all.filter((t) => !present.has(t.module));
   if (missing.length === 0) return 0;
 
   await db.insert(templatesTable).values(
     missing.map((t) => ({
       userId: null,
       name: t.name,
-      description: t.description || null,
+      description: t.description,
       category: t.category,
-      module: t.slug,
+      module: t.module,
       thumbnailUrl: t.thumbnailUrl,
       duration: t.duration,
       isPremium: t.isPremium,
