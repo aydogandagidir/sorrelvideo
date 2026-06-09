@@ -65,6 +65,11 @@ overrides:
   vite@<=6.4.1: ^6.4.2
   esbuild@<=0.24.2: ^0.25.0
 
+patchedDependencies:
+  '@hyperframes/producer@0.6.6':
+    hash: 0709f4015a600182d9f42e525e0a84bd4fdcaeaf053a4c77b9dd6a84bbc5fd79
+    path: patches/@hyperframes__producer@0.6.6.patch
+
 importers:
 
   .:
@@ -153,7 +158,7 @@ importers:
         version: 0.6.6(hono@4.12.18)
       '@hyperframes/producer':
         specifier: ^0.6.6
-        version: 0.6.6(typescript@5.9.3)
+        version: 0.6.6(patch_hash=0709f4015a600182d9f42e525e0a84bd4fdcaeaf053a4c77b9dd6a84bbc5fd79)(typescript@5.9.3)
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.0.2
@@ -8287,7 +8292,7 @@ snapshots:
 
   '@hyperframes/player@0.6.64': {}
 
-  '@hyperframes/producer@0.6.6(typescript@5.9.3)':
+  '@hyperframes/producer@0.6.6(patch_hash=0709f4015a600182d9f42e525e0a84bd4fdcaeaf053a4c77b9dd6a84bbc5fd79)(typescript@5.9.3)':
     dependencies:
       '@fontsource/archivo-black': 5.2.8
       '@fontsource/eb-garamond': 5.2.7
