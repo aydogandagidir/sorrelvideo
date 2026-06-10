@@ -17,6 +17,7 @@ export async function truncateAll(): Promise<void> {
       oauth_accounts,
       sessions,
       render_jobs,
+      avatar_sessions,
       projects,
       brand_kit,
       users,
