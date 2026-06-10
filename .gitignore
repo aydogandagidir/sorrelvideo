@@ -69,3 +69,7 @@ artifacts/api-server/studio-workspaces/
 # Production SPA bundle staged for the api-server to serve (copied from
 # artifacts/sorrel/dist/public by the Dockerfile / single-port local serve).
 artifacts/api-server/public/
+
+# Playwright browser-smoke artifacts (artifacts/sorrel/e2e). Run output, not source.
+artifacts/sorrel/test-results/
+artifacts/sorrel/playwright-report/
