@@ -229,11 +229,31 @@ export function pickBrandColors(
   const vivid = scored.filter((c) => !isNeutral(c.hex));
 
   const primaryColor = vivid[0]?.hex ?? themeColorOr(themeColor) ?? DEFAULT_PRIMARY;
+  const primaryWeight = vivid[0]?.weight ?? 0;
 
-  // Secondary: the next vivid color that's a clearly different hue; else the
-  // darkest neutral present (a brand's dark base); else a darkened primary.
+  // A vivid runner-up must carry MEANINGFUL page presence before it can claim a
+  // brand role. Without this floor a stray illustration/background swatch (e.g.
+  // a 0.006-weight dark green on an otherwise blue site — the bluedev.dev case)
+  // out-ranks the page's true dark base purely by being hue-distant, and the
+  // whole gradient/accent reads off-brand.
+  const significant = (c: ColorCandidate) =>
+    c.weight >= Math.max(0.05, primaryWeight * 0.1);
+
+  // Secondary: the next SIGNIFICANT vivid color that's a clearly different hue;
+  // else a significant DARK vivid (a monochrome brand's saturated dark base —
+  // e.g. bluedev.dev's #0f172a slate, which is "blue" by hue so the distance
+  // rule skips it and isNeutral() rightly calls it vivid); else the darkest
+  // neutral present; else a darkened primary.
   const secondaryColor =
-    vivid.find((c) => c.hex !== primaryColor && hueDistance(c.hex, primaryColor) > 25)?.hex ??
+    vivid.find(
+      (c) =>
+        c.hex !== primaryColor &&
+        hueDistance(c.hex, primaryColor) > 25 &&
+        significant(c),
+    )?.hex ??
+    vivid.find(
+      (c) => c.hex !== primaryColor && significant(c) && luminance(c.hex) < 0.25,
+    )?.hex ??
     darkestNeutral(scored) ??
     darken(primaryColor, 0.55);
 
@@ -242,7 +262,8 @@ export function pickBrandColors(
       (c) =>
         c.hex !== primaryColor &&
         c.hex !== secondaryColor &&
-        hueDistance(c.hex, primaryColor) > 40,
+        hueDistance(c.hex, primaryColor) > 40 &&
+        significant(c),
     )?.hex ?? null;
 
   return { primaryColor, secondaryColor, accentColor };
