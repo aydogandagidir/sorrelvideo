@@ -52,7 +52,13 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    replace({
+    // enforce:"pre" — the replaces must see the RAW .tsx source. Without it the
+    // react plugin compiles JSX first, so the `<HyperframesLogo />` key never
+    // matches and the wordmark swap silently no-ops (header renders empty: the
+    // function-neutralize below, being plain JS, still applies). The /api
+    // repoints are plain string literals and work identically pre or post.
+    Object.assign(
+      replace({
       preventAssignment: true,
       delimiters: ["", ""],
       values: {
@@ -73,7 +79,9 @@ export default defineConfig({
         // (unreferenced) function itself, and the artwork must not ship.
         "function HyperframesLogo() {": "function HyperframesLogo() { return null;",
       },
-    }),
+      }),
+      { enforce: "pre" as const },
+    ),
     {
       // Build guard: fail if any un-repointed /api/projects|events|render literal
       // survived (it would hit Sorrel's entity API instead of the /api/studio/*
@@ -97,7 +105,12 @@ export default defineConfig({
             while ((m = re.exec(txt)) !== null) {
               offenders.push(`${name}: ${txt.slice(m.index, m.index + 24)}`);
             }
-            if (txt.includes("Sorrel")) sawSorrelMark = true;
+            // The wordmark must land in the compiled JS (the .html <title>
+            // already says "Sorrel" — counting it would mask a failed swap,
+            // which is exactly how the first rebrand attempt slipped through).
+            if (name.endsWith(".js") && txt.includes("Sorrel")) {
+              sawSorrelMark = true;
+            }
             // The HeyGen/HyperFrames logo SVG is uniquely identified by its
             // 263×79 viewBox; its presence means the rebrand replace missed.
             if (txt.includes("0 0 263 79")) sawVendorLogo = true;
