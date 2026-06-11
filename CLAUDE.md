@@ -798,9 +798,17 @@ Tracked here so it does not get rediscovered each time:
    `ProtectedRoute`) + a localStorage cookie-consent banner have **landed**, but
    the copy is **DRAFT** — review with counsel before public launch. (Stripe +
    any EU user makes published, accurate policies mandatory.)
-3. **End-to-end Playwright smoke test**: signup → Studio → render →
-   mp4 served. Currently the only render-pipeline check is `pnpm run
-build`.
+3. **End-to-end test coverage** (mostly landed): an HTTP E2E suite (supertest vs
+   the real Express app + testcontainer Postgres) covers the critical journeys —
+   auth, projects, multi-tenant isolation, render-settings gating, avatar
+   endpoints (`api-server/src/test/e2e.integration.test.ts`); plus a hermetic
+   Playwright browser smoke (`artifacts/sorrel/e2e`, `/api` mocked) for the shipped
+   SPA booting + the signup UX in real Chromium (`pnpm --filter @workspace/sorrel
+   run e2e`). **Still pending**: a FULL-STACK browser smoke that renders an MP4
+   (signup → Studio → render → video served) — needs the backend + Postgres + the
+   render toolchain (chrome-headless-shell + ffmpeg) orchestrated, best in CI
+   (Linux Docker; local Windows Docker Desktop's named pipe isn't detected by
+   testcontainers outside the vitest runner).
 4. **Module completion**: Bulk, Analytics, Collab — each needs a spec
    before implementation. Studio MVP (Tur 6) and AI MVP (Tur 7) landed.
 5. **AI v2**: streaming responses, per-field regen, prompt history,
