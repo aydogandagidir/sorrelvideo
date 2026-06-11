@@ -70,8 +70,11 @@ export default defineConfig({
         // the engine vendor — swap the JSX usage for a Sorrel Studio wordmark
         // (inline styles only: the studio's Tailwind scan doesn't see injected
         // class names, so utility classes here would silently not exist).
+        // The wordmark doubles as the way BACK to the Sorrel app — the editor
+        // is a full-screen embed with no other chrome, so without this link the
+        // only exit is the browser back button (user-reported gap).
         "<HyperframesLogo />":
-          '<span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", color: "#fff", userSelect: "none" }}>Sorrel <span style={{ color: "#A3E635" }}>Studio</span></span>',
+          '<a href="/projects" title="Back to Sorrel" style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", color: "#fff", userSelect: "none", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}><span aria-hidden="true" style={{ color: "#A3E635" }}>←</span>Sorrel <span style={{ color: "#A3E635" }}>Studio</span></a>',
         // Lint modal's copy-prompt mentions the engine too.
         "these HyperFrames lint issues": "these Sorrel Studio lint issues",
         // Header shows the bare numeric project id ("3") — label it so users

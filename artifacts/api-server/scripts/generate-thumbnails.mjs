@@ -78,6 +78,11 @@ const SAMPLE_VARS = {
   "user.bodyText": "Placeholder substitution verified.",
   "user.ctaText": "Ship it",
   duration: "9",
+  // Aspect-responsive compositions read {{layout.*}} (see buildCompositionHtml);
+  // posters are generated at the authored portrait canvas.
+  "layout.width": "1080",
+  "layout.height": "1920",
+  "layout.aspect": "portrait",
 };
 
 /** @param {string} html */
