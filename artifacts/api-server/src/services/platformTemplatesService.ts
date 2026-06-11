@@ -22,6 +22,9 @@ interface SeedTemplate {
  * their native canvas with no letterboxing. Their thumbnail PNGs are produced by
  * scripts/generate-thumbnails.mjs (see THUMBNAIL_SLUGS in routes/templates.ts).
  */
+// Exported so the seed test asserts the full platform-template count
+// (registry + hand-authored) instead of a hard-coded number that drifts each
+// time a hand-authored template is added.
 export const HAND_AUTHORED_TEMPLATES: SeedTemplate[] = [
   {
     module: "product-3d",

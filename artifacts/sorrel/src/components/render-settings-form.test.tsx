@@ -12,6 +12,15 @@ import { RenderSettingsForm } from "./render-settings-form";
 import { DEFAULT_RENDER_SETTINGS } from "@/lib/render-settings";
 import { renderWithProviders } from "@/test/test-utils";
 
+// RenderSettingsForm imports `useUpload` from @workspace/object-storage-web,
+// which pulls in the Uppy-based ObjectUploader — a browser-only component the
+// jsdom test env can't transform (its react/jsx-dev-runtime import fails to
+// resolve cross-package), which otherwise makes this whole suite fail to LOAD.
+// These tests exercise the Free/Pro gating, not uploads, so stub the hook.
+vi.mock("@workspace/object-storage-web", () => ({
+  useUpload: () => ({ uploadFile: vi.fn(), isUploading: false, error: null }),
+}));
+
 afterEach(() => vi.restoreAllMocks());
 
 function setup(plan: "free" | "pro", overrides = {}) {
