@@ -224,6 +224,8 @@ async function main() {
     { slug: "product-3d", duration: 7 },
     { slug: "lottie-reveal", duration: 6 },
     { slug: "video-spotlight", duration: 9 },
+    // Renders its built-in DEMO narration (host.payload unsubstituted).
+    { slug: "talking-host", duration: 9 },
   ];
 
   // Optional CLI filter: `node scripts/generate-thumbnails.mjs <slug> [<slug>…]`

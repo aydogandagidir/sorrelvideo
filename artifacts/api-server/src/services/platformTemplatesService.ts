@@ -59,6 +59,17 @@ export const HAND_AUTHORED_TEMPLATES: SeedTemplate[] = [
     isPremium: true,
     tags: ["video", "b-roll", "spotlight", "portrait"],
   },
+  {
+    module: "talking-host",
+    name: "Talking Host",
+    description:
+      "An animated brand host reads your script aloud with lip-sync and karaoke captions — generate it from the Avatar page. Portrait 9:16.",
+    category: "AI",
+    thumbnailUrl: "/api/templates/thumbnails/talking-host.png",
+    duration: 9,
+    isPremium: false,
+    tags: ["ai", "voice", "avatar", "captions", "portrait"],
+  },
 ];
 
 /** The vendored registry manifest, projected onto the seed shape. */

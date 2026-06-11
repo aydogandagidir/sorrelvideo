@@ -29,6 +29,8 @@ import type {
   AvatarSessionTokenRequest,
   AvatarSessionTokenResult,
   AvatarUsageResult,
+  AvatarVideoRequest,
+  AvatarVideoResponse,
   BeginBrowserLoginParams,
   BillingInfo,
   BrandKit,
@@ -3192,6 +3194,79 @@ export const useAvatarChat = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getAvatarChatMutationOptions(options));
+    }
+
+export const getCreateAvatarVideoUrl = () => {
+
+
+
+
+  return `/api/avatar/video`
+}
+
+/**
+ * Synthesizes the script with TTS, word-times it with Whisper, creates a branded `talking-host` project, and auto-starts its render. Costs one AI quota unit on Free; the render start additionally consumes the regular render quota — when that quota is exhausted the project is still created as a draft and `renderStarted` is false.
+
+ * @summary Create a talking-host video from a script (TTS narration; auto-renders)
+ */
+export const createAvatarVideo = async (avatarVideoRequest: AvatarVideoRequest, options?: RequestInit): Promise<AvatarVideoResponse> => {
+
+  return customFetch<AvatarVideoResponse>(getCreateAvatarVideoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      avatarVideoRequest,)
+  }
+);}
+
+
+
+
+export const getCreateAvatarVideoMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAvatarVideo>>, TError,{data: BodyType<AvatarVideoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAvatarVideo>>, TError,{data: BodyType<AvatarVideoRequest>}, TContext> => {
+
+const mutationKey = ['createAvatarVideo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAvatarVideo>>, {data: BodyType<AvatarVideoRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAvatarVideo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAvatarVideoMutationResult = NonNullable<Awaited<ReturnType<typeof createAvatarVideo>>>
+    export type CreateAvatarVideoMutationBody = BodyType<AvatarVideoRequest>
+    export type CreateAvatarVideoMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Create a talking-host video from a script (TTS narration; auto-renders)
+ */
+export const useCreateAvatarVideo = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAvatarVideo>>, TError,{data: BodyType<AvatarVideoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAvatarVideo>>,
+        TError,
+        {data: BodyType<AvatarVideoRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateAvatarVideoMutationOptions(options));
     }
 
 export const getCreateCheckoutSessionUrl = () => {

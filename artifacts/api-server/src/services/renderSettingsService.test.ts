@@ -85,6 +85,51 @@ describe("resolveSettings", () => {
     expect(resolveSettings({ captions: { words: [] } }).captions).toBeUndefined();
     expect(resolveSettings({}).captions).toBeUndefined();
   });
+
+  it("preserves a well-formed voiceover (the talking-host narration MUST survive re-resolve)", () => {
+    // executeRender re-resolves the jsonb column — if this drops, the video is mute.
+    expect(
+      resolveSettings({
+        voiceover: { objectPath: "/objects/uploads/v", startAt: 0.9, volume: 100 },
+      }).voiceover,
+    ).toEqual({ objectPath: "/objects/uploads/v", startAt: 0.9, volume: 100 });
+    // null objectPath is valid: the local renders/<id>/voice.mp3 copy is the source.
+    expect(
+      resolveSettings({ voiceover: { objectPath: null, startAt: 1.5 } }).voiceover,
+    ).toEqual({ objectPath: null, startAt: 1.5, volume: 100 });
+  });
+
+  it("clamps voiceover startAt/volume and drops malformed blobs", () => {
+    expect(
+      resolveSettings({
+        voiceover: { objectPath: null, startAt: -3, volume: 250 },
+      }).voiceover,
+    ).toEqual({ objectPath: null, startAt: 0, volume: 100 });
+    expect(
+      resolveSettings({
+        voiceover: { objectPath: null, startAt: 9999, volume: -1 },
+      }).voiceover,
+    ).toEqual({ objectPath: null, startAt: 600, volume: 0 });
+    // Non-"/objects/" path → whole blob dropped (no half-trusted narration).
+    expect(
+      resolveSettings({
+        voiceover: { objectPath: "http://evil/x", startAt: 0 },
+      } as unknown as Partial<RenderSettings>).voiceover,
+    ).toBeUndefined();
+    expect(resolveSettings({ voiceover: null }).voiceover).toBeUndefined();
+    expect(resolveSettings({}).voiceover).toBeUndefined();
+  });
+
+  it("keeps voiceover through a render-settings PATCH-style merge", () => {
+    // PATCH /render-settings merges { ...existing, ...patch } then re-resolves;
+    // a client patch (which can never contain voiceover) must not erase it.
+    const existing = resolveSettings({
+      voiceover: { objectPath: "/objects/uploads/v", startAt: 0.9, volume: 100 },
+    });
+    const merged = resolveSettings({ ...existing, quality: "standard" });
+    expect(merged.quality).toBe("standard");
+    expect(merged.voiceover).toEqual(existing.voiceover);
+  });
 });
 
 describe("assertRenderSettingsAllowed", () => {
@@ -139,6 +184,15 @@ describe("assertRenderSettingsAllowed", () => {
     expect(() => assertRenderSettingsAllowed(two, "free")).toThrow(
       RenderSettingsUpgradeError,
     );
+  });
+
+  it("does NOT gate voiceover for Free (talking-host auto-render must pass the render-time re-gate)", () => {
+    // The flow that sets voiceover already charged an AI unit at creation;
+    // gating here would 403 the render AFTER the spend and strand a draft.
+    const settings = resolveSettings({
+      voiceover: { objectPath: null, startAt: 0.9, volume: 100 },
+    });
+    expect(() => assertRenderSettingsAllowed(settings, "free")).not.toThrow();
   });
 });
 

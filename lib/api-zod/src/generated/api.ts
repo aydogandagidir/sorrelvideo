@@ -248,6 +248,9 @@ export const UseTemplateParams = zod.object({
 export const listProjectsResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
 export const listProjectsResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
 
+export const listProjectsResponseRenderSettingsOneVoiceoverVolumeMin = 0;
+export const listProjectsResponseRenderSettingsOneVoiceoverVolumeMax = 100;
+
 export const listProjectsResponseRenderProgressMin = 0;
 export const listProjectsResponseRenderProgressMax = 100;
 
@@ -289,7 +292,12 @@ export const ListProjectsResponseItem = zod.object({
   "start": zod.number(),
   "end": zod.number()
 }))
-}).nullish().describe('Optional word-timed captions (Pro). null → none.')
+}).nullish().describe('Optional word-timed captions (Pro). null → none.'),
+  "voiceover": zod.object({
+  "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
+  "startAt": zod.number().describe('Seconds into the composition where speech starts.'),
+  "volume": zod.number().min(listProjectsResponseRenderSettingsOneVoiceoverVolumeMin).max(listProjectsResponseRenderSettingsOneVoiceoverVolumeMax).optional()
+}).nullish().describe('Talking-host narration (server-managed — set by POST \/avatar\/video, not client-writable; deliberately absent from RenderSettingsInput).\n')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(listProjectsResponseRenderProgressMin).max(listProjectsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -321,6 +329,9 @@ export const GetProjectParams = zod.object({
 
 export const getProjectResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
 export const getProjectResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
+
+export const getProjectResponseRenderSettingsOneVoiceoverVolumeMin = 0;
+export const getProjectResponseRenderSettingsOneVoiceoverVolumeMax = 100;
 
 export const getProjectResponseRenderProgressMin = 0;
 export const getProjectResponseRenderProgressMax = 100;
@@ -363,7 +374,12 @@ export const GetProjectResponse = zod.object({
   "start": zod.number(),
   "end": zod.number()
 }))
-}).nullish().describe('Optional word-timed captions (Pro). null → none.')
+}).nullish().describe('Optional word-timed captions (Pro). null → none.'),
+  "voiceover": zod.object({
+  "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
+  "startAt": zod.number().describe('Seconds into the composition where speech starts.'),
+  "volume": zod.number().min(getProjectResponseRenderSettingsOneVoiceoverVolumeMin).max(getProjectResponseRenderSettingsOneVoiceoverVolumeMax).optional()
+}).nullish().describe('Talking-host narration (server-managed — set by POST \/avatar\/video, not client-writable; deliberately absent from RenderSettingsInput).\n')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(getProjectResponseRenderProgressMin).max(getProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -387,6 +403,9 @@ export const UpdateProjectBody = zod.object({
 
 export const updateProjectResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
 export const updateProjectResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
+
+export const updateProjectResponseRenderSettingsOneVoiceoverVolumeMin = 0;
+export const updateProjectResponseRenderSettingsOneVoiceoverVolumeMax = 100;
 
 export const updateProjectResponseRenderProgressMin = 0;
 export const updateProjectResponseRenderProgressMax = 100;
@@ -429,7 +448,12 @@ export const UpdateProjectResponse = zod.object({
   "start": zod.number(),
   "end": zod.number()
 }))
-}).nullish().describe('Optional word-timed captions (Pro). null → none.')
+}).nullish().describe('Optional word-timed captions (Pro). null → none.'),
+  "voiceover": zod.object({
+  "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
+  "startAt": zod.number().describe('Seconds into the composition where speech starts.'),
+  "volume": zod.number().min(updateProjectResponseRenderSettingsOneVoiceoverVolumeMin).max(updateProjectResponseRenderSettingsOneVoiceoverVolumeMax).optional()
+}).nullish().describe('Talking-host narration (server-managed — set by POST \/avatar\/video, not client-writable; deliberately absent from RenderSettingsInput).\n')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(updateProjectResponseRenderProgressMin).max(updateProjectResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -463,6 +487,9 @@ export const CancelProjectRenderParams = zod.object({
 
 export const cancelProjectRenderResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
 export const cancelProjectRenderResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
+
+export const cancelProjectRenderResponseRenderSettingsOneVoiceoverVolumeMin = 0;
+export const cancelProjectRenderResponseRenderSettingsOneVoiceoverVolumeMax = 100;
 
 export const cancelProjectRenderResponseRenderProgressMin = 0;
 export const cancelProjectRenderResponseRenderProgressMax = 100;
@@ -505,7 +532,12 @@ export const CancelProjectRenderResponse = zod.object({
   "start": zod.number(),
   "end": zod.number()
 }))
-}).nullish().describe('Optional word-timed captions (Pro). null → none.')
+}).nullish().describe('Optional word-timed captions (Pro). null → none.'),
+  "voiceover": zod.object({
+  "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
+  "startAt": zod.number().describe('Seconds into the composition where speech starts.'),
+  "volume": zod.number().min(cancelProjectRenderResponseRenderSettingsOneVoiceoverVolumeMin).max(cancelProjectRenderResponseRenderSettingsOneVoiceoverVolumeMax).optional()
+}).nullish().describe('Talking-host narration (server-managed — set by POST \/avatar\/video, not client-writable; deliberately absent from RenderSettingsInput).\n')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(cancelProjectRenderResponseRenderProgressMin).max(cancelProjectRenderResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -581,6 +613,9 @@ export const UpdateProjectRenderSettingsBody = zod.object({
 export const updateProjectRenderSettingsResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
 export const updateProjectRenderSettingsResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
 
+export const updateProjectRenderSettingsResponseRenderSettingsOneVoiceoverVolumeMin = 0;
+export const updateProjectRenderSettingsResponseRenderSettingsOneVoiceoverVolumeMax = 100;
+
 export const updateProjectRenderSettingsResponseRenderProgressMin = 0;
 export const updateProjectRenderSettingsResponseRenderProgressMax = 100;
 
@@ -622,7 +657,12 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
   "start": zod.number(),
   "end": zod.number()
 }))
-}).nullish().describe('Optional word-timed captions (Pro). null → none.')
+}).nullish().describe('Optional word-timed captions (Pro). null → none.'),
+  "voiceover": zod.object({
+  "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
+  "startAt": zod.number().describe('Seconds into the composition where speech starts.'),
+  "volume": zod.number().min(updateProjectRenderSettingsResponseRenderSettingsOneVoiceoverVolumeMin).max(updateProjectRenderSettingsResponseRenderSettingsOneVoiceoverVolumeMax).optional()
+}).nullish().describe('Talking-host narration (server-managed — set by POST \/avatar\/video, not client-writable; deliberately absent from RenderSettingsInput).\n')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(updateProjectRenderSettingsResponseRenderProgressMin).max(updateProjectRenderSettingsResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
@@ -1074,6 +1114,23 @@ export const AvatarChatResponse = zod.object({
 
 
 /**
+ * Synthesizes the script with TTS, word-times it with Whisper, creates a branded `talking-host` project, and auto-starts its render. Costs one AI quota unit on Free; the render start additionally consumes the regular render quota — when that quota is exhausted the project is still created as a draft and `renderStarted` is false.
+
+ * @summary Create a talking-host video from a script (TTS narration; auto-renders)
+ */
+export const createAvatarVideoBodyScriptMin = 10;
+export const createAvatarVideoBodyScriptMax = 1200;
+
+export const createAvatarVideoBodyVoiceDefault = `alloy`;
+
+export const CreateAvatarVideoBody = zod.object({
+  "script": zod.string().min(createAvatarVideoBodyScriptMin).max(createAvatarVideoBodyScriptMax).describe('The narration script (~90 seconds of speech max).'),
+  "voice": zod.enum(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer']).default(createAvatarVideoBodyVoiceDefault).describe('TTS voice.'),
+  "brandKitId": zod.number().optional().describe('Brand kit to style the host with. Omitted → the user\'s default.')
+})
+
+
+/**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
 export const CreateCheckoutSessionBody = zod.object({
@@ -1184,6 +1241,9 @@ export const GetStorageObjectParams = zod.object({
 export const getStatsResponseRecentProjectsItemRenderSettingsOneBackgroundAudioVolumeMin = 0;
 export const getStatsResponseRecentProjectsItemRenderSettingsOneBackgroundAudioVolumeMax = 100;
 
+export const getStatsResponseRecentProjectsItemRenderSettingsOneVoiceoverVolumeMin = 0;
+export const getStatsResponseRecentProjectsItemRenderSettingsOneVoiceoverVolumeMax = 100;
+
 export const getStatsResponseRecentProjectsItemRenderProgressMin = 0;
 export const getStatsResponseRecentProjectsItemRenderProgressMax = 100;
 
@@ -1230,7 +1290,12 @@ export const GetStatsResponse = zod.object({
   "start": zod.number(),
   "end": zod.number()
 }))
-}).nullish().describe('Optional word-timed captions (Pro). null → none.')
+}).nullish().describe('Optional word-timed captions (Pro). null → none.'),
+  "voiceover": zod.object({
+  "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
+  "startAt": zod.number().describe('Seconds into the composition where speech starts.'),
+  "volume": zod.number().min(getStatsResponseRecentProjectsItemRenderSettingsOneVoiceoverVolumeMin).max(getStatsResponseRecentProjectsItemRenderSettingsOneVoiceoverVolumeMax).optional()
+}).nullish().describe('Talking-host narration (server-managed — set by POST \/avatar\/video, not client-writable; deliberately absent from RenderSettingsInput).\n')
 }),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
   "renderProgress": zod.number().min(getStatsResponseRecentProjectsItemRenderProgressMin).max(getStatsResponseRecentProjectsItemRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
   "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),

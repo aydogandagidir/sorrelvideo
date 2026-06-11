@@ -1,0 +1,386 @@
+<!--
+  talking-host — hand-authored Sorrel composition (script→video, Track F+).
+  A branded SVG host (the Live Avatar face) "speaks" a TTS narration: the mouth
+  opens on every Whisper word window and branded karaoke captions fill word by
+  word. The narration track itself is NOT referenced here — renderService
+  injects it as a render-dir sibling element at render time
+  (RenderSettings.voiceover), so this file stays self-contained and previewable.
+
+  Data channel: talkingHostService stamps compositionVars["host.payload"] =
+  base64(JSON({ intro, outro, words: [[text, startSec, endSec], …] })). Base64
+  survives the {{key}} substitution's markup-escaping byte-identical (no quotes,
+  no angle brackets), dodging every escaping hazard. When the placeholder is
+  UNSUBSTITUTED (gallery preview / raw render) atob() throws and the built-in
+  DEMO narration drives the frame instead — the composition is never blank.
+
+  Determinism: ALL motion lives on one PAUSED GSAP timeline registered at
+  window.__timelines["talking-host"] (the only timeline the engine seeks).
+  No CSS animations, no rAF, no wall-clock — frames are byte-identical, and the
+  blink/mouth schedules are pure functions of the payload.
+-->
+<!doctype html>
+<html lang="en" data-aspect="{{layout.aspect}}" style="--vw: {{layout.width}}; --vh: {{layout.height}}">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Talking Host</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=block"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        /* Canvas authored per-render from the chosen aspect (server injects
+           --vw/--vh via {{layout.*}}). Defaults keep the authored portrait. */
+        width: calc(var(--vw, 1080) * 1px);
+        height: calc(var(--vh, 1920) * 1px);
+        overflow: hidden;
+        background: #07070b;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="talking-host"
+      data-composition-id="talking-host"
+      data-width="{{layout.width}}"
+      data-height="{{layout.height}}"
+      data-start="0"
+      data-duration="{{duration}}"
+    >
+      <div class="stage">
+        <div class="glow"></div>
+        <div class="eyebrow">{{brand.companyName}}</div>
+        <div class="host">
+          <svg viewBox="0 0 120 120" role="img" aria-label="Brand host">
+            <defs>
+              <linearGradient id="hosthead" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="{{brand.primaryColor}}" />
+                <stop offset="1" stop-color="{{brand.accentColor}}" />
+              </linearGradient>
+            </defs>
+            <circle cx="60" cy="60" r="52" fill="url(#hosthead)" opacity="0.18" />
+            <circle cx="60" cy="60" r="46" fill="#11131a" stroke="url(#hosthead)" stroke-width="3" />
+            <g class="host-eyes" fill="#f5f7fa">
+              <circle cx="45" cy="52" r="5" />
+              <circle cx="75" cy="52" r="5" />
+            </g>
+            <rect class="host-mouth" x="46" y="72" width="28" height="14" rx="7" fill="#f5f7fa" />
+          </svg>
+        </div>
+        <div class="captions"></div>
+      </div>
+
+      <style>
+        [data-composition-id="talking-host"] {
+          width: 100%;
+          height: 100%;
+        }
+        [data-composition-id="talking-host"] .stage {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          background: radial-gradient(120% 90% at 50% 34%, #14141d 0%, #07070b 66%);
+          font-family: "Inter", sans-serif;
+          overflow: hidden;
+        }
+        [data-composition-id="talking-host"] .glow {
+          position: absolute;
+          left: 50%;
+          top: 36%;
+          width: 780px;
+          height: 780px;
+          transform: translate(-50%, -50%);
+          border-radius: 50%;
+          background: radial-gradient(
+            circle,
+            color-mix(in srgb, {{brand.primaryColor}} 38%, transparent) 0%,
+            rgba(7, 7, 11, 0) 70%
+          );
+          opacity: 0;
+          z-index: 1;
+        }
+        [data-composition-id="talking-host"] .eyebrow {
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 150px;
+          z-index: 3;
+          text-align: center;
+          font-size: 28px;
+          font-weight: 600;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          color: {{brand.accentColor}};
+          opacity: 0;
+        }
+        [data-composition-id="talking-host"] .host {
+          position: absolute;
+          left: 50%;
+          top: 36%;
+          width: 560px;
+          height: 560px;
+          transform: translate(-50%, -50%);
+          z-index: 2;
+          opacity: 0;
+        }
+        [data-composition-id="talking-host"] .host svg {
+          width: 100%;
+          height: 100%;
+        }
+        [data-composition-id="talking-host"] .host-eyes {
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+        [data-composition-id="talking-host"] .host-mouth {
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+        [data-composition-id="talking-host"] .captions {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 300px;
+          height: 240px;
+          z-index: 3;
+        }
+        [data-composition-id="talking-host"] .cap-line {
+          position: absolute;
+          left: 5%;
+          right: 5%;
+          top: 50%;
+          transform: translateY(-50%);
+          text-align: center;
+          font-family: "Space Grotesk", sans-serif;
+          font-size: 64px;
+          line-height: 1.12;
+          font-weight: 700;
+          color: #fff;
+          text-shadow: 0 4px 22px rgba(0, 0, 0, 0.8);
+          opacity: 0;
+        }
+        [data-composition-id="talking-host"] .cap-word {
+          display: inline-block;
+          opacity: 0.38;
+          margin: 0 0.14em;
+        }
+        /* Aspect re-layout, keyed off the server-set data-aspect (not @media).
+           Portrait keeps the authored defaults above. */
+        [data-aspect="landscape"] [data-composition-id="talking-host"] .host {
+          top: 42%;
+          width: 460px;
+          height: 460px;
+        }
+        [data-aspect="landscape"] [data-composition-id="talking-host"] .glow {
+          top: 42%;
+          width: 640px;
+          height: 640px;
+        }
+        [data-aspect="landscape"] [data-composition-id="talking-host"] .eyebrow {
+          top: 72px;
+        }
+        [data-aspect="landscape"] [data-composition-id="talking-host"] .captions {
+          bottom: 84px;
+          height: 170px;
+        }
+        [data-aspect="landscape"] [data-composition-id="talking-host"] .cap-line {
+          left: 12%;
+          right: 12%;
+          font-size: 56px;
+        }
+        [data-aspect="square"] [data-composition-id="talking-host"] .host {
+          top: 37%;
+          width: 480px;
+          height: 480px;
+        }
+        [data-aspect="square"] [data-composition-id="talking-host"] .glow {
+          top: 37%;
+        }
+        [data-aspect="square"] [data-composition-id="talking-host"] .eyebrow {
+          top: 84px;
+        }
+        [data-aspect="square"] [data-composition-id="talking-host"] .captions {
+          bottom: 110px;
+          height: 190px;
+        }
+        [data-aspect="square"] [data-composition-id="talking-host"] .cap-line {
+          font-size: 54px;
+        }
+      </style>
+
+      <script type="application/json" id="host-payload">{{host.payload}}</script>
+
+      <script>
+        (function () {
+          var root = document.querySelector('[data-composition-id="talking-host"]');
+          if (!root || !window.gsap) return;
+
+          // ——— Payload (base64 JSON) with a built-in DEMO fallback ———————————
+          // DEMO timings sum to ~8.9s with the default intro/outro, matching the
+          // server-side duration fallback of "9" for an unparameterized render.
+          var DEMO = {
+            intro: 0.9,
+            outro: 1.4,
+            words: [
+              ["Hi!", 0.0, 0.32], ["I'm", 0.38, 0.55], ["your", 0.58, 0.78],
+              ["brand", 0.82, 1.12], ["host.", 1.16, 1.5], ["Type", 1.9, 2.2],
+              ["a", 2.24, 2.32], ["script", 2.36, 2.72], ["and", 2.76, 2.9],
+              ["I'll", 2.94, 3.12], ["say", 3.16, 3.4], ["it", 3.44, 3.58],
+              ["in", 3.96, 4.1], ["your", 4.14, 4.34], ["colors.", 4.38, 4.9],
+              ["Ready", 5.3, 5.7], ["when", 5.74, 5.92], ["you", 5.96, 6.12],
+              ["are.", 6.16, 6.6]
+            ]
+          };
+
+          var payload = DEMO;
+          try {
+            var rawEl = document.getElementById("host-payload");
+            var raw = rawEl ? rawEl.textContent.trim() : "";
+            var parsed = JSON.parse(atob(raw));
+            if (parsed && Object.prototype.toString.call(parsed.words) === "[object Array]") {
+              payload = parsed;
+            }
+          } catch (e) {
+            /* unsubstituted or malformed → DEMO keeps the frame alive */
+          }
+
+          // Defensive coercion: host.payload is reachable via the generic project
+          // PATCH, so types and bounds are enforced here, not assumed.
+          var intro = typeof payload.intro === "number" && isFinite(payload.intro)
+            ? Math.max(0, Math.min(30, payload.intro)) : 0.9;
+          var outro = typeof payload.outro === "number" && isFinite(payload.outro)
+            ? Math.max(0, Math.min(30, payload.outro)) : 1.4;
+          var words = [];
+          var src = payload.words.slice(0, 600);
+          for (var i = 0; i < src.length; i++) {
+            var w = src[i];
+            if (!w || w.length < 3) continue;
+            var text = String(w[0]).slice(0, 40);
+            var s = Number(w[1]);
+            var e = Number(w[2]);
+            if (text.length === 0 || !isFinite(s) || !isFinite(e) || e <= s || s < 0) continue;
+            words.push([text, s, e]);
+          }
+          words.sort(function (a, b) { return a[1] - b[1]; });
+
+          var lastEnd = words.length ? words[words.length - 1][2] : 0;
+          var TOTAL = parseFloat(root.getAttribute("data-duration"));
+          if (!isFinite(TOTAL) || TOTAL <= 0) {
+            // Unsubstituted "{{duration}}" (gallery preview / raw render): derive
+            // the duration from the narration and tell the engine about it.
+            TOTAL = intro + lastEnd + outro;
+            root.setAttribute("data-duration", String(Math.round(TOTAL * 10) / 10));
+          }
+
+          var host = root.querySelector(".host");
+          var glow = root.querySelector(".glow");
+          var eyebrow = root.querySelector(".eyebrow");
+          var eyes = root.querySelector(".host-eyes");
+          var mouth = root.querySelector(".host-mouth");
+          var captions = root.querySelector(".captions");
+
+          var tl = gsap.timeline({ paused: true });
+
+          // ——— Intro: host scales in, glow blooms, brand eyebrow rises ————————
+          gsap.set(mouth, { scaleY: 0.3 });
+          tl.fromTo(host, { opacity: 0, scale: 0.85 },
+            { opacity: 1, scale: 1, duration: 0.7, ease: "back.out(1.6)" }, 0);
+          tl.fromTo(glow, { opacity: 0 }, { opacity: 1, duration: 0.9, ease: "power2.out" }, 0.1);
+          tl.fromTo(eyebrow, { opacity: 0, y: 18 },
+            { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.3);
+
+          // Gentle idle bob for the whole narration. Bounded repeat — the engine
+          // seeks a FINITE timeline; an infinite repeat would never resolve.
+          tl.to(host, {
+            y: 8, duration: 1.6, ease: "sine.inOut",
+            yoyo: true, repeat: Math.max(1, Math.ceil(TOTAL / 1.6))
+          }, 0);
+
+          // ——— Mouth: open on every word window (audio time + intro offset) ———
+          for (var m = 0; m < words.length; m++) {
+            var wd = words[m];
+            var at = intro + wd[1];
+            var end = intro + wd[2];
+            var open = 0.75 + 0.5 * ((wd[0].length % 4) / 4); // deterministic variety
+            var len = wd[2] - wd[1];
+            tl.to(mouth, { scaleY: open, duration: Math.min(0.09, len / 2), ease: "power2.out" }, at);
+            if (len > 0.55) {
+              // Long word: one mid-word dip so the mouth doesn't freeze open.
+              tl.to(mouth, { scaleY: 0.45, duration: 0.08, ease: "sine.inOut" }, at + len / 2 - 0.04);
+              tl.to(mouth, { scaleY: open, duration: 0.08, ease: "sine.inOut" }, at + len / 2 + 0.05);
+            }
+            tl.to(mouth, { scaleY: 0.3, duration: 0.09, ease: "power2.in" }, Math.max(at, end - 0.09));
+          }
+
+          // ——— Blink schedule (deterministic, off the word grid) ————————————
+          for (var t = 1.1; t < TOTAL - 0.4; t += 3.2) {
+            tl.to(eyes, { scaleY: 0.1, duration: 0.07, yoyo: true, repeat: 1, ease: "sine.inOut" }, t);
+          }
+
+          // ——— Karaoke captions: chunk words into short lines ————————————————
+          function chunkLines(ws) {
+            var lines = [];
+            var cur = [];
+            var len = 0;
+            for (var j = 0; j < ws.length; j++) {
+              var word = ws[j];
+              if (cur.length > 0 && (cur.length >= 4 || len + word[0].length + 1 > 22)) {
+                lines.push(cur);
+                cur = [];
+                len = 0;
+              }
+              cur.push(word);
+              len += word[0].length + 1;
+            }
+            if (cur.length > 0) lines.push(cur);
+            return lines;
+          }
+
+          var lines = chunkLines(words);
+          for (var li = 0; li < lines.length; li++) {
+            var line = lines[li];
+            var lineEl = document.createElement("div");
+            lineEl.className = "cap-line";
+            for (var wi = 0; wi < line.length; wi++) {
+              var span = document.createElement("span");
+              span.className = "cap-word";
+              // textContent ONLY — the words are user script content; never markup.
+              span.textContent = line[wi][0];
+              lineEl.appendChild(span);
+              // Word fill + a tiny pop when it is spoken.
+              var wAt = intro + line[wi][1];
+              tl.to(span, { opacity: 1, duration: 0.12, ease: "none" }, wAt);
+              tl.fromTo(span, { y: 0 }, { y: -4, duration: 0.1, yoyo: true, repeat: 1, ease: "sine.out" }, wAt);
+            }
+            captions.appendChild(lineEl);
+            var lineIn = intro + line[0][1] - 0.15;
+            // Hand off to the next line just before its first word; hold the last.
+            var lineOut = li + 1 < lines.length
+              ? intro + lines[li + 1][0][1] - 0.08
+              : intro + line[line.length - 1][2] + 0.5;
+            tl.to(lineEl, { opacity: 1, duration: 0.12, ease: "none" }, Math.max(0, lineIn));
+            tl.to(lineEl, { opacity: 0, duration: 0.12, ease: "none" }, Math.max(0, lineOut));
+          }
+
+          // ——— Outro: captions clear, host settles ———————————————————————————
+          var outroAt = Math.max(0, TOTAL - outro + 0.3);
+          tl.to(captions, { opacity: 0, duration: 0.4, ease: "power2.in" }, outroAt);
+          tl.to(host, { scale: 0.98, duration: 0.6, ease: "sine.inOut" }, outroAt);
+          tl.to(glow, { opacity: 0.55, duration: 0.6, ease: "sine.inOut" }, outroAt);
+
+          window.__timelines = window.__timelines || {};
+          window.__timelines["talking-host"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>

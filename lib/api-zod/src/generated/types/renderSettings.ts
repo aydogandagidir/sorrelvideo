@@ -11,6 +11,7 @@ import type { RenderSettingsFormat } from './renderSettingsFormat';
 import type { RenderSettingsFps } from './renderSettingsFps';
 import type { RenderSettingsQuality } from './renderSettingsQuality';
 import type { RenderSettingsResolution } from './renderSettingsResolution';
+import type { RenderSettingsVoiceover } from './renderSettingsVoiceover';
 import type { RenderTransition } from './renderTransition';
 
 export interface RenderSettings {
@@ -31,4 +32,10 @@ export interface RenderSettings {
      * @nullable
      */
   captions?: RenderSettingsCaptions;
+  /**
+     * Talking-host narration (server-managed — set by POST /avatar/video, not client-writable; deliberately absent from RenderSettingsInput).
+
+     * @nullable
+     */
+  voiceover?: RenderSettingsVoiceover;
 }

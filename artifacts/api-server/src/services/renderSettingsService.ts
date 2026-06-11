@@ -17,6 +17,7 @@ import {
   type RenderFormat,
   type RenderFps,
   type RenderCaptionWord,
+  type RenderVoiceover,
 } from "@workspace/db";
 
 const QUALITIES: readonly RenderQuality[] = ["draft", "standard", "high"];
@@ -108,11 +109,42 @@ function sanitizeCaptions(
   return clean.length > 0 ? { words: clean.slice(0, 2000) } : undefined;
 }
 
+/**
+ * Coerce a raw voiceover blob (talking-host narration) into a clean
+ * `RenderVoiceover` (or undefined). CRITICAL: `resolveSettings` rebuilds the
+ * settings object field-by-field, so without this block a stored voiceover is
+ * silently DROPPED on the render path (executeRender re-resolves the jsonb)
+ * and erased by any later render-settings PATCH merge — shipping a mute
+ * talking-host video. `objectPath` must be null (local render-dir copy only)
+ * or a "/objects/"-shaped string; ownership is re-checked at render time.
+ */
+function sanitizeVoiceover(raw: unknown): RenderVoiceover | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const v = raw as { objectPath?: unknown; startAt?: unknown; volume?: unknown };
+  const objectPath =
+    typeof v.objectPath === "string" && v.objectPath.startsWith("/objects/")
+      ? v.objectPath
+      : v.objectPath === null
+        ? null
+        : undefined;
+  if (objectPath === undefined) return undefined;
+  const startAt =
+    typeof v.startAt === "number" && Number.isFinite(v.startAt)
+      ? Math.max(0, Math.min(600, v.startAt))
+      : 0;
+  return {
+    objectPath,
+    startAt,
+    volume: clampAudioVolume(v.volume ?? 100),
+  };
+}
+
 export function resolveSettings(
   raw: Partial<RenderSettings> | null | undefined,
 ): RenderSettings {
   const r = raw ?? {};
   const captions = sanitizeCaptions(r.captions);
+  const voiceover = sanitizeVoiceover(r.voiceover);
   return {
     fps: FPS_VALUES.includes(r.fps as RenderFps)
       ? (r.fps as RenderFps)
@@ -149,6 +181,7 @@ export function resolveSettings(
         }
       : {}),
     ...(captions ? { captions } : {}),
+    ...(voiceover ? { voiceover } : {}),
   };
 }
 
@@ -174,6 +207,10 @@ export function assertRenderSettingsAllowed(
     proOnly.push("Multiple transitions");
   if (settings.backgroundAudio) proOnly.push("Background audio");
   if (settings.captions?.words?.length) proOnly.push("Captions");
+  // `voiceover` is deliberately NOT Pro-gated: the talking-host flow that sets
+  // it is metered by an AI quota unit at creation + the render quota. Gating it
+  // here would 403 every Free auto-render AFTER the AI unit was already spent
+  // (this assert re-runs at render time), stranding a draft the user paid for.
 
   if (proOnly.length > 0) {
     throw new RenderSettingsUpgradeError(

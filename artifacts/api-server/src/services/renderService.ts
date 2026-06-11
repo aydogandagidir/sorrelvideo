@@ -15,6 +15,7 @@ import {
   type RenderCaptions,
   type RenderResolution,
   type RenderSettings,
+  type RenderVoiceover,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { getBrandKit, getDefaultBrandKit } from "./brandKitService";
@@ -85,6 +86,10 @@ const COMPOSITION_MAP: Record<string, string> = {
   // website→video: the captured screenshot is injected via compositionVars
   // (capture.image data URI + capture.height/title/url) by websiteToVideoService.
   "website-showcase": "website-showcase.html",
+  // script→video: the TTS narration + Whisper word timings are injected via
+  // compositionVars (base64 host.payload) by talkingHostService; the voiceover
+  // file itself is a render-dir sibling muxed via RenderSettings.voiceover.
+  "talking-host": "talking-host.html",
   // Hand-authored showcase templates (M-features Track B): exercise the engine's
   // Three.js/WebGL and Lottie adapters, which no template used before.
   "product-3d": "product-3d.html",
@@ -129,6 +134,18 @@ const STUDIO_FALLBACKS = {
 export function resolveEntryFile(module: string): string {
   return COMPOSITION_MAP[module] ?? DEFAULT_COMPOSITION;
 }
+
+/**
+ * The per-project render directory (`renders/<projectId>`). Exported so flows
+ * that stage sibling files BEFORE a render (talkingHostService writes the TTS
+ * `voice.mp3` at creation time) resolve the exact directory the pipeline reads.
+ */
+export function renderDirFor(projectId: number): string {
+  return path.join(RENDERS_DIR, String(projectId));
+}
+
+/** Fixed filename of the talking-host narration inside the render dir. */
+export const VOICEOVER_FILENAME = "voice.mp3";
 
 /** Output filename per video container format (no leading directory). */
 const OUTPUT_FILENAME: Record<Exclude<RenderFormat, "png-sequence">, string> = {
@@ -329,6 +346,71 @@ async function resolveBackgroundAudioTag(
     );
     return null;
   }
+}
+
+/**
+ * The talking-host narration could not be sourced from EITHER the local render
+ * dir or object storage. Deliberately a hard failure (unlike background music's
+ * silent fallback): a talking-host video without its voice is worthless, so the
+ * render must fail loudly with an actionable message instead of shipping a mute
+ * MP4. `executeRender`'s catch converts this into project `failed` +
+ * `renderError` + the automatic Free render-quota refund.
+ */
+export class VoiceoverUnavailableError extends Error {
+  constructor() {
+    super("Voiceover audio unavailable — recreate the video from the Avatar page");
+    this.name = "VoiceoverUnavailableError";
+  }
+}
+
+/**
+ * Resolve the talking-host narration into an `<audio>` tag for the engine to
+ * mux. Source preference: the local `renders/<id>/voice.mp3` sibling written at
+ * creation time (works with zero GCS config), else the durable GCS object
+ * (`voiceover.objectPath`, ownership re-checked) downloaded into place. Neither
+ * → throw (see VoiceoverUnavailableError — no silent fallback by design).
+ *
+ * The tag deliberately has NO `loop` (narration must never restart inside a
+ * longer composition) and uses `data-track-index="1"` so a background-music
+ * track (index 0) can be layered under it later. `data-duration` matches the
+ * composition's declared duration; the engine's `audioPadTrim` pads/trims the
+ * mix to the exact video length.
+ */
+export async function resolveVoiceoverTag(
+  userId: string,
+  voiceover: RenderVoiceover,
+  dir: string,
+  compositionHtml: string,
+): Promise<string> {
+  const localPath = path.join(dir, VOICEOVER_FILENAME);
+  if (!fs.existsSync(localPath)) {
+    if (!voiceover.objectPath) throw new VoiceoverUnavailableError();
+    try {
+      const storage = new ObjectStorageService();
+      const file = await storage.getObjectEntityFile(voiceover.objectPath);
+      const canRead = await storage.canAccessObjectEntity({
+        userId,
+        objectFile: file,
+        requestedPermission: ObjectPermission.READ,
+      });
+      if (!canRead) throw new Error("voiceover object not owned by user");
+      await file.download({ destination: localPath });
+    } catch (err) {
+      logger.error(
+        { err, userId, objectPath: voiceover.objectPath },
+        "Voiceover audio unavailable — failing the render",
+      );
+      throw new VoiceoverUnavailableError();
+    }
+  }
+  const volume = Math.max(0, Math.min(1, (voiceover.volume ?? 100) / 100)).toFixed(3);
+  const startAt =
+    typeof voiceover.startAt === "number" && Number.isFinite(voiceover.startAt)
+      ? Math.max(0, voiceover.startAt)
+      : 0;
+  const compDuration =
+    compositionHtml.match(/data-duration="([\d.]+)"/)?.[1] ?? "30";
+  return `<audio src="${VOICEOVER_FILENAME}" data-start="${startAt}" data-duration="${compDuration}" data-track-index="1" data-volume="${volume}"></audio>`;
 }
 
 /**
@@ -550,6 +632,7 @@ async function prepareCompositionFor(
     watermark: boolean;
     backgroundAudio?: RenderAudioTrack | null;
     captions?: RenderCaptions | null;
+    voiceover?: RenderVoiceover | null;
   } = {
     watermark: true,
   },
@@ -590,6 +673,19 @@ async function prepareCompositionFor(
       rendered,
     );
     if (tag) rendered = injectBeforeBodyEnd(rendered, tag);
+  }
+
+  // Voiceover (talking-host narration): local voice.mp3 sibling, else the GCS
+  // copy. NOT wrapped in a try/catch — a missing voiceover must FAIL the render
+  // (VoiceoverUnavailableError), never ship a mute talking-host video.
+  if (options.voiceover) {
+    const tag = await resolveVoiceoverTag(
+      project.userId,
+      options.voiceover,
+      dir,
+      rendered,
+    );
+    rendered = injectBeforeBodyEnd(rendered, tag);
   }
 
   // Captions (Track E): an overlay whose opacity tweens append to the root
@@ -660,6 +756,7 @@ export async function executeRender(
       watermark: settings.watermark,
       backgroundAudio: settings.backgroundAudio,
       captions: settings.captions,
+      voiceover: settings.voiceover,
     });
 
     const format = settings.format;

@@ -1,10 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, Loader2, Mic, Send, Sparkles } from "lucide-react";
-import { useAvatarChat } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
+import { Bot, Clapperboard, Loader2, Mic, Send, Sparkles } from "lucide-react";
+import {
+  useAvatarChat,
+  useCreateAvatarVideo,
+} from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -105,6 +124,141 @@ function AvatarFace({ state }: { state: Status }) {
   );
 }
 
+/** The OpenAI speech voices exposed by POST /api/avatar/video. */
+const VIDEO_VOICES = [
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "fable",
+  "nova",
+  "onyx",
+  "sage",
+  "shimmer",
+] as const;
+type VideoVoice = (typeof VIDEO_VOICES)[number];
+const MAX_SCRIPT_CHARS = 1200;
+
+/**
+ * Script → talking-host video panel: the avatar's render-pipeline value. Type
+ * a script, pick a voice, and the backend TTSes it, word-times it, creates a
+ * `talking-host` project and auto-starts the render — we land on /projects
+ * where the regular polling + video dialog take over.
+ */
+function ScriptToVideoPanel({
+  onUpgradeRequired,
+}: {
+  onUpgradeRequired: () => void;
+}) {
+  const [script, setScript] = useState("");
+  const [voice, setVoice] = useState<VideoVoice>("alloy");
+  const [error, setError] = useState<string | null>(null);
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const createVideo = useCreateAvatarVideo();
+
+  const ready = script.trim().length >= 10 && !createVideo.isPending;
+
+  async function handleSubmit(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    if (!ready) return;
+    setError(null);
+    try {
+      const res = await createVideo.mutateAsync({ data: { script, voice } });
+      if (!res.renderStarted && res.renderMessage) {
+        toast({ title: "Saved as draft", description: res.renderMessage });
+      }
+      setLocation(`/projects?focus=${res.project.id}`);
+    } catch (err) {
+      const e2 = err as { status?: number; data?: { error?: string } };
+      if (e2.status === 403) {
+        onUpgradeRequired();
+        return;
+      }
+      if (e2.status === 503) {
+        setError(
+          "Text-to-speech isn't enabled on this server yet — an admin needs to set an OpenAI key.",
+        );
+        return;
+      }
+      setError(e2.data?.error ?? "Couldn't create the video. Try again.");
+    }
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clapperboard className="h-5 w-5 text-primary" />
+          Script → video
+        </CardTitle>
+        <CardDescription>
+          Your host reads the script aloud — branded, lip-synced, with karaoke
+          captions — and renders straight to MP4.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <Textarea
+            value={script}
+            onChange={(e) => setScript(e.target.value.slice(0, MAX_SCRIPT_CHARS))}
+            placeholder="Hi! Here's what makes our product different…"
+            rows={5}
+            disabled={createVideo.isPending}
+            aria-label="Video script"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Select
+                value={voice}
+                onValueChange={(v) => setVoice(v as VideoVoice)}
+                disabled={createVideo.isPending}
+              >
+                <SelectTrigger className="w-[130px]" aria-label="Voice">
+                  <SelectValue placeholder="Voice" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VIDEO_VOICES.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v.charAt(0).toUpperCase() + v.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-[11px] text-muted-foreground">
+                {script.length}/{MAX_SCRIPT_CHARS}
+              </span>
+            </div>
+            <Button type="submit" disabled={!ready}>
+              {createVideo.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Create video
+                </>
+              )}
+            </Button>
+          </div>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            Uses 1 AI credit per video; the render uses your monthly renders.
+            Voiced in your brand&apos;s tone when a Brand DNA is set.
+          </p>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AvatarPage() {
   const [started, setStarted] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
@@ -112,6 +266,9 @@ export default function AvatarPage() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<
+    "premium_template" | "ai_limit"
+  >("premium_template");
 
   const chat = useAvatarChat();
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
@@ -161,6 +318,7 @@ export default function AvatarPage() {
       } catch (err) {
         const e = err as { status?: number; data?: { error?: string } };
         if (e.status === 403) {
+          setUpgradeReason("premium_template");
           setShowUpgrade(true);
           setStatus("idle");
           return;
@@ -325,11 +483,18 @@ export default function AvatarPage() {
             )}
           </CardContent>
         </Card>
+
+        <ScriptToVideoPanel
+          onUpgradeRequired={() => {
+            setUpgradeReason("ai_limit");
+            setShowUpgrade(true);
+          }}
+        />
       </div>
       <UpgradeModal
         open={showUpgrade}
         onOpenChange={setShowUpgrade}
-        reason="premium_template"
+        reason={upgradeReason}
       />
     </Layout>
   );
