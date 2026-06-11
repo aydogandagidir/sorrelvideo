@@ -15,10 +15,9 @@
   Brand/user placeholders are substituted by renderService.renderCompositionTemplate.
 -->
 <!doctype html>
-<html lang="en">
+<html lang="en" data-aspect="{{layout.aspect}}" style="--vw: {{layout.width}}; --vh: {{layout.height}}">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1080, height=1920" />
     <title>Video Spotlight</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -36,8 +35,10 @@
       html,
       body {
         margin: 0;
-        width: 1080px;
-        height: 1920px;
+        /* Canvas authored per-render from the chosen aspect (server injects
+           --vw/--vh via {{layout.*}}). Defaults keep the legacy portrait. */
+        width: calc(var(--vw, 1080) * 1px);
+        height: calc(var(--vh, 1920) * 1px);
         overflow: hidden;
         background: #05050a;
       }
@@ -47,8 +48,8 @@
     <div
       id="video-spotlight"
       data-composition-id="video-spotlight"
-      data-width="1080"
-      data-height="1920"
+      data-width="{{layout.width}}"
+      data-height="{{layout.height}}"
       data-start="0"
       data-duration="{{duration}}"
     >
@@ -79,8 +80,8 @@
       <style>
         [data-composition-id="video-spotlight"] .stage {
           position: relative;
-          width: 1080px;
-          height: 1920px;
+          width: 100%;
+          height: 100%;
           background: #05050a;
           font-family: "Inter", sans-serif;
           overflow: hidden;
@@ -172,6 +173,31 @@
           border-radius: 2px;
           background: {{brand.primaryColor}};
           z-index: 3;
+        }
+        /* Aspect re-layout, keyed off the server-set data-aspect (not @media).
+           Portrait keeps the authored defaults above. The hero video / scrim are
+           edge-anchored (inset: 0) so they fill any canvas already. */
+        [data-aspect="landscape"] [data-composition-id="video-spotlight"] .copy {
+          left: 110px;
+          right: 110px;
+          bottom: 110px;
+        }
+        [data-aspect="landscape"] [data-composition-id="video-spotlight"] .headline {
+          font-size: 64px;
+          max-width: 1100px;
+        }
+        [data-aspect="landscape"] [data-composition-id="video-spotlight"] .rule {
+          left: 110px;
+          bottom: 84px;
+        }
+        [data-aspect="square"] [data-composition-id="video-spotlight"] .copy {
+          bottom: 130px;
+        }
+        [data-aspect="square"] [data-composition-id="video-spotlight"] .headline {
+          font-size: 62px;
+        }
+        [data-aspect="square"] [data-composition-id="video-spotlight"] .rule {
+          bottom: 104px;
         }
       </style>
 

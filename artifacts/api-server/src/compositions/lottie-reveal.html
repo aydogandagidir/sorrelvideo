@@ -17,10 +17,9 @@
   on it in the gallery (the inline bodymovin JSON cannot be type-checked).
 -->
 <!doctype html>
-<html lang="en">
+<html lang="en" data-aspect="{{layout.aspect}}" style="--vw: {{layout.width}}; --vh: {{layout.height}}">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1080, height=1920" />
     <title>Lottie Reveal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -39,8 +38,10 @@
       html,
       body {
         margin: 0;
-        width: 1080px;
-        height: 1920px;
+        /* Canvas authored per-render from the chosen aspect (server injects
+           --vw/--vh via {{layout.*}}). Defaults keep the legacy portrait. */
+        width: calc(var(--vw, 1080) * 1px);
+        height: calc(var(--vh, 1920) * 1px);
         overflow: hidden;
         background: #07070b;
       }
@@ -50,8 +51,8 @@
     <div
       id="lottie-reveal"
       data-composition-id="lottie-reveal"
-      data-width="1080"
-      data-height="1920"
+      data-width="{{layout.width}}"
+      data-height="{{layout.height}}"
       data-start="0"
       data-duration="6"
     >
@@ -68,8 +69,8 @@
       <style>
         [data-composition-id="lottie-reveal"] .stage {
           position: relative;
-          width: 1080px;
-          height: 1920px;
+          width: 100%;
+          height: 100%;
           background: radial-gradient(120% 90% at 50% 36%, #14141d 0%, #07070b 64%);
           font-family: "Inter", sans-serif;
           overflow: hidden;
@@ -77,7 +78,7 @@
         [data-composition-id="lottie-reveal"] .halo {
           position: absolute;
           left: 50%;
-          top: 640px;
+          top: 33%;
           width: 720px;
           height: 720px;
           transform: translate(-50%, -50%) scale(0.6);
@@ -93,7 +94,7 @@
         [data-composition-id="lottie-reveal"] .lottie {
           position: absolute;
           left: 50%;
-          top: 640px;
+          top: 33%;
           width: 620px;
           height: 620px;
           transform: translate(-50%, -50%);
@@ -138,6 +139,31 @@
           padding: 18px 40px;
           border-radius: 9999px;
           opacity: 0;
+        }
+        /* Aspect re-layout, keyed off the server-set data-aspect (not @media).
+           Portrait keeps the authored defaults above. */
+        [data-aspect="landscape"] [data-composition-id="lottie-reveal"] .halo,
+        [data-aspect="landscape"] [data-composition-id="lottie-reveal"] .lottie {
+          top: 38%;
+        }
+        [data-aspect="landscape"] [data-composition-id="lottie-reveal"] .copy {
+          bottom: 84px;
+          padding: 0 200px;
+        }
+        [data-aspect="landscape"] [data-composition-id="lottie-reveal"] .headline {
+          font-size: 64px;
+          max-width: 1200px;
+        }
+        [data-aspect="square"] [data-composition-id="lottie-reveal"] .halo,
+        [data-aspect="square"] [data-composition-id="lottie-reveal"] .lottie {
+          top: 36%;
+        }
+        [data-aspect="square"] [data-composition-id="lottie-reveal"] .copy {
+          bottom: 96px;
+          padding: 0 110px;
+        }
+        [data-aspect="square"] [data-composition-id="lottie-reveal"] .headline {
+          font-size: 62px;
         }
       </style>
 
