@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import {
   buildSystemPrompt,
   buildUserPrompt,
+  buildAvatarSystem,
   BRAND_EXTRACT_SYSTEM,
   buildBrandExtractUserText,
   VIDEO_IDEAS_SYSTEM,
@@ -17,6 +18,8 @@ import {
   type ExtractBrandResult,
   type GenerateVideoIdeasInput,
   type GenerateVideoIdeasResult,
+  type ChatInput,
+  type ChatResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -29,7 +32,12 @@ const DEFAULT_MODEL = "gpt-4o-mini";
 // cap) — a tight cap can be fully consumed by reasoning and yield empty content.
 // `store: true` matches OpenAI's free-tier example (Responses/quickstart) and is
 // harmless on paid usage.
-const TOKENS = { suggest: 2048, extractBrand: 2048, videoIdeas: 4096 } as const;
+const TOKENS = {
+  suggest: 2048,
+  extractBrand: 2048,
+  videoIdeas: 4096,
+  chat: 600,
+} as const;
 
 let client: OpenAI | null = null;
 function getClient(): OpenAI {
@@ -127,6 +135,32 @@ const VIDEO_IDEAS_RESPONSE_SCHEMA = {
 
 export const openaiProvider: AiProvider = {
   name: "openai",
+
+  async chat(input: ChatInput): Promise<ChatResult> {
+    const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+    const response = await getClient().chat.completions.create({
+      model,
+      max_completion_tokens: input.maxTokens ?? TOKENS.chat,
+      store: true,
+      messages: [
+        { role: "system", content: buildAvatarSystem(input.brand) },
+        ...input.messages.map((m) => ({ role: m.role, content: m.content })),
+      ],
+    });
+
+    const reply = response.choices[0]?.message?.content?.trim();
+    if (!reply) throw new Error("OpenAI returned no message content");
+
+    return {
+      reply,
+      usage: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+        cacheReadInputTokens:
+          response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
+      },
+    };
+  },
 
   async suggest(input: SuggestInput): Promise<SuggestResult> {
     const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;

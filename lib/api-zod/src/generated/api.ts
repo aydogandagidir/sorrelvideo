@@ -1059,6 +1059,21 @@ export const GetAvatarUsageResponse = zod.object({
 
 
 /**
+ * @summary Brand-voiced conversation turn for the free browser avatar (Pro)
+ */
+export const AvatarChatBody = zod.object({
+  "messages": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant']),
+  "content": zod.string()
+}))
+})
+
+export const AvatarChatResponse = zod.object({
+  "reply": zod.string()
+})
+
+
+/**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
 export const CreateCheckoutSessionBody = zod.object({

@@ -626,6 +626,27 @@ export interface AvatarUsageResult {
   sandbox: boolean;
 }
 
+export type AvatarChatMessageRole = typeof AvatarChatMessageRole[keyof typeof AvatarChatMessageRole];
+
+
+export const AvatarChatMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export interface AvatarChatMessage {
+  role: AvatarChatMessageRole;
+  content: string;
+}
+
+export interface AvatarChatRequest {
+  messages: AvatarChatMessage[];
+}
+
+export interface AvatarChatResult {
+  reply: string;
+}
+
 export interface GenerateCaptionsRequest {
   /**
      * /objects/... path of the user's uploaded audio object.

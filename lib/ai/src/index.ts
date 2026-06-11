@@ -31,8 +31,13 @@ export {
   type VideoIdeaModule,
   type GenerateVideoIdeasInput,
   type GenerateVideoIdeasResult,
+  ChatMessageSchema,
+  ChatInputSchema,
+  type ChatMessage,
+  type ChatInput,
+  type ChatResult,
 } from "./schema";
-export { buildSystemPrompt, buildUserPrompt } from "./prompt";
+export { buildSystemPrompt, buildUserPrompt, buildAvatarSystem } from "./prompt";
 export type { AiProvider };
 
 /**

@@ -3,6 +3,7 @@ import {
   SYSTEM_CORE,
   buildBrandContext,
   buildUserPrompt,
+  buildAvatarSystem,
   BRAND_EXTRACT_SYSTEM,
   buildBrandExtractUserText,
   VIDEO_IDEAS_SYSTEM,
@@ -18,6 +19,8 @@ import {
   type ExtractBrandResult,
   type GenerateVideoIdeasInput,
   type GenerateVideoIdeasResult,
+  type ChatInput,
+  type ChatResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -112,6 +115,48 @@ export const anthropicProvider: AiProvider = {
         // Surfaced so the caller can log cache effectiveness. `cache_read > 0`
         // means the stable prefix was served from cache (~10% of input cost);
         // `cache_creation > 0` is the one-time write that seeds it.
+        cacheCreationInputTokens:
+          response.usage.cache_creation_input_tokens ?? undefined,
+        cacheReadInputTokens:
+          response.usage.cache_read_input_tokens ?? undefined,
+      },
+    };
+  },
+
+  async chat(input: ChatInput): Promise<ChatResult> {
+    const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
+    const response = await getClient().messages.create({
+      model,
+      max_tokens: input.maxTokens ?? 300,
+      system: [
+        {
+          type: "text",
+          text: buildAvatarSystem(input.brand),
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: input.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+    });
+
+    const reply = response.content
+      .filter(
+        (block): block is Extract<typeof block, { type: "text" }> =>
+          block.type === "text",
+      )
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
+
+    if (!reply) throw new Error("Anthropic returned no text content");
+
+    return {
+      reply,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
         cacheCreationInputTokens:
           response.usage.cache_creation_input_tokens ?? undefined,
         cacheReadInputTokens:

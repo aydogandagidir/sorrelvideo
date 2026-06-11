@@ -1,100 +1,219 @@
-import { useEffect, useRef, useState } from "react";
-import { LiveAvatarSession, SessionEvent } from "@heygen/liveavatar-web-sdk";
-import { Bot, Loader2, Mic, PhoneOff, Sparkles } from "lucide-react";
-import {
-  useCreateAvatarSessionToken,
-  useGetAvatarUsage,
-} from "@workspace/api-client-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Bot, Loader2, Mic, Send, Sparkles } from "lucide-react";
+import { useAvatarChat } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
-type Status = "idle" | "connecting" | "live" | "error";
+type Msg = { role: "user" | "assistant"; content: string };
+type Status = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 /**
- * Live Avatar (Track F) — a real-time, conversational HeyGen LiveAvatar.
- * A short-lived session token is minted server-side (POST /api/avatar/session-token,
- * which holds LIVEAVATAR_API_KEY); the @heygen/liveavatar-web-sdk LiveAvatarSession
- * opens the WebRTC stream and we attach() the remote tracks to a <video>.
+ * Live Avatar — the FREE, browser-native conversational avatar (Track F,
+ * self-hosted path). The browser does speech-to-text + text-to-speech for free;
+ * the server does only the brand-voiced LLM turn (POST /api/avatar/chat). A
+ * stylized SVG face lip-syncs while it speaks. No GPU, no SaaS, no credits.
  *
- * This is a SEPARATE product line from the batch render pipeline. Pro-gated;
- * config-gated server-side (503 → we surface a "not enabled" note). Runs in
- * sandbox by default (no credit consumption) until per-minute billing is wired.
+ * Voice in (SpeechRecognition) is Chrome/Edge-only — everywhere else the typed
+ * input is the path, so the feature degrades gracefully. Voice OUT
+ * (speechSynthesis) is available in every modern browser.
  */
+
+// Minimal Web Speech typings (not in the DOM lib across all TS configs).
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult:
+    | ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void)
+    | null;
+  onerror: ((e: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+}
+
+function speechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+/** Animated, brand-neutral SVG host. Eyes blink; mouth opens while speaking. */
+function AvatarFace({ state }: { state: Status }) {
+  const speaking = state === "speaking";
+  const listening = state === "listening";
+  return (
+    <div className="relative flex h-44 w-44 items-center justify-center">
+      <div
+        className={`absolute inset-0 rounded-full bg-primary/20 blur-2xl transition-opacity ${
+          speaking || listening ? "opacity-100" : "opacity-40"
+        }`}
+      />
+      {listening && (
+        <span className="absolute inset-0 animate-ping rounded-full border-2 border-primary/40" />
+      )}
+      <svg
+        viewBox="0 0 120 120"
+        className="relative h-40 w-40"
+        role="img"
+        aria-label="Avatar"
+      >
+        <defs>
+          <linearGradient id="avahead" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="hsl(var(--primary))" />
+            <stop offset="1" stopColor="hsl(var(--spark))" />
+          </linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r="52" fill="url(#avahead)" opacity="0.18" />
+        <circle
+          cx="60"
+          cy="60"
+          r="46"
+          fill="hsl(var(--card))"
+          stroke="url(#avahead)"
+          strokeWidth="3"
+        />
+        {/* eyes */}
+        <g className="avatar-eyes" fill="hsl(var(--foreground))">
+          <circle cx="45" cy="52" r="5" />
+          <circle cx="75" cy="52" r="5" />
+        </g>
+        {/* mouth: a rounded rect that scales vertically while speaking */}
+        <rect
+          x="46"
+          y="74"
+          width="28"
+          height={speaking ? 12 : 4}
+          rx="6"
+          fill="hsl(var(--foreground))"
+          className={speaking ? "avatar-mouth-speaking" : ""}
+          style={{ transformBox: "fill-box", transformOrigin: "center" }}
+        />
+      </svg>
+      <style>{`
+        @keyframes avatarBlink { 0%,92%,100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+        .avatar-eyes { transform-box: fill-box; transform-origin: center; animation: avatarBlink 4.5s infinite; }
+        @keyframes avatarTalk { 0%,100% { transform: scaleY(0.5); } 50% { transform: scaleY(1.25); } }
+        .avatar-mouth-speaking { animation: avatarTalk 0.28s ease-in-out infinite; }
+      `}</style>
+    </div>
+  );
+}
+
 export default function AvatarPage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const sessionRef = useRef<LiveAvatarSession | null>(null);
+  const [started, setStarted] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const createToken = useCreateAvatarSessionToken();
-  const { data: usage } = useGetAvatarUsage();
 
-  async function start() {
-    setError(null);
-    setStatus("connecting");
-    try {
-      const { sessionToken } = await createToken.mutateAsync({ data: {} });
-      const session = new LiveAvatarSession(sessionToken, { voiceChat: true });
-      sessionRef.current = session;
-      session.on(SessionEvent.SESSION_STREAM_READY, () => {
-        if (videoRef.current) session.attach(videoRef.current);
-        setStatus("live");
-      });
-      session.on(SessionEvent.SESSION_DISCONNECTED, () => {
-        sessionRef.current = null;
-        setStatus("idle");
-      });
-      await session.start();
-    } catch (err) {
-      const e = err as {
-        status?: number;
-        data?: { error?: string; reason?: string };
-      };
-      sessionRef.current = null;
-      if (e.data?.reason === "avatar_limit") {
-        setError(
-          e.data?.error ??
-            "You've reached your monthly avatar session limit — it resets next month.",
-        );
-        setStatus("error");
-        return;
-      }
-      if (e.status === 403) {
-        setShowUpgrade(true);
-        setStatus("idle");
-        return;
-      }
-      if (e.status === 503) {
-        setError("The live avatar isn't enabled on this server yet.");
-        setStatus("error");
-        return;
-      }
-      setError(e.data?.error ?? "Could not start the avatar session.");
-      setStatus("error");
-    }
-  }
+  const chat = useAvatarChat();
+  const recogRef = useRef<SpeechRecognitionLike | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sttSupported = speechRecognitionCtor() !== null;
 
-  async function stop() {
-    try {
-      await sessionRef.current?.stop();
-    } catch {
-      /* ignore — we're tearing down anyway */
-    }
-    sessionRef.current = null;
-    setStatus("idle");
-  }
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages, status]);
 
-  // Tear the session down if the user navigates away while it's live.
+  // Tear down speech on unmount so a reply doesn't keep talking after navigation.
   useEffect(() => {
     return () => {
-      void sessionRef.current?.stop();
-      sessionRef.current = null;
+      window.speechSynthesis?.cancel();
+      recogRef.current?.stop();
     };
   }, []);
 
-  const connecting = status === "connecting" || createToken.isPending;
+  const speak = useCallback((text: string) => {
+    const synth = window.speechSynthesis;
+    if (!synth) {
+      setStatus("idle");
+      return;
+    }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1;
+    u.onend = () => setStatus("idle");
+    u.onerror = () => setStatus("idle");
+    setStatus("speaking");
+    synth.speak(u);
+  }, []);
+
+  const send = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || chat.isPending) return;
+      setError(null);
+      setDraft("");
+      const next: Msg[] = [...messages, { role: "user", content: trimmed }];
+      setMessages(next);
+      setStatus("thinking");
+      try {
+        const res = await chat.mutateAsync({ data: { messages: next } });
+        setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
+        speak(res.reply);
+      } catch (err) {
+        const e = err as { status?: number; data?: { error?: string } };
+        if (e.status === 403) {
+          setShowUpgrade(true);
+          setStatus("idle");
+          return;
+        }
+        if (e.status === 503) {
+          setError(
+            "The avatar isn't enabled on this server yet — an admin needs to set an AI key.",
+          );
+          setStatus("error");
+          return;
+        }
+        setError(e.data?.error ?? "The avatar could not reply. Try again.");
+        setStatus("error");
+      }
+    },
+    [messages, chat, speak],
+  );
+
+  const listen = useCallback(() => {
+    const Ctor = speechRecognitionCtor();
+    if (!Ctor || chat.isPending) return;
+    window.speechSynthesis?.cancel();
+    const r = new Ctor();
+    recogRef.current = r;
+    r.lang = "en-US";
+    r.continuous = false;
+    r.interimResults = false;
+    r.onresult = (e) => {
+      const transcript = e.results?.[0]?.[0]?.transcript ?? "";
+      if (transcript.trim()) void send(transcript);
+      else setStatus("idle");
+    };
+    r.onerror = () => setStatus("idle");
+    r.onend = () => setStatus((s) => (s === "listening" ? "idle" : s));
+    setStatus("listening");
+    r.start();
+  }, [send, chat.isPending]);
+
+  function start() {
+    setStarted(true);
+    const greeting =
+      "Hi! I'm your brand's assistant. Tap the mic and talk, or type below — ask me anything.";
+    setMessages([{ role: "assistant", content: greeting }]);
+    speak(greeting);
+  }
+
+  const statusLabel: Record<Status, string> = {
+    idle: "Ready",
+    listening: "Listening…",
+    thinking: "Thinking…",
+    speaking: "Speaking…",
+    error: "Ready",
+  };
 
   return (
     <Layout>
@@ -103,7 +222,7 @@ export default function AvatarPage() {
           <div>
             <h1 className="text-[27px] leading-tight">Live Avatar</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              A real-time, conversational AI avatar — talk to it with your voice.
+              A real-time, conversational AI host — talk to it with your voice.
             </p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11.5px] font-semibold text-primary">
@@ -112,81 +231,98 @@ export default function AvatarPage() {
         </div>
 
         <Card>
-          <CardContent className="flex flex-col items-center gap-4 p-5">
-            <div className="relative aspect-[3/4] w-full max-w-[420px] overflow-hidden rounded-xl border bg-secondary">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="h-full w-full object-cover"
-              />
-              {status !== "live" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                  {connecting ? (
-                    <>
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <span className="text-sm">Connecting…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Bot className="h-10 w-10" />
-                      <span className="text-sm">
-                        {status === "error"
-                          ? "Session ended"
-                          : "Ready when you are"}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-              {status === "live" && (
-                <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-spark/90 px-2 py-0.5 text-[11px] font-semibold text-white">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                  LIVE
-                </span>
-              )}
-            </div>
+          <CardContent className="flex flex-col items-center gap-5 p-5">
+            <AvatarFace state={status} />
 
-            {error && (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            )}
-
-            {status === "live" ? (
-              <div className="flex flex-col items-center gap-2">
-                <Button type="button" variant="destructive" onClick={stop}>
-                  <PhoneOff className="h-4 w-4" /> End conversation
+            {!started ? (
+              <>
+                <Button type="button" size="lg" onClick={start}>
+                  <Bot className="h-4 w-4" /> Start conversation
                 </Button>
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Mic className="h-3.5 w-3.5" /> Just speak — the avatar listens
-                  and replies.
+                <p className="text-center text-[11.5px] text-muted-foreground">
+                  Free and unlimited. Voiced by your browser, answered in your
+                  brand voice.
                 </p>
-              </div>
+              </>
             ) : (
-              <Button
-                type="button"
-                size="lg"
-                onClick={start}
-                disabled={connecting}
-              >
-                {connecting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Connecting…
-                  </>
-                ) : (
-                  <>
-                    <Bot className="h-4 w-4" /> Start conversation
-                  </>
-                )}
-              </Button>
-            )}
+              <>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {chat.isPending ? "Thinking…" : statusLabel[status]}
+                </span>
 
-            <p className="text-center text-[11.5px] text-muted-foreground">
-              {usage?.sandbox === false
-                ? `${usage.used} of ${usage.limit} sessions used this month.`
-                : "Sandbox mode — free and unlimited."}
-            </p>
+                <div
+                  ref={scrollRef}
+                  className="flex max-h-[260px] w-full flex-col gap-2 overflow-y-auto"
+                >
+                  {messages.map((m, i) => (
+                    <div
+                      key={i}
+                      className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
+                        m.role === "user"
+                          ? "self-end bg-primary/15 text-foreground"
+                          : "self-start bg-secondary text-foreground"
+                      }`}
+                    >
+                      {m.content}
+                    </div>
+                  ))}
+                </div>
+
+                {error && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {error}
+                  </p>
+                )}
+
+                <form
+                  className="flex w-full items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void send(draft);
+                  }}
+                >
+                  {sttSupported && (
+                    <Button
+                      type="button"
+                      variant={status === "listening" ? "default" : "outline"}
+                      size="icon"
+                      onClick={listen}
+                      disabled={chat.isPending}
+                      aria-label="Talk"
+                      title="Tap and speak"
+                    >
+                      <Mic className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder={
+                      sttSupported ? "Tap the mic or type…" : "Type a message…"
+                    }
+                    disabled={chat.isPending}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={chat.isPending || !draft.trim()}
+                    aria-label="Send"
+                  >
+                    {chat.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </form>
+
+                {!sttSupported && (
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    Voice input needs Chrome or Edge — typing works everywhere.
+                  </p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

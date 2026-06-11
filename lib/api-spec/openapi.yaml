@@ -1009,6 +1009,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /avatar/chat:
+    post:
+      operationId: avatarChat
+      tags: [avatar]
+      summary: Brand-voiced conversation turn for the free browser avatar (Pro)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AvatarChatRequest"
+      responses:
+        "200":
+          description: Reply.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvatarChatResult"
+        "400":
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Pro plan required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: AI provider failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: AI is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /billing/checkout:
     post:
       operationId: createCheckoutSession
@@ -2029,6 +2078,29 @@ components:
           type: integer
         sandbox:
           type: boolean
+    AvatarChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+    AvatarChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvatarChatMessage"
+    AvatarChatResult:
+      type: object
+      required: [reply]
+      properties:
+        reply:
+          type: string
 
     GenerateCaptionsRequest:
       type: object

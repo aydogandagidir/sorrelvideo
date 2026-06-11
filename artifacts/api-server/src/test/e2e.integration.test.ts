@@ -163,4 +163,21 @@ describe.runIf(INTEGRATION_AVAILABLE)("E2E — Track F avatar endpoints", () => 
       else process.env.LIVEAVATAR_SANDBOX = prevSandbox;
     }
   });
+
+  it("the free chat endpoint requires auth (401) and is Pro-gated (403)", async () => {
+    // No session → 401.
+    const anon = await request(app)
+      .post("/api/avatar/chat")
+      .send({ messages: [{ role: "user", content: "Hi" }] });
+    expect(anon.status).toBe(401);
+
+    // A signed-up (Free) user → 403 upgrade_required (avatar is a Pro feature),
+    // BEFORE any AI provider call, so it's deterministic without an API key.
+    const { agent } = await signup("avatar-chat@test.local");
+    const gated = await agent
+      .post("/api/avatar/chat")
+      .send({ messages: [{ role: "user", content: "Hi" }] });
+    expect(gated.status).toBe(403);
+    expect(gated.body.reason).toBe("upgrade_required");
+  });
 });
