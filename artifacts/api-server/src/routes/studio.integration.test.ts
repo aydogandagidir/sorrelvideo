@@ -6,6 +6,7 @@ import request from "supertest";
 import { db, projectsTable } from "@workspace/db";
 import app from "../app";
 import { createSession } from "../lib/auth";
+import { writeFile as writeWorkspaceFile } from "../services/studioWorkspaceService";
 import { createFreeUser, truncateAll } from "../test/integration";
 import { INTEGRATION_AVAILABLE } from "../test/setup";
 
@@ -132,6 +133,37 @@ describe.runIf(INTEGRATION_AVAILABLE)(
         .get(`/api/studio/projects/${project.id}/preview/nope.css`)
         .set("Authorization", `Bearer ${sid}`);
       expect(missing.status).toBe(404);
+    });
+
+    it("self-heals a stale default seed on open (pre-contract doc, never saved)", async () => {
+      const { sid, project } = await makeStudioProject();
+      // First open seeds the CURRENT doc; then simulate a workspace that
+      // survived from an older deploy by writing the legacy ms-era seed
+      // directly through the service (bypassing the entry-save persistence).
+      await request(app)
+        .get(`/api/studio/projects/${project.id}`)
+        .set("Authorization", `Bearer ${sid}`);
+      const legacy =
+        '<html><body><div data-composition-id="studio-default"></div>' +
+        "<script>var DURATION_MS = 5000;</script></body></html>";
+      await writeWorkspaceFile(
+        project.userId,
+        String(project.id),
+        "index.html",
+        legacy,
+      );
+
+      // Re-open → the stale seed is detected and refreshed in place.
+      const reopen = await request(app)
+        .get(`/api/studio/projects/${project.id}`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(reopen.status).toBe(200);
+
+      const entry = await request(app)
+        .get(`/api/studio/projects/${project.id}/files/index.html`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(entry.body.content).toContain("isActive"); // new contract
+      expect(entry.body.content).not.toContain("DURATION_MS");
     });
 
     it("GET /lint runs the engine linter and returns findings JSON", async () => {
