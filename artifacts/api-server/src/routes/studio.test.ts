@@ -110,6 +110,29 @@ describe("GET /api/studio/projects/:id/preview/comp/*splat (wildcard)", () => {
   });
 });
 
+describe("GET /api/studio/projects/:id/preview (master)", () => {
+  it("returns 401 (not 404 — the route must exist) when no session is present", async () => {
+    const res = await request(app).get("/api/studio/projects/1/preview");
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/studio/projects/:id/preview/*splat (asset wildcard)", () => {
+  it("returns 401 (not 404) for an asset path", async () => {
+    const res = await request(app).get(
+      "/api/studio/projects/1/preview/assets/logo.svg",
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/studio/projects/:id/lint", () => {
+  it("returns 401 (not 404 — the route must exist) when no session is present", async () => {
+    const res = await request(app).get("/api/studio/projects/1/lint");
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("GET /api/studio/events", () => {
   it("returns 401 when no session is present", async () => {
     const res = await request(app).get("/api/studio/events");

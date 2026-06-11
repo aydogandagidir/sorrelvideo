@@ -92,3 +92,60 @@ describe.runIf(INTEGRATION_AVAILABLE)(
     });
   },
 );
+
+describe.runIf(INTEGRATION_AVAILABLE)(
+  "studio preview + lint (the editor's iframe/lint contract)",
+  () => {
+    async function makeStudioProject() {
+      const userId = await createFreeUser();
+    const sid = await createSession({ userId });
+      const [project] = await db
+        .insert(projectsTable)
+        .values({ userId, name: "Studio P", module: "studio" })
+        .returning();
+      return { sid, project };
+    }
+
+    it("GET /preview serves the entry composition as HTML (seeding if needed)", async () => {
+      const { sid, project } = await makeStudioProject();
+      const res = await request(app)
+        .get(`/api/studio/projects/${project.id}/preview`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/html");
+      expect(res.text).toContain("<html");
+      expect(res.text).toContain("__timelines"); // the studio timeline seed
+    });
+
+    it("GET /preview/<file> serves workspace files (asset wildcard)", async () => {
+      const { sid, project } = await makeStudioProject();
+      // Seed via the master preview first, then fetch the entry as an asset.
+      await request(app)
+        .get(`/api/studio/projects/${project.id}/preview`)
+        .set("Authorization", `Bearer ${sid}`);
+      const res = await request(app)
+        .get(`/api/studio/projects/${project.id}/preview/index.html`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/html");
+      const missing = await request(app)
+        .get(`/api/studio/projects/${project.id}/preview/nope.css`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(missing.status).toBe(404);
+    });
+
+    it("GET /lint runs the engine linter and returns findings JSON", async () => {
+      const { sid, project } = await makeStudioProject();
+      const res = await request(app)
+        .get(`/api/studio/projects/${project.id}/lint`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("application/json");
+      expect(Array.isArray(res.body.findings)).toBe(true);
+      expect(typeof res.body.errorCount).toBe("number");
+      // The seed composition must not be reported broken by our own linter —
+      // this doubles as a quality gate on studio-default-timelines.html.
+      expect(res.body.errorCount).toBe(0);
+    });
+  },
+);
