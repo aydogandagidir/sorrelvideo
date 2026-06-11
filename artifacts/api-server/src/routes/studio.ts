@@ -46,6 +46,7 @@ import {
 } from "@workspace/db";
 import {
   resolveWorkspaceDir,
+  safeResolve,
   listFiles,
   readFile,
   writeFile,
@@ -76,6 +77,10 @@ import {
   getUserPlan,
 } from "../services/billingService";
 import { emitFileChange, subscribe } from "../lib/studioEvents";
+import {
+  prepareHyperframeLintBody,
+  runHyperframeLint,
+} from "@hyperframes/producer";
 
 const router: IRouter = Router();
 
@@ -610,6 +615,169 @@ router.get(
     }
   },
 );
+
+/**
+ * Resolve the project's ENTRY composition HTML for preview/lint, seeding the
+ * workspace first if it was never opened (same seed precedence as the open
+ * route: studio-authored compositionHtml → studio timeline seed → the project's
+ * vars-substituted real composition). Returns null when no entry exists even
+ * after seeding (the caller 404s).
+ */
+async function resolveEntryHtml(project: ProjectRow): Promise<string | null> {
+  const seedHtml =
+    typeof project.compositionHtml === "string" &&
+    project.compositionHtml.length > 0
+      ? project.compositionHtml
+      : project.module === "studio"
+        ? readSeedComposition()
+        : await buildCompositionHtml(project);
+  await ensureWorkspace(project.userId, String(project.id), {
+    entryFile: STUDIO_ENTRY_FILE,
+    html: seedHtml,
+  });
+  const entry = await readFile(
+    project.userId,
+    String(project.id),
+    STUDIO_ENTRY_FILE,
+  );
+  if (entry !== null) return entry;
+  // Legacy workspaces seeded by the render pipeline used composition.html.
+  return readFile(project.userId, String(project.id), "composition.html");
+}
+
+/**
+ * GET /api/studio/projects/:id/preview — the studio's MASTER preview iframe
+ * source: the workspace entry composition as a full HTML document. Seeds the
+ * workspace when missing so a deep link straight to the editor previews too.
+ * `no-store` so every saved edit is reflected on the next iframe reload.
+ */
+router.get(
+  "/studio/projects/:id/preview",
+  async (req, res): Promise<void> => {
+    const project = await loadOwnedProject(req, res);
+    if (!project) return;
+
+    try {
+      const html = await resolveEntryHtml(project);
+      if (html === null) {
+        res.status(404).json({ error: "No composition to preview" });
+        return;
+      }
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(html);
+    } catch (err) {
+      if (err instanceof WorkspacePathError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
+      throw err;
+    }
+  },
+);
+
+/** Content types for workspace files the preview iframe / asset panel loads. */
+const PREVIEW_MIME: Record<string, string> = {
+  html: "text/html; charset=utf-8",
+  htm: "text/html; charset=utf-8",
+  css: "text/css; charset=utf-8",
+  js: "text/javascript; charset=utf-8",
+  mjs: "text/javascript; charset=utf-8",
+  json: "application/json; charset=utf-8",
+  svg: "image/svg+xml",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  ico: "image/x-icon",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  ttf: "font/ttf",
+  txt: "text/plain; charset=utf-8",
+  md: "text/markdown; charset=utf-8",
+};
+
+/**
+ * GET /api/studio/projects/:id/preview/*splat — serve any workspace file for
+ * the preview iframe's sub-resources and the asset/media panels. Registered
+ * AFTER `/preview/comp/*splat` so composition previews keep their dedicated
+ * handler. Raw byte read (assets may be binary) behind the same
+ * `safeResolve` traversal guard the workspace service uses everywhere.
+ */
+router.get(
+  "/studio/projects/:id/preview/*splat",
+  async (req, res): Promise<void> => {
+    const project = await loadOwnedProject(req, res);
+    if (!project) return;
+
+    const rel = splatPath(req);
+    try {
+      const abs = safeResolve(
+        resolveWorkspaceDir(project.userId, String(project.id)),
+        rel,
+      );
+      const bytes = await fs.promises.readFile(abs);
+      const ext = path.extname(rel).slice(1).toLowerCase();
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader(
+        "Content-Type",
+        PREVIEW_MIME[ext] ?? "application/octet-stream",
+      );
+      res.send(bytes);
+    } catch (err) {
+      if (err instanceof WorkspacePathError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        res.status(404).json({ error: "File not found" });
+        return;
+      }
+      throw err;
+    }
+  },
+);
+
+/**
+ * GET /api/studio/projects/:id/lint — run the engine's composition linter
+ * (producer `runHyperframeLint`) on the project's entry composition and return
+ * the full result; the studio's lint modal reads `findings[]`
+ * ({severity,message,file,fixHint}).
+ */
+router.get("/studio/projects/:id/lint", async (req, res): Promise<void> => {
+  const project = await loadOwnedProject(req, res);
+  if (!project) return;
+
+  try {
+    const html = await resolveEntryHtml(project);
+    if (html === null) {
+      res.status(404).json({ error: "No composition to lint" });
+      return;
+    }
+    const prepared = prepareHyperframeLintBody({
+      html,
+      entryFile: STUDIO_ENTRY_FILE,
+    });
+    if ("error" in prepared) {
+      res.status(400).json({ error: prepared.error });
+      return;
+    }
+    res.json(runHyperframeLint(prepared.prepared));
+  } catch (err) {
+    if (err instanceof WorkspacePathError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
 
 /**
  * GET /api/studio/events — Server-Sent Events stream the studio subscribes to

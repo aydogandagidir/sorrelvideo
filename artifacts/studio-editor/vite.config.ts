@@ -59,6 +59,19 @@ export default defineConfig({
         "/api/projects": "/api/studio/projects",
         "/api/events": "/api/studio/events",
         "/api/render/": "/api/studio/render/",
+        // REBRAND: the studio header hardcodes the HeyGen/HyperFrames wordmark
+        // (<HyperframesLogo /> in StudioHeader.tsx). Users must see Sorrel, not
+        // the engine vendor — swap the JSX usage for a Sorrel Studio wordmark
+        // (inline styles only: the studio's Tailwind scan doesn't see injected
+        // class names, so utility classes here would silently not exist).
+        "<HyperframesLogo />":
+          '<span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", color: "#fff", userSelect: "none" }}>Sorrel <span style={{ color: "#A3E635" }}>Studio</span></span>',
+        // Lint modal's copy-prompt mentions the engine too.
+        "these HyperFrames lint issues": "these Sorrel Studio lint issues",
+        // Early-return the now-unused vendor logo component so its SVG body
+        // becomes unreachable code the minifier strips — the bundler keeps the
+        // (unreferenced) function itself, and the artwork must not ship.
+        "function HyperframesLogo() {": "function HyperframesLogo() { return null;",
       },
     }),
     {
@@ -68,6 +81,8 @@ export default defineConfig({
       name: "assert-repoint",
       closeBundle(): void {
         const offenders: string[] = [];
+        let sawSorrelMark = false;
+        let sawVendorLogo = false;
         const scan = (dir: string): void => {
           for (const name of fs.readdirSync(dir)) {
             const p = path.join(dir, name);
@@ -82,12 +97,21 @@ export default defineConfig({
             while ((m = re.exec(txt)) !== null) {
               offenders.push(`${name}: ${txt.slice(m.index, m.index + 24)}`);
             }
+            if (txt.includes("Sorrel")) sawSorrelMark = true;
+            // The HeyGen/HyperFrames logo SVG is uniquely identified by its
+            // 263×79 viewBox; its presence means the rebrand replace missed.
+            if (txt.includes("0 0 263 79")) sawVendorLogo = true;
           }
         };
         scan(path.resolve(here, "dist"));
         if (offenders.length > 0) {
           throw new Error(
             `[assert-repoint] un-repointed API paths:\n  ${offenders.slice(0, 12).join("\n  ")}`,
+          );
+        }
+        if (sawVendorLogo || !sawSorrelMark) {
+          throw new Error(
+            `[assert-repoint] rebrand check failed (vendor logo present: ${sawVendorLogo}, Sorrel mark present: ${sawSorrelMark}) — the <HyperframesLogo /> replace in vite.config.ts no longer matches the studio source`,
           );
         }
       },
