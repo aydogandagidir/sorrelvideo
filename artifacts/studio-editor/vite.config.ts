@@ -74,6 +74,10 @@ export default defineConfig({
           '<span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", color: "#fff", userSelect: "none" }}>Sorrel <span style={{ color: "#A3E635" }}>Studio</span></span>',
         // Lint modal's copy-prompt mentions the engine too.
         "these HyperFrames lint issues": "these Sorrel Studio lint issues",
+        // Header shows the bare numeric project id ("3") — label it so users
+        // understand what the number is.
+        'text-neutral-300">{projectId}</span>':
+          'text-neutral-300">{"Project " + projectId}</span>',
         // Early-return the now-unused vendor logo component so its SVG body
         // becomes unreachable code the minifier strips — the bundler keeps the
         // (unreferenced) function itself, and the artwork must not ship.
