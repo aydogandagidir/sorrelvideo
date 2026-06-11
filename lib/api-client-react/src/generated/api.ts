@@ -24,6 +24,8 @@ import type {
   AiSuggestResult,
   AnalyticsOverview,
   AuthUserEnvelope,
+  AvatarChatRequest,
+  AvatarChatResult,
   AvatarSessionTokenRequest,
   AvatarSessionTokenResult,
   AvatarUsageResult,
@@ -3120,6 +3122,77 @@ export function useGetAvatarUsage<TData = Awaited<ReturnType<typeof getAvatarUsa
 
 
 
+
+export const getAvatarChatUrl = () => {
+
+
+
+
+  return `/api/avatar/chat`
+}
+
+/**
+ * @summary Brand-voiced conversation turn for the free browser avatar (Pro)
+ */
+export const avatarChat = async (avatarChatRequest: AvatarChatRequest, options?: RequestInit): Promise<AvatarChatResult> => {
+
+  return customFetch<AvatarChatResult>(getAvatarChatUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      avatarChatRequest,)
+  }
+);}
+
+
+
+
+export const getAvatarChatMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avatarChat>>, TError,{data: BodyType<AvatarChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof avatarChat>>, TError,{data: BodyType<AvatarChatRequest>}, TContext> => {
+
+const mutationKey = ['avatarChat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof avatarChat>>, {data: BodyType<AvatarChatRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  avatarChat(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AvatarChatMutationResult = NonNullable<Awaited<ReturnType<typeof avatarChat>>>
+    export type AvatarChatMutationBody = BodyType<AvatarChatRequest>
+    export type AvatarChatMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Brand-voiced conversation turn for the free browser avatar (Pro)
+ */
+export const useAvatarChat = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof avatarChat>>, TError,{data: BodyType<AvatarChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof avatarChat>>,
+        TError,
+        {data: BodyType<AvatarChatRequest>},
+        TContext
+      > => {
+      return useMutation(getAvatarChatMutationOptions(options));
+    }
 
 export const getCreateCheckoutSessionUrl = () => {
 

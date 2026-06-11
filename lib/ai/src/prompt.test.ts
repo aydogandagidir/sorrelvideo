@@ -4,8 +4,35 @@ import {
   buildBrandContext,
   buildSystemPrompt,
   buildUserPrompt,
+  buildAvatarSystem,
   buildVideoIdeasUserText,
 } from "./prompt";
+
+const EMPTY_BRAND = {
+  companyName: null,
+  voice: null,
+  voiceDescription: null,
+} as const;
+
+describe("buildAvatarSystem", () => {
+  it("names the brand + demands short, plain spoken text", () => {
+    const sys = buildAvatarSystem({
+      ...EMPTY_BRAND,
+      companyName: "Acme",
+      description: "CI tooling",
+    });
+    expect(sys).toContain("Acme");
+    expect(sys).toMatch(/spoken|out loud/i);
+    expect(sys).toMatch(/no markdown/i);
+    expect(sys).toContain("What they do: CI tooling"); // brand context folded in
+  });
+
+  it("works without a brand (generic host, no leaked null)", () => {
+    const sys = buildAvatarSystem(EMPTY_BRAND);
+    expect(sys).toMatch(/friendly AI host/i);
+    expect(sys).not.toContain("null");
+  });
+});
 
 describe("buildSystemPrompt", () => {
   it("returns the base scaffold when no brand info is supplied", () => {

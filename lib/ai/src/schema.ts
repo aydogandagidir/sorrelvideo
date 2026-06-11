@@ -62,6 +62,33 @@ export interface SuggestResult extends SuggestOutput {
   usage: SuggestUsage;
 }
 
+// ─────────────────────────── Live Avatar chat ───────────────────────────────
+// A free, browser-native conversational avatar (Track F, self-hosted path): the
+// browser does speech-to-text + text-to-speech for free; this is the LLM turn in
+// the middle, voiced in the user's brand. Replies are SHORT (spoken aloud) and
+// plain text (never markdown).
+
+/** One conversation turn. `system` turns are server-built, never client-sent. */
+export const ChatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().min(1).max(4000),
+});
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+export const ChatInputSchema = z.object({
+  /** Prior turns + the latest user turn (last). Bounded so a client can't blow context. */
+  messages: z.array(ChatMessageSchema).min(1).max(40),
+  brand: BrandDnaSchema,
+  maxTokens: z.number().int().positive().max(1000).optional(),
+});
+export type ChatInput = z.infer<typeof ChatInputSchema>;
+
+export interface ChatResult {
+  /** The assistant's plain-text reply, ready to speak. */
+  reply: string;
+  usage: SuggestUsage;
+}
+
 // ───────────────────────────── Brand extraction ─────────────────────────────
 // Refine raw signals scraped from a website (CSS colors, fonts, logo, meta) plus
 // a screenshot into a canonical brand kit. The deterministic DOM scrape happens

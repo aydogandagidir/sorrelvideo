@@ -2,7 +2,13 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
+import {
+  getProvider,
+  ChatInputSchema,
+  ChatMessageSchema,
+} from "@workspace/ai";
 import { getUserPlan } from "../services/billingService";
+import { getDefaultBrandKit } from "../services/brandKitService";
 import { aiSuggestLimiter } from "../middlewares/rateLimit";
 import {
   mintSessionToken,
@@ -21,6 +27,20 @@ const router: IRouter = Router();
 const SessionTokenBody = z.object({
   pushToTalk: z.boolean().optional(),
 });
+
+const ChatBody = z.object({
+  messages: z.array(ChatMessageSchema).min(1).max(40),
+});
+
+/** Resolve the caller's plan (avatar features are Pro). */
+async function getRequestPlan(userId: string): Promise<"free" | "pro"> {
+  const [u] = await db
+    .select({ stripeCustomerId: usersTable.stripeCustomerId })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  return getUserPlan(u?.stripeCustomerId ?? null);
+}
 
 /**
  * POST /api/avatar/session-token — mint a short-lived LiveAvatar session token
@@ -53,12 +73,7 @@ router.post(
     }
 
     // Pro gate — the live avatar is a Pro feature (metered upstream).
-    const [u] = await db
-      .select({ stripeCustomerId: usersTable.stripeCustomerId })
-      .from(usersTable)
-      .where(eq(usersTable.id, req.user.id))
-      .limit(1);
-    const plan = await getUserPlan(u?.stripeCustomerId ?? null);
+    const plan = await getRequestPlan(req.user.id);
     if (plan !== "pro") {
       res.status(403).json({
         error: "The live avatar requires the Pro plan",
@@ -133,6 +148,89 @@ router.get(
       limit: usage.limit,
       sandbox: isLiveAvatarSandbox(),
     });
+  },
+);
+
+/**
+ * POST /api/avatar/chat — the LLM turn for the FREE browser-native avatar. The
+ * browser does speech-to-text + text-to-speech for free; this returns the
+ * brand-voiced plain-text reply it speaks. Pro-gated + rate-limited; reuses the
+ * configured AI provider (ANTHROPIC/OPENAI) + the user's default Brand DNA for
+ * personality. No SaaS, no credits — this is the zero-cost path.
+ */
+router.post(
+  "/avatar/chat",
+  aiSuggestLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const parsed = ChatBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+
+    // Avatar is a Pro feature (consistent with the live path). Pro AI is
+    // unlimited, so no monthly-unit charge here — abuse is bounded by the limiter.
+    const plan = await getRequestPlan(req.user.id);
+    if (plan !== "pro") {
+      res.status(403).json({
+        error: "The avatar requires the Pro plan",
+        reason: "upgrade_required",
+      });
+      return;
+    }
+
+    const brand = await getDefaultBrandKit(req.user.id);
+    const provider = getProvider();
+
+    try {
+      const input = ChatInputSchema.parse({
+        messages: parsed.data.messages,
+        brand: {
+          companyName: brand?.companyName ?? null,
+          tagline: brand?.tagline ?? null,
+          description: brand?.description ?? null,
+          valueProposition: brand?.valueProposition ?? null,
+          targetAudience: brand?.targetAudience ?? null,
+          industry: brand?.industry ?? null,
+          keywords: brand?.keywords ?? null,
+          personality: brand?.personality ?? null,
+          voice: brand?.brandVoice ?? null,
+          voiceDescription: brand?.voiceDescription ?? null,
+        },
+      });
+      const result = await provider.chat(input);
+      req.log.info(
+        {
+          provider: provider.name,
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+        },
+        "Avatar chat reply generated",
+      );
+      res.status(200).json({ reply: result.reply });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const status =
+        typeof (err as { status?: unknown }).status === "number"
+          ? (err as { status: number }).status
+          : undefined;
+      req.log.error(
+        { err, provider: provider.name, status },
+        `Avatar chat provider call failed: ${detail}`,
+      );
+      const notConfigured =
+        /API_KEY is not set|not configured/i.test(detail) || status === 401;
+      res.status(notConfigured ? 503 : 502).json({
+        error: notConfigured
+          ? "AI isn't configured on the server yet. An admin needs to set ANTHROPIC_API_KEY (or OPENAI_API_KEY)."
+          : "The avatar could not reply right now",
+      });
+    }
   },
 );
 

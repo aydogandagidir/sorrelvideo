@@ -5,12 +5,19 @@ import type {
   ExtractBrandResult,
   GenerateVideoIdeasInput,
   GenerateVideoIdeasResult,
+  ChatInput,
+  ChatResult,
 } from "../schema";
 
 export interface AiProvider {
   readonly name: "anthropic" | "openai";
   /** Generate Studio copy (headline/body/cta) from a brief + brand DNA. */
   suggest(input: SuggestInput): Promise<SuggestResult>;
+  /**
+   * A free-form, brand-voiced conversation turn for the Live Avatar (plain-text
+   * reply, spoken aloud client-side). Unlike suggest/extract this is NOT JSON.
+   */
+  chat(input: ChatInput): Promise<ChatResult>;
   /**
    * Refine scraped website signals (+ an optional screenshot) into a brand DNA:
    * visual identity (name, colors, font) + narrative identity (tagline,
