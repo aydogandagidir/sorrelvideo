@@ -21,6 +21,18 @@ import {
   recordAvatarSession,
   getAvatarSessionUsage,
 } from "../services/avatarSessionsService";
+import {
+  isTtsConfigured,
+  TTS_VOICES,
+  TtsError,
+  TtsNotConfiguredError,
+} from "../services/ttsService";
+import {
+  isTranscriptionConfigured,
+  TranscriptionError,
+  TranscriptionNotConfiguredError,
+} from "../services/transcriptionService";
+import { createTalkingHostVideo } from "../services/talkingHostService";
 
 const router: IRouter = Router();
 
@@ -30,6 +42,12 @@ const SessionTokenBody = z.object({
 
 const ChatBody = z.object({
   messages: z.array(ChatMessageSchema).min(1).max(40),
+});
+
+const AvatarVideoBody = z.object({
+  script: z.string().trim().min(10).max(1200),
+  voice: z.enum(TTS_VOICES).optional(),
+  brandKitId: z.number().int().positive().optional(),
 });
 
 /** Resolve the caller's plan (avatar features are Pro). */
@@ -230,6 +248,79 @@ router.post(
           ? "AI isn't configured on the server yet. An admin needs to set ANTHROPIC_API_KEY (or OPENAI_API_KEY)."
           : "The avatar could not reply right now",
       });
+    }
+  },
+);
+
+/**
+ * POST /api/avatar/video — script → branded talking-host MP4 (Track F+, the
+ * avatar's render-pipeline value). TTS the script, word-time it with Whisper,
+ * create a `talking-host` project, and auto-start its render.
+ *
+ * Deliberately NOT Pro-gated (unlike the neighboring /avatar/chat): a Free
+ * user spends ONE AI quota unit per creation (charged inside the service,
+ * AFTER the providers succeed) and the auto-render consumes the regular render
+ * quota — when that is exhausted the project still lands as a draft and the
+ * response says so. Config-gated on both TTS and ASR keys; rate-limited via
+ * the shared AI limiter.
+ */
+router.post(
+  "/avatar/video",
+  aiSuggestLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const parsed = AvatarVideoBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+
+    if (!isTtsConfigured() || !isTranscriptionConfigured()) {
+      res.status(503).json({ error: "Text-to-speech is not configured" });
+      return;
+    }
+
+    try {
+      const result = await createTalkingHostVideo(req.user.id, parsed.data);
+      req.log.info(
+        {
+          userId: req.user.id,
+          projectId: result.project.id,
+          renderStarted: result.renderStarted,
+        },
+        "Talking-host video created",
+      );
+      res.status(201).json({
+        project: JSON.parse(JSON.stringify(result.project)),
+        renderStarted: result.renderStarted,
+        renderMessage: result.renderMessage,
+      });
+    } catch (err) {
+      if (
+        err instanceof TtsNotConfiguredError ||
+        err instanceof TranscriptionNotConfiguredError
+      ) {
+        res.status(503).json({ error: err.message });
+        return;
+      }
+      const e = err as { reason?: string; message?: string };
+      if (e.reason === "upgrade_required") {
+        res.status(403).json({
+          error: e.message ?? "AI limit reached — upgrade to Pro",
+          reason: "upgrade_required",
+        });
+        return;
+      }
+      if (err instanceof TtsError || err instanceof TranscriptionError) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
+      req.log.error({ err }, "Talking-host video creation failed");
+      res.status(500).json({ error: "Could not create the video" });
     }
   },
 );

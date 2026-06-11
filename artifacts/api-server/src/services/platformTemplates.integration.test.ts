@@ -1,27 +1,39 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { isNull } from "drizzle-orm";
 import { db, templatesTable } from "@workspace/db";
-import { seedPlatformTemplates } from "./platformTemplatesService";
+import {
+  HAND_AUTHORED_TEMPLATES,
+  seedPlatformTemplates,
+} from "./platformTemplatesService";
 import { REGISTRY_TEMPLATES } from "./registryTemplates";
 import { truncateAll } from "../test/integration";
 import { INTEGRATION_AVAILABLE } from "../test/setup";
 
+// The full platform seed = the vendored registry blocks PLUS the hand-authored
+// showcase templates. Derived from the service's own lists so adding a template
+// never silently breaks these counts again (they drifted once before, when the
+// Track B hand-authored set landed without updating the registry-only counts).
+const SEED_TOTAL = REGISTRY_TEMPLATES.length + HAND_AUTHORED_TEMPLATES.length;
+
 describe.runIf(INTEGRATION_AVAILABLE)("seedPlatformTemplates", () => {
   beforeEach(truncateAll);
 
-  it("seeds every registry template as a platform row, then is idempotent", async () => {
+  it("seeds every platform template as a platform row, then is idempotent", async () => {
     const first = await seedPlatformTemplates();
-    expect(first).toBe(REGISTRY_TEMPLATES.length);
+    expect(first).toBe(SEED_TOTAL);
 
     const rows = await db
       .select()
       .from(templatesTable)
       .where(isNull(templatesTable.userId));
-    expect(rows).toHaveLength(REGISTRY_TEMPLATES.length);
-    // Every registry slug is present, as a platform (userId === null) row.
+    expect(rows).toHaveLength(SEED_TOTAL);
+    // Every registry + hand-authored slug is present as a platform row.
     const modules = new Set(rows.map((r) => r.module));
     for (const t of REGISTRY_TEMPLATES) {
       expect(modules.has(t.slug)).toBe(true);
+    }
+    for (const t of HAND_AUTHORED_TEMPLATES) {
+      expect(modules.has(t.module)).toBe(true);
     }
     expect(rows.every((r) => r.userId === null)).toBe(true);
 
@@ -33,7 +45,7 @@ describe.runIf(INTEGRATION_AVAILABLE)("seedPlatformTemplates", () => {
       .select()
       .from(templatesTable)
       .where(isNull(templatesTable.userId));
-    expect(after).toHaveLength(REGISTRY_TEMPLATES.length);
+    expect(after).toHaveLength(SEED_TOTAL);
   });
 
   it("preserves an existing row's metadata (insert-if-missing never clobbers)", async () => {
@@ -49,8 +61,8 @@ describe.runIf(INTEGRATION_AVAILABLE)("seedPlatformTemplates", () => {
     });
 
     const inserted = await seedPlatformTemplates();
-    // All registry templates EXCEPT the pre-existing slug are inserted.
-    expect(inserted).toBe(REGISTRY_TEMPLATES.length - 1);
+    // Every platform template EXCEPT the pre-existing slug is inserted.
+    expect(inserted).toBe(SEED_TOTAL - 1);
 
     const [preexisting] = await db
       .select()

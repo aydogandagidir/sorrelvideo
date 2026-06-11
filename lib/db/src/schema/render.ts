@@ -76,6 +76,31 @@ export interface RenderCaptions {
   words: RenderCaptionWord[];
 }
 
+/**
+ * The narration track of a talking-host video (server-managed — set by
+ * `createTalkingHostVideo`, never accepted from client input; it is therefore
+ * deliberately absent from the API's `RenderSettingsInput`).
+ *
+ * Unlike `backgroundAudio` the source of truth is a server-generated TTS file:
+ * the render path prefers the local `renders/<projectId>/voice.mp3` sibling
+ * (written at creation time, so dev works with zero GCS config) and falls back
+ * to downloading `objectPath` (the durable GCS copy, when storage is
+ * configured). A voiceover that resolves NOWHERE fails the render loudly — a
+ * silent talking-host video is worthless, so there is no bg-music-style
+ * silent fallback.
+ */
+export interface RenderVoiceover {
+  /**
+   * "/objects/..." path of the persisted TTS audio object, or null when only
+   * the local render-dir copy exists (GCS unconfigured at creation time).
+   */
+  objectPath: string | null;
+  /** Seconds into the composition where speech starts (the intro delay). */
+  startAt: number;
+  /** Playback volume 0–100 (defaults to 100 — narration is the primary track). */
+  volume?: number;
+}
+
 export interface RenderSettings {
   fps: RenderFps;
   quality: RenderQuality;
@@ -100,6 +125,12 @@ export interface RenderSettings {
    * the engine seeks for a top-level composition). Absent/null → no captions.
    */
   captions?: RenderCaptions | null;
+  /**
+   * Optional talking-host narration (server-managed; NOT Pro-gated — the flow
+   * that sets it is metered by an AI quota unit + the render quota instead).
+   * Absent/null → no narration track, exactly today's behaviour.
+   */
+  voiceover?: RenderVoiceover | null;
 }
 
 /**

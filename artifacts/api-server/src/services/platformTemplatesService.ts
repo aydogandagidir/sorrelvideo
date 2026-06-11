@@ -22,7 +22,7 @@ interface SeedTemplate {
  * their native canvas with no letterboxing. Their thumbnail PNGs are produced by
  * scripts/generate-thumbnails.mjs (see THUMBNAIL_SLUGS in routes/templates.ts).
  */
-const HAND_AUTHORED_TEMPLATES: SeedTemplate[] = [
+export const HAND_AUTHORED_TEMPLATES: SeedTemplate[] = [
   {
     module: "product-3d",
     name: "Product 3D",
@@ -55,6 +55,17 @@ const HAND_AUTHORED_TEMPLATES: SeedTemplate[] = [
     duration: 9,
     isPremium: true,
     tags: ["video", "b-roll", "spotlight", "portrait"],
+  },
+  {
+    module: "talking-host",
+    name: "Talking Host",
+    description:
+      "An animated brand host reads your script aloud with lip-sync and karaoke captions — generate it from the Avatar page. Portrait 9:16.",
+    category: "AI",
+    thumbnailUrl: "/api/templates/thumbnails/talking-host.png",
+    duration: 9,
+    isPremium: false,
+    tags: ["ai", "voice", "avatar", "captions", "portrait"],
   },
 ];
 

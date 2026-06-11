@@ -52,9 +52,83 @@ export function isTranscriptionConfigured(): boolean {
   return Boolean(process.env.WHISPER_API_KEY ?? process.env.OPENAI_API_KEY);
 }
 
+/** A buffer transcription: the timed words plus the clip's total duration. */
+export interface TranscriptionResult {
+  words: TranscriptWord[];
+  /** Total audio length in seconds (verbose_json `duration`), when reported. */
+  duration: number | null;
+}
+
+/**
+ * Transcribe raw audio bytes into word-timed captions. The shared Whisper call
+ * under both `transcribeObject` (captions for an uploaded object) and the
+ * talking-host flow (timing a server-generated TTS buffer — no GCS round-trip).
+ */
+export async function transcribeBuffer(
+  buf: Buffer | Uint8Array,
+  contentType: string,
+): Promise<TranscriptionResult> {
+  const apiKey = process.env.WHISPER_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new TranscriptionNotConfiguredError();
+  if (buf.byteLength > MAX_AUDIO_BYTES) {
+    throw new TranscriptionError(
+      "Audio exceeds the 25MB transcription limit",
+      413,
+    );
+  }
+
+  const form = new FormData();
+  // Wrap in a fresh Uint8Array — a Node Buffer<ArrayBufferLike> isn't a valid
+  // DOM BlobPart (its backing buffer is ArrayBufferLike, not ArrayBuffer).
+  form.append("file", new Blob([new Uint8Array(buf)], { type: contentType }), "audio");
+  form.append("model", "whisper-1");
+  form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "word");
+
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(WHISPER_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+  } catch (err) {
+    logger.error({ err }, "Whisper request threw");
+    throw new TranscriptionError("Transcription service unavailable", 502);
+  }
+  if (!res.ok) {
+    logger.error({ status: res.status }, "Whisper API returned an error");
+    throw new TranscriptionError("Transcription failed", 502);
+  }
+
+  const data = (await res.json()) as {
+    duration?: number;
+    words?: { word?: string; start?: number; end?: number }[];
+  };
+  const words = (data.words ?? [])
+    .map((w) => ({
+      text: String(w.word ?? "").trim(),
+      start: Number(w.start),
+      end: Number(w.end),
+    }))
+    .filter(
+      (w) =>
+        w.text.length > 0 &&
+        Number.isFinite(w.start) &&
+        Number.isFinite(w.end) &&
+        w.end > w.start,
+    );
+  const duration =
+    typeof data.duration === "number" && Number.isFinite(data.duration)
+      ? data.duration
+      : null;
+  return { words, duration };
+}
+
 /**
  * Transcribe a user-uploaded audio object ("/objects/...") into word-timed
  * captions. Re-checks ownership (defense in depth) before touching the file.
+ * Returns the bare word list — the captions route's stable contract.
  */
 export async function transcribeObject(
   userId: string,
@@ -88,44 +162,5 @@ export async function transcribeObject(
   const contentType = (meta.contentType as string) || "audio/mpeg";
   const [buf] = await file.download();
 
-  const form = new FormData();
-  // Wrap in a fresh Uint8Array — a Node Buffer<ArrayBufferLike> isn't a valid
-  // DOM BlobPart (its backing buffer is ArrayBufferLike, not ArrayBuffer).
-  form.append("file", new Blob([new Uint8Array(buf)], { type: contentType }), "audio");
-  form.append("model", "whisper-1");
-  form.append("response_format", "verbose_json");
-  form.append("timestamp_granularities[]", "word");
-
-  let res: Awaited<ReturnType<typeof fetch>>;
-  try {
-    res = await fetch(WHISPER_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-    });
-  } catch (err) {
-    logger.error({ err }, "Whisper request threw");
-    throw new TranscriptionError("Transcription service unavailable", 502);
-  }
-  if (!res.ok) {
-    logger.error({ status: res.status }, "Whisper API returned an error");
-    throw new TranscriptionError("Transcription failed", 502);
-  }
-
-  const data = (await res.json()) as {
-    words?: { word?: string; start?: number; end?: number }[];
-  };
-  return (data.words ?? [])
-    .map((w) => ({
-      text: String(w.word ?? "").trim(),
-      start: Number(w.start),
-      end: Number(w.end),
-    }))
-    .filter(
-      (w) =>
-        w.text.length > 0 &&
-        Number.isFinite(w.start) &&
-        Number.isFinite(w.end) &&
-        w.end > w.start,
-    );
+  return (await transcribeBuffer(buf, contentType)).words;
 }

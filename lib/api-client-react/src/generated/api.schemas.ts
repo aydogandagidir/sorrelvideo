@@ -218,6 +218,27 @@ export type RenderSettingsCaptions = {
 }[];
 } | null;
 
+/**
+ * Talking-host narration (server-managed — set by POST /avatar/video, not client-writable; deliberately absent from RenderSettingsInput).
+
+ * @nullable
+ */
+export type RenderSettingsVoiceover = {
+  /**
+     * /objects/... path of the persisted TTS audio, or null when only the local render-dir copy exists.
+
+     * @nullable
+     */
+  objectPath: string | null;
+  /** Seconds into the composition where speech starts. */
+  startAt: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  volume?: number;
+} | null;
+
 export interface RenderSettings {
   fps: RenderSettingsFps;
   quality: RenderSettingsQuality;
@@ -236,6 +257,12 @@ export interface RenderSettings {
      * @nullable
      */
   captions?: RenderSettingsCaptions;
+  /**
+     * Talking-host narration (server-managed — set by POST /avatar/video, not client-writable; deliberately absent from RenderSettingsInput).
+
+     * @nullable
+     */
+  voiceover?: RenderSettingsVoiceover;
 }
 
 export interface Project {
@@ -645,6 +672,50 @@ export interface AvatarChatRequest {
 
 export interface AvatarChatResult {
   reply: string;
+}
+
+/**
+ * TTS voice.
+ */
+export type AvatarVideoRequestVoice = typeof AvatarVideoRequestVoice[keyof typeof AvatarVideoRequestVoice];
+
+
+export const AvatarVideoRequestVoice = {
+  alloy: 'alloy',
+  ash: 'ash',
+  ballad: 'ballad',
+  coral: 'coral',
+  echo: 'echo',
+  fable: 'fable',
+  nova: 'nova',
+  onyx: 'onyx',
+  sage: 'sage',
+  shimmer: 'shimmer',
+} as const;
+
+export interface AvatarVideoRequest {
+  /**
+     * The narration script (~90 seconds of speech max).
+     * @minLength 10
+     * @maxLength 1200
+     */
+  script: string;
+  /** TTS voice. */
+  voice?: AvatarVideoRequestVoice;
+  /** Brand kit to style the host with. Omitted → the user's default. */
+  brandKitId?: number;
+}
+
+export interface AvatarVideoResponse {
+  project: Project;
+  /** False → the project was created as a draft (e.g. render quota exhausted); render it manually from Projects.
+   */
+  renderStarted: boolean;
+  /**
+     * User-facing explanation when the render did not start.
+     * @nullable
+     */
+  renderMessage?: string | null;
 }
 
 export interface GenerateCaptionsRequest {

@@ -1,8 +1,16 @@
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   injectWatermark,
   renderCompositionTemplate,
+  renderDirFor,
   resolveEntryFile,
+  resolveVoiceoverTag,
+  RENDERS_DIR,
+  VOICEOVER_FILENAME,
+  VoiceoverUnavailableError,
 } from "./renderService";
 
 describe("renderCompositionTemplate", () => {
@@ -128,7 +136,81 @@ describe("resolveEntryFile", () => {
     expect(resolveEntryFile("studio")).toBe("studio-default.html");
   });
 
+  it("returns the talking-host composition for the talking-host module", () => {
+    expect(resolveEntryFile("talking-host")).toBe("talking-host.html");
+  });
+
   it("returns the default composition for unknown modules", () => {
     expect(resolveEntryFile("does-not-exist")).toBe("product-launch.html");
+  });
+});
+
+describe("renderDirFor", () => {
+  it("resolves the per-project directory under RENDERS_DIR", () => {
+    expect(renderDirFor(42)).toBe(path.join(RENDERS_DIR, "42"));
+  });
+});
+
+describe("resolveVoiceoverTag", () => {
+  const html = '<div data-composition-id="talking-host" data-duration="12.5"></div><body></body>';
+
+  function tmpDirWithVoice(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sorrel-voice-"));
+    fs.writeFileSync(path.join(dir, VOICEOVER_FILENAME), "fake-mp3-bytes");
+    return dir;
+  }
+
+  it("uses the local voice.mp3 sibling and emits a loop-free, track-1 tag", async () => {
+    const dir = tmpDirWithVoice();
+    const tag = await resolveVoiceoverTag(
+      "user-1",
+      { objectPath: null, startAt: 0.9, volume: 100 },
+      dir,
+      html,
+    );
+    expect(tag).toContain(`src="${VOICEOVER_FILENAME}"`);
+    expect(tag).toContain('data-start="0.9"');
+    // data-duration mirrors the composition's declared duration (audioPadTrim).
+    expect(tag).toContain('data-duration="12.5"');
+    // Narration is a distinct mix track from background music (index 0)…
+    expect(tag).toContain('data-track-index="1"');
+    expect(tag).toContain('data-volume="1.000"');
+    // …and must NEVER restart inside a longer composition.
+    expect(tag).not.toContain("loop");
+  });
+
+  it("defaults volume to full and startAt to 0 when malformed", async () => {
+    const dir = tmpDirWithVoice();
+    const tag = await resolveVoiceoverTag(
+      "user-1",
+      { objectPath: null, startAt: Number.NaN },
+      dir,
+      "<body></body>",
+    );
+    expect(tag).toContain('data-start="0"');
+    expect(tag).toContain('data-volume="1.000"');
+    // No data-duration in the doc → the bg-audio fallback of 30s.
+    expect(tag).toContain('data-duration="30"');
+  });
+
+  it("THROWS when there is no local file and no objectPath (no silent mute)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sorrel-novoice-"));
+    await expect(
+      resolveVoiceoverTag("user-1", { objectPath: null, startAt: 0 }, dir, html),
+    ).rejects.toBeInstanceOf(VoiceoverUnavailableError);
+  });
+
+  it("THROWS when the GCS fallback fails (storage unconfigured here)", async () => {
+    // No local file; objectPath set but PRIVATE_OBJECT_DIR is unset in unit
+    // tests, so the storage lookup throws → must surface as the strict error.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sorrel-novoice-"));
+    await expect(
+      resolveVoiceoverTag(
+        "user-1",
+        { objectPath: "/objects/uploads/v", startAt: 0 },
+        dir,
+        html,
+      ),
+    ).rejects.toBeInstanceOf(VoiceoverUnavailableError);
   });
 });

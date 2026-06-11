@@ -53,6 +53,7 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `AI_PROVIDER`                                                   | api-server (AI suggest)                 | `anthropic` (default) or `openai`. Picks which provider `lib/ai` routes calls to.                |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`                         | api-server (when AI_PROVIDER=anthropic) | API key + optional model override (defaults to `claude-haiku-4-5`).                              |
 | `OPENAI_API_KEY` / `OPENAI_MODEL`                               | api-server (when AI_PROVIDER=openai)    | API key + optional model override (defaults to `gpt-4o-mini`). Also powers Whisper auto-captions (`POST /captions/generate`; set `WHISPER_API_KEY` to override). |
+| `TTS_API_KEY` / `OPENAI_TTS_MODEL`                              | api-server (talking-host, optional)     | Script→video narration via OpenAI TTS. Falls back to `OPENAI_API_KEY`; model defaults to `gpt-4o-mini-tts` (brand-tone `instructions` only sent on that family). Unset (and no OpenAI key) → `POST /avatar/video` 503s. |
 | `SENTRY_DSN`                                                    | api-server (optional)                   | Backend Sentry error tracking (runtime). Init is a no-op when unset, app still runs.             |
 | `VITE_SENTRY_DSN` / `VITE_SENTRY_TRACES_SAMPLE_RATE`           | sorrel (optional, **build-time**)       | Frontend Sentry. Vite inlines `import.meta.env.VITE_*` at build → must be a Docker build ARG (Railway injects matching service vars). Unset → browser SDK no-ops. |
 | `SENTRY_TRACES_SAMPLE_RATE`                                     | api-server (optional)                   | Backend Sentry trace sampling — defaults to `0.1` (10 %).                                        |
@@ -475,6 +476,56 @@ Set `=true` ONLY on container hosts that can't start a sandboxed Chrome (root /
 no user namespaces). The captured screenshot is embedded as a **JPEG** data URI
 (full page, capped at 9000px tall — JPEG keeps a tall capture's base64 ~1–1.5MB);
 moving it to object storage is still a future optimisation.
+
+## Script → talking-host video (avatar's render value)
+
+`POST /api/avatar/video { script (10–1200 chars), voice?, brandKitId? }` turns a
+script into a branded talking-host MP4: `talkingHostService.createTalkingHostVideo`
+→ `ttsService.synthesizeSpeech` (OpenAI `gpt-4o-mini-tts`, `TTS_API_KEY ??
+OPENAI_API_KEY`, brand voice/personality mapped to `instructions`) →
+`transcribeBuffer` (the Whisper word-timing core shared with captions, also
+surfacing verbose_json's clip `duration`) → creates a `talking-host` project →
+**auto-starts the render** via `startProjectRender` (the claim→quota→re-gate→
+ledger→enqueue sequence extracted VERBATIM from POST /projects/:id/render — both
+callers share one implementation, pinned by the render integration suites). The
+SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
+`/projects?focus=<id>` where the normal 3s polling + video dialog take over.
+
+- **Gating**: NOT Pro-gated (deliberately unlike `/avatar/chat`). Free spends
+  **1 AI unit** per creation, charged AFTER both providers succeed (the
+  routes/ai.ts precedent — a 502 never burns quota); the auto-render consumes
+  the regular render quota, and when THAT is exhausted the project still lands
+  as a **draft** (`renderStarted: false` + `renderMessage` in the 201).
+- **Data channel**: `compositionVars["host.payload"] =
+  base64(JSON({intro, outro, words:[[text,start,end],…]}))` — base64 survives
+  `escapeMarkup` byte-identical (no quote-escaping hazard). The composition
+  (`compositions/talking-host.html`) decodes it, builds mouth tweens per word
+  window + branded karaoke (DOM via `textContent` ONLY — words are user script)
+  on ONE paused GSAP timeline at `window.__timelines["talking-host"]`; an
+  unsubstituted payload (gallery preview) falls back to a built-in ~9s DEMO.
+  `duration` = `intro + whisperDuration + outro` (clamped 3–120s).
+- **Voiceover track** (`RenderSettings.voiceover { objectPath, startAt,
+  volume? }`, server-managed, ABSENT from `RenderSettingsInput`): the TTS mp3 is
+  ALWAYS written to `renders/<id>/voice.mp3` (dev needs no GCS) AND uploaded as
+  a private GCS object when configured (durable re-renders; `objectPath` null
+  without GCS). `renderService.resolveVoiceoverTag` prefers the local file, else
+  downloads the object (ownership re-checked), and injects
+  `<audio src="voice.mp3" data-start="{startAt}" data-track-index="1">` —
+  **no `loop`** (narration must not restart; bg music keeps index 0). Missing
+  BOTH sources **fails the render loudly** (`VoiceoverUnavailableError` →
+  `failed` + refund) — deliberately stricter than bg music's silent fallback,
+  because a mute talking-host video is worthless.
+- **Two coercion traps**, both regression-tested: `resolveSettings` MUST carry
+  `voiceover` through its field-by-field rebuild (else executeRender's
+  re-resolve ships a silent video / a settings PATCH erases the track), and
+  `assertRenderSettingsAllowed` must NOT list voiceover as Pro-only (the
+  render-time re-gate would 403 every Free auto-render AFTER the AI unit was
+  spent).
+- **Gallery**: seeded as the hand-authored `talking-host` platform template
+  (Free, category "AI"); its thumbnail is rendered from the DEMO narration by
+  `scripts/generate-thumbnails.mjs` and the slug is allow-listed in
+  `THUMBNAIL_SLUGS`. A template-gallery project without a payload renders the
+  DEMO silently (no voiceover in settings → no injection → no strict failure).
 
 ## Billing
 
