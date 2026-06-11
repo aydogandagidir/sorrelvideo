@@ -333,6 +333,16 @@ router.get("/studio/projects/:id", async (req, res): Promise<void> => {
       entryFile: STUDIO_ENTRY_FILE,
       html: seedHtml,
     });
+    // Self-heal: a pre-existing workspace (persistent volume survives deploys;
+    // ensureWorkspace never rewrites) may still hold an OLD default seed that
+    // predates the player contract — refresh it as long as the user never
+    // saved their own document.
+    const entry = await readFile(
+      project.userId,
+      String(project.id),
+      STUDIO_ENTRY_FILE,
+    );
+    if (entry !== null) await upgradeStaleSeed(project, entry);
     res.json({
       files: await listFiles(project.userId, String(project.id)),
       dir: resolveWorkspaceDir(project.userId, String(project.id)),
@@ -617,6 +627,39 @@ router.get(
 );
 
 /**
+ * A stale DEFAULT seed: the workspace entry came from an older
+ * studio-default-timelines.html (it carries the seed's composition id but
+ * predates the full TimelineLike playback contract — `isActive` is the marker)
+ * AND the user never saved their own document (compositionHtml null). Studio
+ * workspaces can outlive deploys (persistent volume), and ensureWorkspace
+ * never touches an existing dir — so without this check a contract upgrade to
+ * the seed would never reach previously-opened projects (player stuck at 0:00).
+ */
+function isStaleDefaultSeed(html: string, project: ProjectRow): boolean {
+  return (
+    project.module === "studio" &&
+    (typeof project.compositionHtml !== "string" ||
+      project.compositionHtml.length === 0) &&
+    html.includes('data-composition-id="studio-default"') &&
+    !html.includes("isActive")
+  );
+}
+
+/**
+ * Refresh a never-customized workspace entry that still holds a stale default
+ * seed. Returns the HTML to use (fresh seed when upgraded, original otherwise).
+ */
+async function upgradeStaleSeed(
+  project: ProjectRow,
+  entryHtml: string,
+): Promise<string> {
+  if (!isStaleDefaultSeed(entryHtml, project)) return entryHtml;
+  const fresh = readSeedComposition();
+  await writeFile(project.userId, String(project.id), STUDIO_ENTRY_FILE, fresh);
+  return fresh;
+}
+
+/**
  * Resolve the project's ENTRY composition HTML for preview/lint, seeding the
  * workspace first if it was never opened (same seed precedence as the open
  * route: studio-authored compositionHtml → studio timeline seed → the project's
@@ -640,7 +683,7 @@ async function resolveEntryHtml(project: ProjectRow): Promise<string | null> {
     String(project.id),
     STUDIO_ENTRY_FILE,
   );
-  if (entry !== null) return entry;
+  if (entry !== null) return upgradeStaleSeed(project, entry);
   // Legacy workspaces seeded by the render pipeline used composition.html.
   return readFile(project.userId, String(project.id), "composition.html");
 }
