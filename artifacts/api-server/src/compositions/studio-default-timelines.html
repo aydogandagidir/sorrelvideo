@@ -7,13 +7,16 @@
   studio-default.html (a {{placeholder}} template the render service merges
   brand-kit + compositionVars into), this document is FINAL HTML the Studio
   edits and previews directly: it registers a real timeline on
-  `window.__timelines["studio-default"]` so the Studio's timeline panel can read
-  `duration()`, `seek(ms)`, and the per-clip `data-start`/`data-duration`/
-  `data-track-index` metadata to lay out tracks.
+  `window.__timelines["studio-default"]` implementing the Studio's full
+  TimelineLike contract — play / pause / seek(s) / time() / duration() /
+  isActive() — plus the per-clip `data-start`/`data-duration`/`data-track-index`
+  metadata the timeline panel lays tracks out from.
 
   The root carries `data-composition-id` / `data-width` / `data-height` (the
-  Studio reads these to size the canvas). Timeline times are in MILLISECONDS
-  (the Studio panel works in ms); the seek interface accepts ms and drives the
+  Studio reads these to size the canvas). ALL times are in SECONDS (the GSAP
+  convention the Studio's playback adapter and DOM parser assume — values at or
+  beyond the root duration() are DROPPED as out-of-range, so ms-scale numbers
+  here would empty the whole timeline panel). The seek interface drives the
   same opacity/translate intro the legacy composition uses, so a render of this
   document produces a non-blank clip even if the host never seeks.
 -->
@@ -146,13 +149,14 @@
     >
       <div class="glow"></div>
 
-      <!-- Each .clip is a timeline clip: data-start / data-duration are in MS,
-           data-track-index lays it out on a Studio track row. -->
+      <!-- Each .clip is a timeline clip: data-start / data-duration are in
+           SECONDS (gsap convention), data-track-index lays it out on a Studio
+           track row. -->
       <div
         id="brand-badge"
         class="clip brand"
-        data-start="100"
-        data-duration="700"
+        data-start="0.1"
+        data-duration="0.7"
         data-track-index="0"
         data-slide="-36"
       >
@@ -162,8 +166,8 @@
       <h1
         id="headline"
         class="clip headline"
-        data-start="350"
-        data-duration="950"
+        data-start="0.35"
+        data-duration="0.95"
         data-track-index="1"
         data-slide="46"
       >
@@ -172,8 +176,8 @@
       <p
         id="body-text"
         class="clip body"
-        data-start="800"
-        data-duration="900"
+        data-start="0.8"
+        data-duration="0.9"
         data-track-index="2"
         data-slide="34"
       >
@@ -183,8 +187,8 @@
       <div
         id="cta-button"
         class="clip cta"
-        data-start="1200"
-        data-duration="800"
+        data-start="1.2"
+        data-duration="0.8"
         data-track-index="3"
         data-slide="26"
       >
@@ -197,10 +201,10 @@
     <script>
       (function () {
         var COMPOSITION_ID = "studio-default";
-        var DURATION_MS = 5000;
+        var DURATION_S = 5;
 
         // Build the clip list straight from the DOM so editing data-* attrs in
-        // the Studio updates the timeline with no JS changes.
+        // the Studio updates the timeline with no JS changes. All times SECONDS.
         var clips = Array.prototype.slice
           .call(document.querySelectorAll(".clip"))
           .map(function (el) {
@@ -208,7 +212,7 @@
             var duration = parseFloat(el.getAttribute("data-duration")) || 0;
             return {
               el: el,
-              id: el.className.replace("clip", "").trim() || "clip",
+              id: el.id || el.className.replace("clip", "").trim() || "clip",
               start: start,
               duration: duration,
               trackIndex: parseInt(el.getAttribute("data-track-index"), 10) || 0,
@@ -225,9 +229,9 @@
           return 1 - Math.pow(1 - p, 3);
         }
 
-        // Drive every clip's intro from an absolute time in MS.
-        function renderAt(ms) {
-          var t = Math.max(0, Math.min(DURATION_MS, Number(ms) || 0));
+        // Drive every clip's intro from an absolute time in SECONDS.
+        function renderAt(s) {
+          var t = Math.max(0, Math.min(DURATION_S, Number(s) || 0));
           for (var i = 0; i < clips.length; i++) {
             var c = clips[i];
             var raw =
@@ -240,19 +244,64 @@
             c.el.style.opacity = String(p);
             c.el.style.transform = "translateY(" + (1 - p) * c.slide + "px)";
           }
-          if (pbar) pbar.style.width = clamp01(t / DURATION_MS) * 100 + "%";
+          if (pbar) pbar.style.width = clamp01(t / DURATION_S) * 100 + "%";
         }
 
-        // The timeline object the Studio panel consumes. duration() is in MS;
-        // seek(ms) accepts MS. `clips` exposes the per-clip layout metadata so
-        // the panel can render track rows without re-parsing the DOM.
+        // Playback state for the Studio's transport (RAF-driven, like a paused
+        // GSAP timeline the host can play/pause/scrub).
+        var now = 0;
+        var playing = false;
+        var rafId = null;
+        // null → "first frame after play": the delta starts from the rAF
+        // callback's own timestamp, so no wall-clock (performance.now/Date.now)
+        // is ever read — the engine's determinism lint forbids those.
+        var lastTick = null;
+
+        function tick(ts) {
+          if (!playing) return;
+          if (lastTick === null) lastTick = ts;
+          now += (ts - lastTick) / 1000;
+          lastTick = ts;
+          if (now >= DURATION_S) {
+            now = DURATION_S;
+            playing = false;
+            renderAt(now);
+            return;
+          }
+          renderAt(now);
+          rafId = requestAnimationFrame(tick);
+        }
+
+        // The timeline object the Studio's playback adapter consumes — the FULL
+        // TimelineLike contract (play/pause/seek/time/duration/isActive), all in
+        // SECONDS like a GSAP timeline. A partial object (or ms units) makes the
+        // adapter resolve duration 0 and disables the transport entirely.
         var timeline = {
           id: COMPOSITION_ID,
-          duration: function () {
-            return DURATION_MS;
+          play: function () {
+            if (playing) return;
+            if (now >= DURATION_S) now = 0;
+            playing = true;
+            lastTick = null;
+            rafId = requestAnimationFrame(tick);
           },
-          seek: function (ms) {
-            renderAt(ms);
+          pause: function () {
+            playing = false;
+            if (rafId !== null) cancelAnimationFrame(rafId);
+            rafId = null;
+          },
+          seek: function (s) {
+            now = Math.max(0, Math.min(DURATION_S, Number(s) || 0));
+            renderAt(now);
+          },
+          time: function () {
+            return now;
+          },
+          duration: function () {
+            return DURATION_S;
+          },
+          isActive: function () {
+            return playing;
           },
           clips: clips.map(function (c) {
             return {
@@ -264,16 +313,17 @@
           }),
         };
 
-        // Register on the shared __timelines registry the Studio reads.
+        // Register on the shared __timelines registry the Studio reads (keyed by
+        // the root's data-composition-id).
         window.__timelines = window.__timelines || {};
         window.__timelines[COMPOSITION_ID] = timeline;
 
         // Back-compat with the legacy player host (window.__hf.seek expects
         // SECONDS) so this document also renders through the existing pipeline.
         window.__hf = {
-          duration: DURATION_MS / 1000,
+          duration: DURATION_S,
           seek: function (seconds) {
-            renderAt((Number(seconds) || 0) * 1000);
+            timeline.seek(seconds);
           },
         };
 
