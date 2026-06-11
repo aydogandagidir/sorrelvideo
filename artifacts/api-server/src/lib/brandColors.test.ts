@@ -88,6 +88,35 @@ describe("pickBrandColors", () => {
     expect(primaryColor).toMatch(/^#[0-9a-f]{6}$/);
     expect(secondaryColor).toMatch(/^#[0-9a-f]{6}$/);
   });
+
+  it("ignores negligible-weight vivid noise for secondary/accent (bluedev.dev case)", () => {
+    // Real capture shape from bluedev.dev: a strong CTA blue, a strong dark
+    // slate base, and a ~0.006-weight dark-green background swatch. The green
+    // must NOT become the gradient's far stop / the accent — the page's true
+    // dark base wins.
+    const candidates: ColorCandidate[] = [
+      { hex: "#015aff", source: "cta", weight: 1.1 },
+      { hex: "#0f172a", source: "link", weight: 0.85 },
+      { hex: "#0f3d2e", source: "background", weight: 0.0058 },
+    ];
+    const { primaryColor, secondaryColor, accentColor } = pickBrandColors(
+      candidates,
+      null,
+    );
+    expect(primaryColor).toBe("#015aff");
+    expect(secondaryColor).toBe("#0f172a"); // darkest neutral — the dark base
+    expect(accentColor).toBeNull(); // noise must not be promoted to accent
+  });
+
+  it("still lets a genuinely used second brand color claim secondary", () => {
+    const candidates: ColorCandidate[] = [
+      { hex: "#015aff", source: "cta", weight: 1.0 },
+      { hex: "#10b981", source: "link", weight: 0.4 }, // real, weight-bearing green
+      { hex: "#0b0b0f", source: "text", weight: 0.3 },
+    ];
+    const { secondaryColor } = pickBrandColors(candidates, null);
+    expect(secondaryColor).toBe("#10b981");
+  });
 });
 
 describe("sanitizeFontFamily", () => {

@@ -54,8 +54,16 @@
           </div>
         </div>
 
-        <!-- Branded intro card -->
+        <!-- Branded intro card. The REAL site logo leads when the brand kit has
+             one (auto-extracted from the captured site); an empty/broken logo
+             collapses via CSS/onerror so the name-only intro is the fallback. -->
         <div class="intro">
+          <img
+            class="intro-logo"
+            src="{{brand.logoUrl}}"
+            alt=""
+            onerror="this.style.display='none'"
+          />
           <div class="intro-kicker">PRESENTING</div>
           <div class="intro-name">{{brand.companyName}}</div>
         </div>
@@ -158,6 +166,16 @@
           gap: 18px;
           background:
             linear-gradient(135deg, {{brand.primaryColor}}, {{brand.secondaryColor}});
+        }
+        [data-composition-id="website-showcase"] .intro-logo {
+          height: 96px;
+          max-width: 460px;
+          object-fit: contain;
+          margin-bottom: 10px;
+          filter: drop-shadow(0 10px 34px rgba(0, 0, 0, 0.35));
+        }
+        [data-composition-id="website-showcase"] .intro-logo[src=""] {
+          display: none;
         }
         [data-composition-id="website-showcase"] .intro-kicker {
           color: rgba(255, 255, 255, 0.8);

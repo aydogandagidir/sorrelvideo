@@ -405,6 +405,27 @@ ENTIRE page scrolls through without racing, capped at 45s. An explicit `duration
 (3–60) still overrides. `STUDIO_FALLBACKS` keeps `duration: "9"` only for legacy
 projects whose `compositionVars` predate the field.
 
+**Brand fidelity (the "doesn't look like my site" fixes — verified against
+bluedev.dev).** Three layers:
+
+- **Lazy-load scroll-priming**: before measuring/shooting, `captureWebsite`
+  steps the page to the bottom (re-reads `scrollHeight` each step but caps at
+  1.2× the height limit so an infinite feed can't run away) and back, then
+  settles 500ms — otherwise IntersectionObserver-gated sections never paint and
+  the showcase video "scrolls through blank white" below the hero.
+- **Truthful previews**: the projects grid + video-dialog placeholder render the
+  REAL `compositionVars["capture.image"]` when present instead of the generic
+  `CompositionThumb` mock (which fabricates a letter badge + "Learn more" CTA +
+  a project-name headline — users read the mock as broken output).
+- **Real logo + palette**: `website-showcase`'s intro leads with
+  `<img src="{{brand.logoUrl}}">` (CSS `[src=""]` + `onerror` collapse it when
+  absent/broken). `pickBrandColors` requires a vivid runner-up to carry
+  meaningful weight (`≥ max(0.05, 10% of primary)`) before claiming
+  secondary/accent — a 0.006-weight stray swatch can no longer beat the page's
+  true dark base — and a saturated dark same-hue base (#0f172a-style slate,
+  "vivid" by saturation so `darkestNeutral` never sees it) is an explicit
+  secondary tier.
+
 **Capabilities (shipped).** The video dialog (`projects.tsx`) has **Download**
 (direct same-origin MP4) + **Share** (Web Share API with the actual file so a
 private render shares without a public link; falls back to copy-link). **Length

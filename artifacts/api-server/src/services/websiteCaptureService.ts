@@ -166,6 +166,32 @@ export async function captureWebsite(
       .$eval('meta[name="theme-color"]', (el) => el.getAttribute("content"))
       .catch(() => null);
 
+    // Prime lazy-loaded content BEFORE measuring/shooting: modern sites gate
+    // below-the-fold sections and images behind IntersectionObserver, so an
+    // unscrolled full-page screenshot captures the hero followed by blank
+    // white — and the showcase video then "scrolls through nothing" (the
+    // bluedev.dev bug). Step through the page to trigger the observers (the
+    // loop re-reads scrollHeight, so content that loads mid-scroll extends the
+    // walk, bounded so an infinite-scroll feed can't run away), return to the
+    // top, and give the just-triggered images/reveal animations a beat to
+    // finish painting. Best-effort — a hostile page must not fail the capture.
+    const primeCapPx = (opts?.maxHeight ?? MAX_CAPTURE_HEIGHT) * 1.2;
+    await page
+      .evaluate(async (maxPx) => {
+        const step = Math.max(200, Math.round(window.innerHeight * 0.8));
+        for (
+          let y = 0;
+          y <= Math.min(maxPx, document.documentElement.scrollHeight);
+          y += step
+        ) {
+          window.scrollTo(0, y);
+          await new Promise((r) => setTimeout(r, 110));
+        }
+        window.scrollTo(0, 0);
+      }, primeCapPx)
+      .catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 500));
+
     const fullHeight = await page
       .evaluate(() => document.documentElement.scrollHeight)
       .catch(() => VIEWPORT.height);

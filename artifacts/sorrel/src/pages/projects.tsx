@@ -84,6 +84,19 @@ function thumbProps(project: Project, brand?: BrandKit) {
   };
 }
 
+/**
+ * The REAL captured-site screenshot a website→video project carries in its
+ * compositionVars (a data URI). When present it is what the video actually
+ * shows — so previews/placeholders render IT instead of the generic mock card
+ * (which fabricates a letter badge + "Learn more" CTA and reads off-brand,
+ * exactly the "this doesn't look like my site" complaint).
+ */
+function captureImageSrc(project: Project): string | null {
+  const v = (project.compositionVars ?? {}) as Record<string, unknown>;
+  const img = v["capture.image"];
+  return typeof img === "string" && img.startsWith("data:image/") ? img : null;
+}
+
 function StatusDot({ status }: { status: string }) {
   const map: Record<string, { cls: string; label: string; live?: boolean }> = {
     ready: {
@@ -209,6 +222,12 @@ function ProjectCard({
                   alt={project.name}
                   className="absolute inset-0 h-full w-full object-cover"
                 />
+              ) : captureImageSrc(project) ? (
+                <img
+                  src={captureImageSrc(project) ?? undefined}
+                  alt={project.name}
+                  className="absolute inset-0 h-full w-full object-cover object-top"
+                />
               ) : (
                 <CompositionThumb
                   {...thumbProps(project, brand)}
@@ -216,6 +235,12 @@ function ProjectCard({
                 />
               )}
             </HoverPlayVideo>
+          ) : captureImageSrc(project) ? (
+            <img
+              src={captureImageSrc(project) ?? undefined}
+              alt={project.name}
+              className="absolute inset-0 h-full w-full object-cover object-top"
+            />
           ) : (
             <CompositionThumb
               {...thumbProps(project, brand)}
@@ -416,7 +441,17 @@ function ProjectDetail({
                   playerSize,
                 )}
               >
-                <CompositionThumb {...thumbProps(project, brand)} chrome />
+                {captureImageSrc(project) ? (
+                  // website→video: show the REAL captured site (what the video
+                  // scrolls through), never the fabricated mock card.
+                  <img
+                    src={captureImageSrc(project) ?? undefined}
+                    alt={project.name}
+                    className="absolute inset-0 h-full w-full object-cover object-top"
+                  />
+                ) : (
+                  <CompositionThumb {...thumbProps(project, brand)} chrome />
+                )}
               </div>
             )}
           </div>
