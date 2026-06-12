@@ -81,6 +81,12 @@ import {
   prepareHyperframeLintBody,
   runHyperframeLint,
 } from "@hyperframes/producer";
+import {
+  listGoogleFontFamilies,
+  listInstalledFontFamilies,
+  readSystemFontFile,
+} from "../services/studioFontsService";
+import { REGISTRY_TEMPLATES } from "../services/registryTemplates";
 
 const router: IRouter = Router();
 
@@ -1165,5 +1171,220 @@ router.delete("/studio/render/:jobId", async (req, res): Promise<void> => {
 
   res.status(200).json({ ok: true });
 });
+
+// ─── Studio 0.6.91 surface: fonts, block catalog, render downloads, stubs ───
+// The 0.6.91 editor calls these in addition to the M9 file-server contract.
+// The vite repoint (studio-editor/vite.config.ts) maps /api/fonts → /api/studio
+// /fonts and /api/registry → /api/studio/registry; the rest are project-scoped
+// and ride the existing /api/projects → /api/studio/projects repoint.
+
+/**
+ * GET /api/studio/fonts — installed host font families for the editor's font
+ * picker (propertyPanelFont.tsx). Auth-gated but not project-scoped: host
+ * fonts are global, brand-neutral resources (in the Docker image this lists
+ * the apt-installed font packages). `{ fonts: string[] }`.
+ */
+router.get("/studio/fonts", (req, res): void => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  res.json({ fonts: listInstalledFontFamilies() });
+});
+
+/**
+ * GET /api/studio/fonts/google — Google Fonts family names (cached; static
+ * fallback list when the metadata endpoint is unreachable). `{ fonts }`.
+ */
+router.get("/studio/fonts/google", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  res.json({ fonts: await listGoogleFontFamilies() });
+});
+
+/**
+ * GET /api/studio/fonts/file?family=… — the bytes of an installed font, used by
+ * the editor to preview/embed a picked system font. The service enforces
+ * upstream's rails (O_NOFOLLOW open + 5MB cap); errors map 1:1 to status codes.
+ */
+router.get("/studio/fonts/file", (req, res): void => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const family = typeof req.query.family === "string" ? req.query.family : "";
+  if (!family) {
+    res.status(400).json({ error: "family parameter required" });
+    return;
+  }
+  const result = readSystemFontFile(family);
+  if ("error" in result) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  res.setHeader("Content-Type", result.mimeType);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${result.fileName}"`,
+  );
+  res.send(result.buffer);
+});
+
+/**
+ * GET /api/studio/registry/blocks — the editor's block catalog
+ * (useBlockCatalog.ts expects an upstream `RegistryItem[]`). Sorrel serves its
+ * VENDORED manifest mapped onto the upstream `hyperframes:block` shape, so the
+ * catalog lists exactly the blocks this app ships — never the live upstream
+ * registry. Browse-only for now: install is stubbed 501 below.
+ */
+router.get("/studio/registry/blocks", (req, res): void => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  res.json(
+    REGISTRY_TEMPLATES.map((t) => ({
+      type: "hyperframes:block",
+      name: t.slug,
+      title: t.name,
+      description: t.description,
+      tags: t.tags.length > 0 ? t.tags : [t.category.toLowerCase()],
+      files: [
+        {
+          path: `${t.slug}.html`,
+          target: `compositions/${t.slug}.html`,
+          type: "hyperframes:block",
+        },
+      ],
+      dimensions: { width: t.width, height: t.height },
+      duration: t.duration,
+      preview: { poster: t.thumbnailUrl },
+    })),
+  );
+});
+
+/** Artifact mime by extension — mirrors routes/projects.ts's VIDEO_MIME. */
+const RENDER_FILE_MIME: Record<string, string> = {
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+};
+
+/**
+ * GET /api/studio/projects/:id/renders/file/:filename — download a finished
+ * render from the editor's RenderQueue panel. `:filename` is matched EXACTLY
+ * against the names the renders list above advertises (`renderFilename(job)`)
+ * for this project's READY jobs — the param is never used as a path on its
+ * own, so traversal is structurally impossible. A png-sequence artifact
+ * ("frames", a directory) → 409, same contract as the public video route.
+ */
+router.get(
+  "/studio/projects/:id/renders/file/:filename",
+  async (req, res): Promise<void> => {
+    const project = await loadOwnedProject(req, res);
+    if (!project) return;
+
+    const raw = Array.isArray(req.params.filename)
+      ? req.params.filename[0]
+      : req.params.filename;
+
+    const jobs = await db
+      .select()
+      .from(renderJobsTable)
+      .where(
+        and(
+          eq(renderJobsTable.projectId, project.id),
+          eq(renderJobsTable.status, "ready"),
+        ),
+      )
+      .orderBy(desc(renderJobsTable.createdAt));
+
+    const job = jobs.find((j) => j.outputPath && renderFilename(j) === raw);
+    if (!job?.outputPath) {
+      res.status(404).json({ error: "Render file not found" });
+      return;
+    }
+
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(job.outputPath);
+    } catch {
+      res.status(404).json({ error: "Render file not found" });
+      return;
+    }
+    if (stat.isDirectory()) {
+      res.status(409).json({
+        error:
+          "This render is a PNG sequence; download it from the project page",
+      });
+      return;
+    }
+
+    const mime =
+      RENDER_FILE_MIME[path.extname(job.outputPath).toLowerCase()] ??
+      "application/octet-stream";
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Content-Length", String(stat.size));
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${path.basename(job.outputPath)}"`,
+    );
+    fs.createReadStream(job.outputPath).pipe(res);
+  },
+);
+
+/**
+ * Studio 0.6.91 editing endpoints Sorrel doesn't implement yet, stubbed 501 so
+ * an editor gesture degrades to a visible error toast instead of falling
+ * through to a Sorrel entity route or a confusing 404. Auth+ownership-gated
+ * like every project route (the gate runs BEFORE the 501 so the stubs leak no
+ * project existence to non-owners):
+ *  - file-mutations/{patch,remove,probe,split}-element — property-panel DOM
+ *    edits + razor splits against the workspace files
+ *  - gsap-mutations — the keyframe system's timeline writes
+ *  - waveform — audio waveform extraction for the timeline
+ *  - registry/install — block-catalog install into the workspace
+ * Implementing any of these means porting the matching handler from upstream
+ * `core/src/studio-api/routes/files.ts` (self-contained per route).
+ */
+const STUB_NOT_SUPPORTED = { error: "Not supported in Sorrel Studio yet" };
+
+router.all(
+  "/studio/projects/:id/file-mutations/*splat",
+  async (req, res): Promise<void> => {
+    const project = await loadOwnedProject(req, res);
+    if (!project) return;
+    res.status(501).json(STUB_NOT_SUPPORTED);
+  },
+);
+
+router.all(
+  "/studio/projects/:id/gsap-mutations/*splat",
+  async (req, res): Promise<void> => {
+    const project = await loadOwnedProject(req, res);
+    if (!project) return;
+    res.status(501).json(STUB_NOT_SUPPORTED);
+  },
+);
+
+router.all(
+  "/studio/projects/:id/waveform/*splat",
+  async (req, res): Promise<void> => {
+    const project = await loadOwnedProject(req, res);
+    if (!project) return;
+    res.status(501).json(STUB_NOT_SUPPORTED);
+  },
+);
+
+router.all(
+  "/studio/projects/:id/registry/install",
+  async (req, res): Promise<void> => {
+    const project = await loadOwnedProject(req, res);
+    if (!project) return;
+    res.status(501).json(STUB_NOT_SUPPORTED);
+  },
+);
 
 export default router;

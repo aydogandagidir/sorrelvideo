@@ -42,12 +42,9 @@ export default defineConfig({
       // studio's `exports` map doesn't expose the css; alias the real file so
       // main.tsx can pull the @tailwind layers + studio's global dark theme.
       "@studio/studio.css": path.join(studioSrc, "styles", "studio.css"),
-      // @hyperframes/core@0.6.6 declares this subpath in `exports` but doesn't
-      // ship the file (packaging bug); redirect to a local stub. See the stub.
-      "@hyperframes/core/runtime/lottie-readiness": path.resolve(
-        here,
-        "src/stubs/lottie-readiness.ts",
-      ),
+      // NOTE: the 0.6.6-era alias for `@hyperframes/core/runtime/lottie-readiness`
+      // is gone — core 0.6.91 actually ships dist/lottieReadiness.js, so the
+      // declared subpath resolves for real and the local stub was deleted.
     },
   },
   plugins: [
@@ -65,6 +62,11 @@ export default defineConfig({
         "/api/projects": "/api/studio/projects",
         "/api/events": "/api/studio/events",
         "/api/render/": "/api/studio/render/",
+        // 0.6.91 additions: the font picker (propertyPanelFont.tsx) calls
+        // /api/fonts + /api/fonts/google + /api/fonts/file?family=…, and the
+        // block catalog (useBlockCatalog.ts) calls /api/registry/blocks.
+        "/api/fonts": "/api/studio/fonts",
+        "/api/registry": "/api/studio/registry",
         // REBRAND: the studio header hardcodes the HeyGen/HyperFrames wordmark
         // (<HyperframesLogo /> in StudioHeader.tsx). Users must see Sorrel, not
         // the engine vendor — swap the JSX usage for a Sorrel Studio wordmark
@@ -107,15 +109,19 @@ export default defineConfig({
             }
             if (!/\.(js|css|html)$/.test(name)) continue;
             const txt = fs.readFileSync(p, "utf8");
-            const re = /\/api\/(projects|events|render)\b/g;
+            const re = /\/api\/(projects|events|render|fonts|registry)\b/g;
             let m: RegExpExecArray | null;
             while ((m = re.exec(txt)) !== null) {
               offenders.push(`${name}: ${txt.slice(m.index, m.index + 24)}`);
             }
-            // The wordmark must land in the compiled JS (the .html <title>
-            // already says "Sorrel" — counting it would mask a failed swap,
-            // which is exactly how the first rebrand attempt slipped through).
-            if (name.endsWith(".js") && txt.includes("Sorrel")) {
+            // The wordmark must land in the compiled JS. Checked via its
+            // UNIQUE "Back to Sorrel" link title — a bare "Sorrel" check is
+            // satisfied by the lint-modal replace alone, masking a missed
+            // wordmark swap. (Note: in the DEV server the swap is skipped —
+            // vite dev compiles dependency JSX before this plugin sees it, so
+            // the dev header shows no wordmark. The rollup BUILD path is the
+            // one that ships, and the one this guard protects.)
+            if (name.endsWith(".js") && txt.includes("Back to Sorrel")) {
               sawSorrelMark = true;
             }
             // The HeyGen/HyperFrames logo SVG is uniquely identified by its

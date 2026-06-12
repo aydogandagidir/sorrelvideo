@@ -139,3 +139,70 @@ describe("GET /api/studio/events", () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ── Studio 0.6.91 surface (fonts / block catalog / render downloads / stubs) ──
+// Same contract as above: every new route must exist (401, never 404) without a
+// session. The wildcard cases double as Express 5 named-wildcard guards.
+
+describe("GET /api/studio/fonts (+ /google, /file)", () => {
+  it("returns 401 for the installed-fonts list", async () => {
+    const res = await request(app).get("/api/studio/fonts");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 for the google-fonts list", async () => {
+    const res = await request(app).get("/api/studio/fonts/google");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 for the font-file download", async () => {
+    const res = await request(app).get("/api/studio/fonts/file?family=Inter");
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/studio/registry/blocks", () => {
+  it("returns 401 when no session is present", async () => {
+    const res = await request(app).get("/api/studio/registry/blocks");
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/studio/projects/:id/renders/file/:filename", () => {
+  it("returns 401 when no session is present", async () => {
+    const res = await request(app).get(
+      "/api/studio/projects/1/renders/file/output.mp4",
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("Studio 0.6.91 stub routes (501 surface)", () => {
+  it("file-mutations wildcard returns 401 (not 404) unauthenticated", async () => {
+    const res = await request(app).post(
+      "/api/studio/projects/1/file-mutations/patch-element/index.html",
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("gsap-mutations wildcard returns 401 (not 404) unauthenticated", async () => {
+    const res = await request(app).post(
+      "/api/studio/projects/1/gsap-mutations/index.html",
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("waveform wildcard returns 401 (not 404) unauthenticated", async () => {
+    const res = await request(app).get(
+      "/api/studio/projects/1/waveform/assets/audio.mp3",
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("registry/install returns 401 unauthenticated", async () => {
+    const res = await request(app).post(
+      "/api/studio/projects/1/registry/install",
+    );
+    expect(res.status).toBe(401);
+  });
+});

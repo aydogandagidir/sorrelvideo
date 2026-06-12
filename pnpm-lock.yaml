@@ -642,14 +642,14 @@ importers:
   artifacts/studio-editor:
     dependencies:
       '@hyperframes/core':
-        specifier: 0.6.6
-        version: 0.6.6(hono@4.12.18)
+        specifier: 0.6.91
+        version: 0.6.91(hono@4.12.18)
       '@hyperframes/player':
-        specifier: 0.6.6
-        version: 0.6.6
+        specifier: 0.6.91
+        version: 0.6.91
       '@hyperframes/studio':
-        specifier: 0.6.6
-        version: 0.6.6(hono@4.12.18)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zustand@5.0.14(@types/react@19.2.15)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0)))
+        specifier: 0.6.91
+        version: 0.6.91(hono@4.12.18)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zustand@5.0.14(@types/react@19.2.15)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0)))
       react:
         specifier: 19.1.0
         version: 19.1.0
@@ -1625,14 +1625,6 @@ packages:
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
 
-  '@hyperframes/core@0.6.6':
-    resolution: {integrity: sha512-zZu1rjXNgN7Y9d9f+/HmYizapp7wE2u03wOyeG4UBoq7PGs6WFr1UeWxL2DuE5BsuuOGVsyINHNYOUVO2P80Aw==}
-    peerDependencies:
-      hono: ^4.0.0
-    peerDependenciesMeta:
-      hono:
-        optional: true
-
   '@hyperframes/core@0.6.91':
     resolution: {integrity: sha512-5dWbLn+CkmQWeglCR3FtFcJoF8C4T9zF0bmmTv2B4Eoo2+OwODIPGbByGg47OgfdyU8Fbng1djx6Fhzof4Ocfw==}
     peerDependencies:
@@ -1645,9 +1637,6 @@ packages:
     resolution: {integrity: sha512-p60qtwSBBjHRid81yFZffDjBa7hZ6k0id4kZCTEP04cvs1ArqiIZFGAeRn+txASQqtvddH68T9LOvEFLhv0fiQ==}
     engines: {node: '>=22'}
 
-  '@hyperframes/player@0.6.6':
-    resolution: {integrity: sha512-9f50P7MX02cPeFHTrTRkr3o/ZrdVY0cbPnnCnkslAS2IKFEhkGRBrjdBnviG81t0ZMf8qYoRqMJBuTQM2FCrcw==}
-
   '@hyperframes/player@0.6.91':
     resolution: {integrity: sha512-fxRhtzm2En6eeREnklvjjP4yvM6ah5/0qapL1TD030I80uVzfiKXxvoqkXJkXHGhG+awNZeM2VdFcW4bh4sqCg==}
 
@@ -1655,8 +1644,8 @@ packages:
     resolution: {integrity: sha512-RHglJtpmE65ZeiJHH3AKoBoXE4DyBOKKLgIOkFQmFjDkS8rKuQNZ8re++9kHNHjlTCwXjauisGzCXP1Tz8D2KQ==}
     engines: {node: '>=22'}
 
-  '@hyperframes/studio@0.6.6':
-    resolution: {integrity: sha512-q1G1GNxS3PGxuHe6RdHD5ekShr/Gvg8sxGg7zRg6cjdNQf7Q0crdIktDnQitRkVfWeScppW+GpePXHgaOgz/Jg==}
+  '@hyperframes/studio@0.6.91':
+    resolution: {integrity: sha512-08b6mN47u/+R2GzNHZmJHbVJ7ooThWMqpgvJRgi41cXOqbSxdFw/bsoD7syh3G6lE45VFoKyoQP8jhWNrbGsEA==}
     peerDependencies:
       react: 19.1.0
       react-dom: 19.1.0
@@ -3443,6 +3432,12 @@ packages:
   '@types/dockerode@3.3.47':
     resolution: {integrity: sha512-ShM1mz7rCjdssXt7Xz0u1/R2BJC7piWa3SJpUBiVjCf2A3XNn4cP6pUVaD8bLanpPVVn4IKzJuw3dOvkJ8IbYw==}
 
+  '@types/dom-mediacapture-transform@0.1.11':
+    resolution: {integrity: sha512-Y2p+nGf1bF2XMttBnsVPHUWzRRZzqUoJAKmiP10b5umnO6DDrWI0BrGDJy1pOHoOULVmGSfFNkQrAlC5dcj6nQ==}
+
+  '@types/dom-webcodecs@0.1.13':
+    resolution: {integrity: sha512-O5hkiFIcjjszPIYyUSyvScyvrBoV3NOEEZx/pMlsu44TKzWNkLVBBxnxJz42in5n3QIolYOcBYFCPZZ0h8SkwQ==}
+
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
@@ -4157,9 +4152,6 @@ packages:
     peerDependencies:
       react: 19.1.0
       react-dom: 19.1.0
-
-  codemirror@6.0.2:
-    resolution: {integrity: sha512-VhydHotNW5w1UGK0Qj96BwSk/Zqbp9WbnyK2W/eVMv4QyF41INRGpjUhFJY7/uDNuudSc33a/PKr4iDqRduvHw==}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -5775,6 +5767,9 @@ packages:
     resolution: {integrity: sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw==}
     engines: {node: '>= 0.8'}
 
+  mediabunny@1.46.0:
+    resolution: {integrity: sha512-HIaMQ6PVMndrFb9sNCh9/uAsLFBfLzyAgbk3kN7ZqlRRq//9RPYqIOQtXYpkbWBZU8ZJkaAUNLDtwTcdKo7yQw==}
+
   merge-descriptors@2.0.0:
     resolution: {integrity: sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g==}
     engines: {node: '>=18'}
@@ -5869,20 +5864,6 @@ packages:
 
   motion-utils@12.39.0:
     resolution: {integrity: sha512-8nadJAJjTtqRkmRF36FoJTrywK9nnFmnPwnSMyxaOCU7GDjN9RTMJIxx9De8ErM+vpPhMccr/6fo5WciyQLnMQ==}
-
-  motion@12.40.0:
-    resolution: {integrity: sha512-yjrHUrBFW6kQvjJwRsoiPSAhC5tRwRqNGJWmiJ4CrGnbKp0V88AdzkhBmDoqIsIPfarOe0Uddd37Xq43/gIocA==}
-    peerDependencies:
-      '@emotion/is-prop-valid': '*'
-      react: 19.1.0
-      react-dom: 19.1.0
-    peerDependenciesMeta:
-      '@emotion/is-prop-valid':
-        optional: true
-      react:
-        optional: true
-      react-dom:
-        optional: true
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -7743,14 +7724,14 @@ snapshots:
     dependencies:
       '@codemirror/language': 6.12.3
       '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
+      '@codemirror/view': 6.43.0
       '@lezer/common': 1.5.2
 
   '@codemirror/commands@6.10.3':
     dependencies:
       '@codemirror/language': 6.12.3
       '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
+      '@codemirror/view': 6.43.0
       '@lezer/common': 1.5.2
 
   '@codemirror/lang-css@6.3.1':
@@ -7768,7 +7749,7 @@ snapshots:
       '@codemirror/lang-javascript': 6.2.5
       '@codemirror/language': 6.12.3
       '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
+      '@codemirror/view': 6.43.0
       '@lezer/common': 1.5.2
       '@lezer/css': 1.3.3
       '@lezer/html': 1.3.13
@@ -7779,14 +7760,14 @@ snapshots:
       '@codemirror/language': 6.12.3
       '@codemirror/lint': 6.9.6
       '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
+      '@codemirror/view': 6.43.0
       '@lezer/common': 1.5.2
       '@lezer/javascript': 1.5.4
 
   '@codemirror/language@6.12.3':
     dependencies:
       '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
+      '@codemirror/view': 6.43.0
       '@lezer/common': 1.5.2
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.10
@@ -7801,7 +7782,7 @@ snapshots:
   '@codemirror/search@6.7.0':
     dependencies:
       '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
+      '@codemirror/view': 6.43.0
       crelt: 1.0.6
 
   '@codemirror/state@6.6.0':
@@ -7812,7 +7793,7 @@ snapshots:
     dependencies:
       '@codemirror/language': 6.12.3
       '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
+      '@codemirror/view': 6.43.0
       '@lezer/highlight': 1.2.3
 
   '@codemirror/view@6.40.0':
@@ -8279,17 +8260,6 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@hyperframes/core@0.6.6(hono@4.12.18)':
-    dependencies:
-      '@chenglou/pretext': 0.0.5
-      postcss: 8.5.15
-    optionalDependencies:
-      esbuild: 0.25.12
-      hono: 4.12.18
-      linkedom: 0.18.12
-    transitivePeerDependencies:
-      - canvas
-
   '@hyperframes/core@0.6.91(hono@4.12.18)':
     dependencies:
       '@babel/parser': 7.29.7
@@ -8321,8 +8291,6 @@ snapshots:
       - supports-color
       - typescript
       - utf-8-validate
-
-  '@hyperframes/player@0.6.6': {}
 
   '@hyperframes/player@0.6.91': {}
 
@@ -8358,7 +8326,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@hyperframes/studio@0.6.6(hono@4.12.18)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zustand@5.0.14(@types/react@19.2.15)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0)))':
+  '@hyperframes/studio@0.6.91(hono@4.12.18)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zustand@5.0.14(@types/react@19.2.15)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0)))':
     dependencies:
       '@codemirror/autocomplete': 6.20.2
       '@codemirror/commands': 6.10.3
@@ -8370,16 +8338,14 @@ snapshots:
       '@codemirror/state': 6.6.0
       '@codemirror/theme-one-dark': 6.1.3
       '@codemirror/view': 6.40.0
-      '@hyperframes/core': 0.6.6(hono@4.12.18)
-      '@hyperframes/player': 0.6.6
+      '@hyperframes/core': 0.6.91(hono@4.12.18)
+      '@hyperframes/player': 0.6.91
       '@phosphor-icons/react': 2.1.10(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      codemirror: 6.0.2
-      motion: 12.40.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      mediabunny: 1.46.0
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
       zustand: 5.0.14(@types/react@19.2.15)(react@19.1.0)(use-sync-external-store@1.6.0(react@19.1.0))
     transitivePeerDependencies:
-      - '@emotion/is-prop-valid'
       - canvas
       - hono
 
@@ -10246,6 +10212,12 @@ snapshots:
       '@types/node': 25.9.1
       '@types/ssh2': 1.15.5
 
+  '@types/dom-mediacapture-transform@0.1.11':
+    dependencies:
+      '@types/dom-webcodecs': 0.1.13
+
+  '@types/dom-webcodecs@0.1.13': {}
+
   '@types/estree@1.0.8': {}
 
   '@types/express-serve-static-core@5.1.1':
@@ -11079,16 +11051,6 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
-
-  codemirror@6.0.2:
-    dependencies:
-      '@codemirror/autocomplete': 6.20.2
-      '@codemirror/commands': 6.10.3
-      '@codemirror/language': 6.12.3
-      '@codemirror/lint': 6.9.6
-      '@codemirror/search': 6.7.0
-      '@codemirror/state': 6.6.0
-      '@codemirror/view': 6.40.0
 
   color-convert@2.0.1:
     dependencies:
@@ -12829,6 +12791,11 @@ snapshots:
 
   media-typer@1.1.0: {}
 
+  mediabunny@1.46.0:
+    dependencies:
+      '@types/dom-mediacapture-transform': 0.1.11
+      '@types/dom-webcodecs': 0.1.13
+
   merge-descriptors@2.0.0: {}
 
   merge2@1.4.1: {}
@@ -12897,14 +12864,6 @@ snapshots:
       motion-utils: 12.39.0
 
   motion-utils@12.39.0: {}
-
-  motion@12.40.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
-    dependencies:
-      framer-motion: 12.40.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      tslib: 2.8.1
-    optionalDependencies:
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
 
   ms@2.1.3: {}
 
