@@ -150,3 +150,67 @@ describe.runIf(INTEGRATION_AVAILABLE)("POST /api/templates/:id/use", () => {
     expect(res.body.renderSettings.resolution).toBe("landscape");
   });
 });
+
+/**
+ * GET /api/templates/:id/assets/:name — serve a multi-file template's vendored
+ * sibling asset to the preview iframe. The name is allow-listed against the
+ * manifest, so a traversal payload 404s without touching the filesystem.
+ */
+describe.runIf(INTEGRATION_AVAILABLE)(
+  "GET /api/templates/:id/assets/:name",
+  () => {
+    it("streams a declared asset with the right content-type", async () => {
+      const userId = await createFreeUser();
+      const sid = await authFor(userId);
+      const template = await insertPlatformTemplate({
+        module: "instagram-follow",
+      });
+
+      const res = await request(app)
+        .get(`/api/templates/${template.id}/assets/avatar.jpg`)
+        .set("Authorization", `Bearer ${sid}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("image/jpeg");
+      expect(res.headers["cache-control"]).toContain("max-age");
+    });
+
+    it("404s an asset name the module doesn't declare", async () => {
+      const userId = await createFreeUser();
+      const sid = await authFor(userId);
+      const template = await insertPlatformTemplate({
+        module: "instagram-follow",
+      });
+
+      const res = await request(app)
+        .get(`/api/templates/${template.id}/assets/not-a-real-asset.png`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(404);
+    });
+
+    it("404s a traversal attempt without touching the filesystem (allow-list)", async () => {
+      const userId = await createFreeUser();
+      const sid = await authFor(userId);
+      const template = await insertPlatformTemplate({
+        module: "instagram-follow",
+      });
+
+      const res = await request(app)
+        .get(
+          `/api/templates/${template.id}/assets/${encodeURIComponent("../../registry-templates.generated.json")}`,
+        )
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(404);
+    });
+
+    it("401s without a session", async () => {
+      const template = await insertPlatformTemplate({
+        module: "instagram-follow",
+      });
+      const res = await request(app).get(
+        `/api/templates/${template.id}/assets/avatar.jpg`,
+      );
+      expect(res.status).toBe(401);
+    });
+  },
+);

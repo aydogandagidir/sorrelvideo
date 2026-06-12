@@ -38,7 +38,7 @@ import {
   markRendering,
 } from "./renderJobsService";
 import { generateThumbnail } from "./thumbnailService";
-import { REGISTRY_COMPOSITION_MAP } from "./registryTemplates";
+import { REGISTRY_COMPOSITION_MAP, assetsForModule } from "./registryTemplates";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
@@ -68,7 +68,7 @@ export const RENDERS_DIR = process.env.RENDERS_DIR
   ? path.resolve(process.env.RENDERS_DIR)
   : path.resolve(__dirname, "../renders");
 
-const COMPOSITIONS_DIR = firstExistingDir(
+export const COMPOSITIONS_DIR = firstExistingDir(
   [
     path.resolve(__dirname, "compositions"), // bundled next to dist (if copied)
     path.resolve(__dirname, "../compositions"), // prod Docker: /app/compositions
@@ -77,6 +77,26 @@ const COMPOSITIONS_DIR = firstExistingDir(
   ],
   path.resolve(__dirname, "../compositions"),
 );
+
+/**
+ * Copy a module's vendored sibling assets (compositions/assets/<module>/<name>)
+ * into a per-render directory's `assets/` subdir so the engine resolves the
+ * composition's relative `assets/<name>` refs. Only the manifest-declared names
+ * are copied (the allow-list), one file at a time — NOT a recursive dir copy —
+ * so the manifest stays the source of truth. A missing committed asset is a
+ * packaging bug, so this throws loudly (like the voiceover path) rather than
+ * silently shipping a broken render. No-op for modules with no assets.
+ */
+export function copyTemplateAssets(module: string, destDir: string): void {
+  const names = assetsForModule(module);
+  if (names.length === 0) return;
+  const srcDir = path.join(COMPOSITIONS_DIR, "assets", module);
+  const outDir = path.join(destDir, "assets");
+  fs.mkdirSync(outDir, { recursive: true });
+  for (const name of names) {
+    fs.copyFileSync(path.join(srcDir, name), path.join(outDir, name));
+  }
+}
 
 const COMPOSITION_MAP: Record<string, string> = {
   "product-launch": "product-launch.html",
@@ -778,6 +798,12 @@ async function prepareCompositionFor(
 
   const dir = path.join(RENDERS_DIR, String(project.id));
   fs.mkdirSync(dir, { recursive: true });
+
+  // Vendored sibling assets (multi-file registry blocks: social avatars, the
+  // money-count sfx, code-snippet backgrounds): copy compositions/assets/<module>/*
+  // into <dir>/assets/* so the composition's relative `assets/<name>` refs
+  // resolve at render time. No-op for self-contained single-file modules.
+  copyTemplateAssets(project.module, dir);
 
   // Video spotlight (Track D): replace the HERO_VIDEO marker with a <video> ONLY
   // when an uploaded clip is present + downloads OK. The engine HARD-FAILS if a

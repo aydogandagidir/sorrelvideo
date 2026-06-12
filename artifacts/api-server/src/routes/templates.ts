@@ -24,6 +24,7 @@ import {
   resolveEntryFile,
   renderCompositionTemplate,
 } from "../services/renderService";
+import { serveTemplateAsset } from "../lib/templateAssets";
 import {
   resolutionForModule,
   REGISTRY_TEMPLATES,
@@ -199,6 +200,43 @@ router.get("/templates/thumbnails/:slug", (req, res): void => {
   // Inteligence/..."), same constraint as the project video/thumbnail routes.
   fs.createReadStream(thumbPath).pipe(res);
 });
+
+// GET /api/templates/:id/assets/:name — serve a multi-file template's vendored
+// sibling asset (avatar/background/sfx) to the preview iframe. SPEC-EXEMPT
+// (browser sub-resource, like the composition + thumbnail routes). Registered
+// BEFORE `GET /templates/:id` so "assets" isn't parsed as an id. Auth + the
+// own-or-platform 404 logic mirror the /composition route; the asset name is
+// allow-listed against the manifest by serveTemplateAsset (no path traversal).
+router.get(
+  "/templates/:id/assets/:name",
+  async (req, res): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid template id" });
+      return;
+    }
+    const [template] = await db
+      .select()
+      .from(templatesTable)
+      .where(eq(templatesTable.id, id));
+    if (
+      !template ||
+      (template.userId !== null && template.userId !== req.user.id)
+    ) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    const name = Array.isArray(req.params.name)
+      ? req.params.name[0]
+      : req.params.name;
+    serveTemplateAsset(res, template.module, name);
+  },
+);
 
 router.post("/templates", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {

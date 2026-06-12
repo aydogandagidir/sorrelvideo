@@ -265,6 +265,16 @@ async function main() {
       substitute(fs.readFileSync(compFile, "utf-8")),
       "utf-8",
     );
+    // Multi-file blocks: copy vendored sibling assets next to the composition so
+    // their `assets/<name>` refs resolve (same as renderService.copyTemplateAssets).
+    for (const a of t.assets ?? []) {
+      const assetsOut = path.join(dir, "assets");
+      fs.mkdirSync(assetsOut, { recursive: true });
+      fs.copyFileSync(
+        path.join(COMPOSITIONS_DIR, "assets", t.slug, a.name),
+        path.join(assetsOut, a.name),
+      );
+    }
     const mp4 = path.join(dir, "out.mp4");
     const outPng = path.join(THUMBNAILS_DIR, `${t.slug}.png`);
     try {

@@ -120,11 +120,21 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 - **Template library (registry-vendored, Apache-2.0)**: the hand-authored
   compositions are joined by templates vendored from the open-source
   [Hyperframes registry](https://github.com/heygen-com/hyperframes/tree/main/registry)
-  (Apache-2.0). `scripts/import-registry-templates.mjs` fetches curated, *self-
-  contained* blocks → writes `<slug>.html` (attribution header) + the
-  `compositions/registry-templates.generated.json` manifest + `REGISTRY-NOTICE.md`
-  (blocks that need co-located assets are skipped — the render pipeline serves a
-  single `composition.html` with no adjacent files). `scripts/verify-registry-renders.mjs`
+  (Apache-2.0). `scripts/import-registry-templates.mjs` fetches curated blocks →
+  writes `<slug>.html` (attribution header) + the
+  `compositions/registry-templates.generated.json` manifest + `REGISTRY-NOTICE.md`.
+  **Multi-file blocks are supported**: a block whose extra files are all static
+  `hyperframes:asset`s (images/audio, allow-listed extensions) is vendored — the
+  importer downloads each asset to `compositions/assets/<slug>/<name>`, normalizes
+  the composition's relative refs to the canonical `assets/<name>` form, and
+  records them in the manifest's `assets[]`. `renderService.copyTemplateAssets`
+  copies them next to the per-render `composition.html` (the engine resolves the
+  relative refs; an `<audio src="assets/x.wav">` is muxed into the output's audio
+  track — sha-proven), and the **allow-listed** `GET /api/templates/:id/assets/:name`
+  + `GET /api/projects/:id/assets/:name` routes serve them to the preview iframe
+  (`:name` matched against the manifest so it can't traverse). Blocks whose extra
+  files are NON-static (`.glb` models, `lib/*.js` runtimes) are still skipped.
+  `scripts/verify-registry-renders.mjs`
   render-checks every vendored block against the installed engine.
   `services/registryTemplates.ts` types the manifest and feeds both renderService's
   `COMPOSITION_MAP` (slug → file) and `seedPlatformTemplates()`

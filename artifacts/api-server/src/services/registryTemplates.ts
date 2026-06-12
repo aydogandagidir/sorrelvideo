@@ -47,10 +47,31 @@ export interface RegistryTemplate {
    * HTML-declared defaults); this is purely the manifest's typed view of them.
    */
   variables?: CompositionVariable[];
+  /**
+   * Vendored sibling assets (images/audio) this composition references via
+   * relative `assets/<name>` paths. They live committed under
+   * `compositions/assets/<slug>/<name>`, are copied into the per-render dir
+   * (renderService.copyTemplateAssets) so the engine resolves them, and are
+   * served to the preview iframe by the template/project asset routes. Absent
+   * for self-contained single-file blocks.
+   */
+  assets?: { name: string }[];
 }
 
 export const REGISTRY_TEMPLATES: RegistryTemplate[] =
   manifest as RegistryTemplate[];
+
+/**
+ * The vendored asset basenames for a module (registry slug), or `[]` for a
+ * module with no assets / a non-registry module. The single source of truth
+ * for the asset allow-list used by the render copy step + the asset routes —
+ * a `:name` is only ever served if it appears here, so user input never becomes
+ * a path outside this set.
+ */
+export function assetsForModule(module: string): string[] {
+  const t = REGISTRY_TEMPLATES.find((x) => x.slug === module);
+  return t?.assets?.map((a) => a.name) ?? [];
+}
 
 /**
  * slug → composition filename, merged into renderService's COMPOSITION_MAP so a

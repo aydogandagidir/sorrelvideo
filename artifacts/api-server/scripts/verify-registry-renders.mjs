@@ -69,6 +69,17 @@ for (const t of manifest) {
     substitute(fs.readFileSync(file, "utf-8")),
     "utf-8",
   );
+  // Multi-file blocks: copy their vendored sibling assets next to the
+  // composition so the engine resolves the `assets/<name>` refs (mirrors
+  // renderService.copyTemplateAssets — without it those blocks render broken).
+  for (const a of t.assets ?? []) {
+    const assetsOut = path.join(dir, "assets");
+    fs.mkdirSync(assetsOut, { recursive: true });
+    fs.copyFileSync(
+      path.join(COMPOSITIONS_DIR, "assets", t.slug, a.name),
+      path.join(assetsOut, a.name),
+    );
+  }
   const out = path.join(dir, "out.mp4");
   try {
     const job = createRenderJob({ fps: { num: FPS, den: 1 }, quality: "draft", format: "mp4", entryFile: "composition.html" });

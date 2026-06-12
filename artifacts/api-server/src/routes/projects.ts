@@ -41,6 +41,7 @@ import { startProjectRender } from "../services/renderStartService";
 import { getUserPlan } from "../services/billingService";
 import { findUnsafeCompositionVar } from "../lib/compositionVars";
 import { logger } from "../lib/logger";
+import { serveTemplateAsset } from "../lib/templateAssets";
 
 const router: IRouter = Router();
 
@@ -661,6 +662,41 @@ router.get("/projects/:id/composition", async (req, res): Promise<void> => {
   // A string body is safe to res.send — the Express-5 spaces-in-path issue only
   // affects res.sendFile, which we deliberately avoid here.
   res.send(html);
+});
+
+// GET /api/projects/:id/assets/:name — serve a vendored sibling asset
+// (avatar/background/sfx) for a project created from a multi-file template, so
+// the `/composition` preview iframe resolves the composition's `assets/<name>`
+// refs. Auth + ownership mirror `/composition`; the name is allow-listed against
+// the manifest (serveTemplateAsset). Source is the COMMITTED compositions/assets
+// dir (not the render dir), so it works for drafts that never rendered.
+router.get("/projects/:id/assets/:name", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid project id" });
+    return;
+  }
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (project.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const name = Array.isArray(req.params.name)
+    ? req.params.name[0]
+    : req.params.name;
+  serveTemplateAsset(res, project.module, name);
 });
 
 // GET /api/projects/:id/thumbnail — stream the rendered poster frame (PNG).
