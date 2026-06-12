@@ -19,7 +19,7 @@ const router: IRouter = Router();
  */
 router.post(
   "/compositions/lint",
-  (req: Request, res: Response): void => {
+  async (req: Request, res: Response): Promise<void> => {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: "Unauthorized" });
       return;
@@ -33,7 +33,7 @@ router.post(
       return;
     }
 
-    res.json({ messages: lintComposition(parsed.data.source) });
+    res.json({ messages: await lintComposition(parsed.data.source) });
   },
 );
 

@@ -20,7 +20,7 @@ function readComposition(name: string): string {
 
 /**
  * A minimal, lint-clean Hyperframes composition. It satisfies every
- * error-severity rule core 0.6.6 enforces: a root element carrying
+ * error-severity rule core 0.6.91 enforces: a root element carrying
  * `data-composition-id` + `data-width`/`data-height`, and a `window.__timelines`
  * registry whose key matches that id, with syntactically valid inline JS.
  *
@@ -53,9 +53,9 @@ describe("lintComposition", () => {
   // Importing core's runtime `lintHyperframeHtml` is the reason vitest needs
   // `server.deps.inline: [/@hyperframes\/core/]`. Linting a real composition
   // here proves that wiring resolves at runtime (no extensionless-import crash).
-  it("lints a real shipped composition without throwing and returns an array", () => {
+  it("lints a real shipped composition without throwing and returns an array", async () => {
     const html = readComposition("studio-default.html");
-    const messages = lintComposition(html);
+    const messages = await lintComposition(html);
     expect(Array.isArray(messages)).toBe(true);
     // Every finding is well-formed: a known severity and a non-empty message.
     for (const m of messages) {
@@ -65,12 +65,12 @@ describe("lintComposition", () => {
     }
   });
 
-  it("returns no error-severity findings for a lint-clean composition", () => {
-    expect(errorsOf(lintComposition(CLEAN_COMPOSITION))).toHaveLength(0);
+  it("returns no error-severity findings for a lint-clean composition", async () => {
+    expect(errorsOf(await lintComposition(CLEAN_COMPOSITION))).toHaveLength(0);
   });
 
-  it("reports findings for an obviously-broken composition", () => {
-    const messages = lintComposition(BROKEN_COMPOSITION);
+  it("reports findings for an obviously-broken composition", async () => {
+    const messages = await lintComposition(BROKEN_COMPOSITION);
     expect(messages.length).toBeGreaterThan(0);
     // A bare fragment has no composition root and no timeline registry, so the
     // linter must flag at least one error.
@@ -81,10 +81,10 @@ describe("lintComposition", () => {
 });
 
 describe("assertNoLintErrors", () => {
-  it("throws a 400 error listing the lint errors for broken HTML", () => {
+  it("rejects with a 400 error listing the lint errors for broken HTML", async () => {
     let thrown: unknown;
     try {
-      assertNoLintErrors(BROKEN_COMPOSITION);
+      await assertNoLintErrors(BROKEN_COMPOSITION);
     } catch (e) {
       thrown = e;
     }
@@ -93,7 +93,7 @@ describe("assertNoLintErrors", () => {
     expect((thrown as Error).message).toContain("lint error");
   });
 
-  it("does not throw for a lint-clean composition", () => {
-    expect(() => assertNoLintErrors(CLEAN_COMPOSITION)).not.toThrow();
+  it("does not reject for a lint-clean composition", async () => {
+    await expect(assertNoLintErrors(CLEAN_COMPOSITION)).resolves.toBeUndefined();
   });
 });

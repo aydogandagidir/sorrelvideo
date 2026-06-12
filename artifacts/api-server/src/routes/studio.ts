@@ -812,7 +812,9 @@ router.get("/studio/projects/:id/lint", async (req, res): Promise<void> => {
       res.status(400).json({ error: prepared.error });
       return;
     }
-    res.json(runHyperframeLint(prepared.prepared));
+    // `runHyperframeLint` became async in producer 0.6.91 — the missing await
+    // serialized a pending Promise as `{}` (tsc can't catch it: res.json(any)).
+    res.json(await runHyperframeLint(prepared.prepared));
   } catch (err) {
     if (err instanceof WorkspacePathError) {
       res.status(err.status).json({ error: err.message });

@@ -25,8 +25,8 @@ import {
  * App-shaped lint finding. Mirrors the engine's `HyperframeLintFinding` but
  * keeps only the fields the app needs and renames `code` → `rule`.
  *
- * `line` is carried for forward-compatibility: core 0.6.6 findings do not
- * include a line number, so it is currently always `undefined`. If a future
+ * `line` is carried for forward-compatibility: core 0.6.91 findings still do
+ * not include a line number, so it is currently always `undefined`. If a future
  * core version adds positional data, map it here without a contract change.
  */
 export interface LintMessage {
@@ -64,13 +64,14 @@ function toLintMessage(finding: HyperframeLintFinding): LintMessage {
 /**
  * Lint a composition's HTML and return the findings as `LintMessage[]`.
  *
- * Pure + synchronous: only runs core's static rule set (`lintHyperframeHtml`),
- * never the async URL-reachability passes (`lintMediaUrls` / `lintScriptUrls`),
- * so it makes no network calls and is deterministic. An empty array means the
- * linter found nothing to report.
+ * Pure + deterministic: only runs core's static rule set (`lintHyperframeHtml`),
+ * never the URL-reachability pass (`lintMediaUrls`), so it makes no network
+ * calls. Async because core 0.6.91 made `lintHyperframeHtml` async (rules may
+ * return promises) — the default rule set still does no I/O. An empty array
+ * means the linter found nothing to report.
  */
-export function lintComposition(html: string): LintMessage[] {
-  const result = lintHyperframeHtml(html);
+export async function lintComposition(html: string): Promise<LintMessage[]> {
+  const result = await lintHyperframeHtml(html);
   return result.findings.map(toLintMessage);
 }
 
@@ -82,8 +83,8 @@ export function lintComposition(html: string): LintMessage[] {
  * Bad Request, byte-compatible with how other services attach a status to
  * their domain errors.
  */
-export function assertNoLintErrors(html: string): void {
-  const errors = lintComposition(html).filter(
+export async function assertNoLintErrors(html: string): Promise<void> {
+  const errors = (await lintComposition(html)).filter(
     (message) => message.severity === "error",
   );
   if (errors.length === 0) return;
