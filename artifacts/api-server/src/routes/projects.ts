@@ -1,4 +1,5 @@
 import fs from "fs";
+import archiver from "archiver";
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import {
@@ -39,6 +40,7 @@ import {
 import { startProjectRender } from "../services/renderStartService";
 import { getUserPlan } from "../services/billingService";
 import { findUnsafeCompositionVar } from "../lib/compositionVars";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -487,13 +489,42 @@ router.get("/projects/:id/video", async (req, res): Promise<void> => {
   // render job (falls back to legacy output.mp4 / mp4 for old projects).
   const { path: filePath, format } = await getRenderArtifact(id);
 
-  // png-sequence renders an OUTPUT DIRECTORY of frames, not a streamable file.
-  // Download-as-zip is deferred (M-later); surface a clear 409 for now.
+  // png-sequence renders an OUTPUT DIRECTORY of frames (+ an optional audio
+  // sidecar), not a single streamable file. Stream it back as a zip built on
+  // the fly. archiver reads one entry at a time and respects `res` backpressure
+  // — constant memory regardless of frame count; PNGs are already compressed so
+  // we STORE (level 0) for ~10x faster archiving. No Content-Length (size is
+  // unknown until finalize) → chunked transfer, and Range requests are ignored
+  // (answered as a full 200) — zip downloads don't resume, an accepted trade.
   if (format === "png-sequence") {
-    res.status(409).json({
-      error:
-        "This project rendered a PNG sequence; download-as-zip is not available yet.",
+    res.status(200);
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="project-${id}-frames.zip"`,
+    );
+
+    const archive = archiver("zip", { zlib: { level: 0 } });
+    archive.on("warning", (err: Error) => {
+      logger.warn({ err, projectId: id }, "zip archive warning");
     });
+    archive.on("error", (err: Error) => {
+      logger.error({ err, projectId: id }, "zip archive error");
+      // Headers are already sent (streaming) — destroy the socket so the client
+      // sees a truncated/aborted download rather than a silently-OK partial zip.
+      res.destroy(err);
+    });
+    // Client aborted (closed the tab / cancelled the download) → stop reading
+    // frames off disk immediately.
+    req.on("close", () => archive.destroy());
+
+    archive.pipe(res);
+    // `filePath` IS the frames directory for png-sequence (getRenderArtifact).
+    // `false` = no top-level folder; picks up the engine's optional audio.aac
+    // sidecar written alongside the frames (intentional — it's part of the render).
+    archive.directory(filePath, false);
+    void archive.finalize();
     return;
   }
 
