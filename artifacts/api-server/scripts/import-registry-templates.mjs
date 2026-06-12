@@ -26,7 +26,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 const REPO = "heygen-com/hyperframes";
-const REF = "main";
+// Pinned to the audited commit (tag model-assets-v1, @hyperframes 0.6.91) so a
+// re-run vendors EXACTLY what was render-verified, not a moving `main` that
+// could drift mid-PR. Bump deliberately alongside an engine bump.
+const REF = "c52165d1b63cf11955ceb4e2265cbe34b0718852";
 const RAW = (p) => `https://raw.githubusercontent.com/${REPO}/${REF}/${p}`;
 const SOURCE_URL = (slug) =>
   `https://github.com/${REPO}/tree/${REF}/registry/blocks/${slug}`;
@@ -97,6 +100,19 @@ const DATA_CHART_VARIABLES = [
     default: 5,
     min: 1,
   },
+];
+
+/**
+ * Every apple-terminal variant uses gsap's TextPlugin syntax
+ * (`tl.set(el,{text:""})`) to clear the typed line, but only gsap core is
+ * bundled, so each render logs "Missing plugin? TextPlugin". The typing itself
+ * is driven by direct textContent writes, so this set is a no-op — replace it
+ * with a plain DOM write to silence the log without loading the heavier plugin.
+ * Shared across all 12 terminal entries (the original `-pro` + the 11 themes).
+ * @type {{find:string|RegExp,replace:string}[]}
+ */
+const APPLE_TERMINAL_INJECT = [
+  { find: 'tl.set(typedEl, { text: "" }, 0);', replace: 'typedEl.textContent = "";' },
 ];
 
 /**
@@ -269,14 +285,7 @@ const CURATION = [
     slug: "code-snippet-apple-terminal-pro",
     category: "Code",
     isPremium: true,
-    // The composition uses gsap's TextPlugin syntax (tl.set(el,{text:""})) to
-    // clear the line, but only gsap core is bundled, so every render logs
-    // "Missing plugin? TextPlugin". The typing itself is driven by direct
-    // textContent writes, so this set is a no-op — replace it with a plain DOM
-    // write to silence the log without loading the (heavier) plugin.
-    inject: [
-      { find: 'tl.set(typedEl, { text: "" }, 0);', replace: 'typedEl.textContent = "";' },
-    ],
+    inject: APPLE_TERMINAL_INJECT,
   },
   { slug: "x-post", category: "Social", isPremium: false },
   { slug: "reddit-post", category: "Social", isPremium: false },
@@ -288,6 +297,81 @@ const CURATION = [
   { slug: "glitch", category: "Motion", isPremium: false },
   { slug: "light-leak", category: "Motion", isPremium: true },
   { slug: "swirl-vortex", category: "Motion", isPremium: true },
+
+  // ── Batch 2 (×51): every importable single-file block not yet vendored. ──
+  // Categories + premium splits are Sorrel product calls; NO brand injection
+  // for any of these groups (maps are perceptual data encodings; shader/vfx/
+  // transition demos are scene content — recoloring them is neither cheap nor
+  // obvious; the macos/showcase blocks would each need bespoke anchors — a
+  // later pass). The 12 apple-terminal variants share the TextPlugin-silencing
+  // inject below.
+
+  // Data / Diagram / Showcase / Social (9)
+  { slug: "us-map", category: "Data", isPremium: false },
+  { slug: "us-map-hex", category: "Data", isPremium: true },
+  { slug: "us-map-flow", category: "Data", isPremium: true },
+  { slug: "spain-map", category: "Data", isPremium: true },
+  { slug: "flowchart", category: "Diagram", isPremium: false },
+  { slug: "flowchart-vertical", category: "Diagram", isPremium: false },
+  { slug: "macos-notification", category: "Social", isPremium: false },
+  { slug: "app-showcase", category: "Showcase", isPremium: false },
+  { slug: "ui-3d-reveal", category: "Showcase", isPremium: true },
+
+  // Named shader transitions (10) — 4s two-scene demos, premium Effects shelf.
+  { slug: "chromatic-radial-split", category: "Effects", isPremium: true },
+  { slug: "cross-warp-morph", category: "Effects", isPremium: true },
+  { slug: "domain-warp-dissolve", category: "Effects", isPremium: true },
+  { slug: "flash-through-white", category: "Effects", isPremium: true },
+  { slug: "gravitational-lens", category: "Effects", isPremium: true },
+  { slug: "ridged-burn", category: "Effects", isPremium: true },
+  { slug: "ripple-waves", category: "Effects", isPremium: true },
+  { slug: "sdf-iris", category: "Effects", isPremium: true },
+  { slug: "thermal-distortion", category: "Effects", isPremium: true },
+  { slug: "whip-pan", category: "Effects", isPremium: true },
+
+  // transitions-* showcase reels (13) — premium Effects.
+  { slug: "transitions-3d", category: "Effects", isPremium: true },
+  { slug: "transitions-blur", category: "Effects", isPremium: true },
+  { slug: "transitions-cover", category: "Effects", isPremium: true },
+  { slug: "transitions-destruction", category: "Effects", isPremium: true },
+  { slug: "transitions-dissolve", category: "Effects", isPremium: true },
+  { slug: "transitions-distortion", category: "Effects", isPremium: true },
+  { slug: "transitions-grid", category: "Effects", isPremium: true },
+  { slug: "transitions-light", category: "Effects", isPremium: true },
+  { slug: "transitions-mechanical", category: "Effects", isPremium: true },
+  { slug: "transitions-other", category: "Effects", isPremium: true },
+  { slug: "transitions-push", category: "Effects", isPremium: true },
+  { slug: "transitions-radial", category: "Effects", isPremium: true },
+  { slug: "transitions-scale", category: "Effects", isPremium: true },
+
+  // VFX (4 kept) — all premium WebGL.
+  // DROPPED (verified empirically by isolated render probes on the render box,
+  // chrome-headless-shell + software GPU):
+  //  - liquid-glass-context-menu / liquid-glass-media-controls (webgpu): no
+  //    WebGPU on the render box → ~15-21 KiB near-empty output.
+  //  - vfx-text-cursor / vfx-liquid-glass (html-in-canvas drawElementImage):
+  //    pinned to 1 worker + screenshot mode, they don't finish a render in 200s
+  //    of software-GPU capture → CI-timeout + minutes-long user renders.
+  // The 4 kept vfx-* blocks (liquid-background/magnetic/portal/shatter) are
+  // WebGL and probe-render in well under the cap. Re-add the dropped four only
+  // if the render backend gains a real GPU / WebGPU.
+  { slug: "vfx-liquid-background", category: "Effects", isPremium: true },
+  { slug: "vfx-magnetic", category: "Effects", isPremium: true },
+  { slug: "vfx-portal", category: "Effects", isPremium: true },
+  { slug: "vfx-shatter", category: "Effects", isPremium: true },
+
+  // Apple-terminal code themes (11): 3 free + 8 premium theme packs.
+  { slug: "code-snippet-apple-terminal-basic", category: "Code", isPremium: false, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-clear-dark", category: "Code", isPremium: false, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-clear-light", category: "Code", isPremium: false, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-grass", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-homebrew", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-man-page", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-novel", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-ocean", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-red-sands", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-silver-aerogel", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
+  { slug: "code-snippet-apple-terminal-solid-colors", category: "Code", isPremium: true, inject: APPLE_TERMINAL_INJECT },
 ];
 
 /** Does the composition reference LOCAL relative assets we can't vendor inline? */

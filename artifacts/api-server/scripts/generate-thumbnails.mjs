@@ -32,6 +32,7 @@
  * table + a FAIL list otherwise.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
@@ -41,13 +42,22 @@ const THUMBNAILS_DIR = path.join(COMPOSITIONS_DIR, "thumbnails");
 const MANIFEST = path.join(COMPOSITIONS_DIR, "registry-templates.generated.json");
 const CORE_SRC = path.join(CWD, "node_modules", "@hyperframes", "core", "dist");
 const CORE_DEST = path.join(CWD, "core", "dist");
-const WORK = path.join(CWD, "renders", "__thumbnails__");
+// Scratch under the OS temp dir, NOT the (already deep) worktree: the producer
+// mkdtemps inside the per-slug dir, and a long slug like
+// `code-snippet-apple-terminal-silver-aerogel` nested under the worktree path
+// blew past Windows' 260-char MAX_PATH → ENAMETOOLONG. Same fix as
+// verify-registry-renders. (Output PNGs still land in the committed
+// THUMBNAILS_DIR; only the transient render scratch moves.)
+const WORK = path.join(os.tmpdir(), "hf-thumbnails");
 
 // Render knobs: a poster frame is a single still, so fidelity comes from the
 // composition, not the framerate. A modest fps keeps the full batch fast while
 // still landing real frames at the candidate seek marks. `draft` matches the
 // verify script (this is a smoke-quality still, not a deliverable).
-const FPS = 12;
+// Override with THUMBNAIL_FPS for heavy/long compositions (e.g. the 11-24s
+// transitions-* reels + html-in-canvas vfx): fewer frames → far faster render,
+// and the poster is a single seek-selected still so the lower fps is invisible.
+const FPS = Number(process.env.THUMBNAIL_FPS) || 12;
 // Candidate seek fractions of the clip's duration. These compositions all
 // animate IN (fade / slide / type / zoom / country-by-country choropleth
 // reveal), so an early frame is often blank or half-drawn. We grab one frame at

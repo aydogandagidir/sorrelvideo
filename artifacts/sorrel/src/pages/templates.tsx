@@ -70,6 +70,10 @@ function TemplateCard({
             src={template.thumbnailUrl}
             alt=""
             aria-hidden="true"
+            // The gallery now lists ~75 templates; lazy/async decoding keeps
+            // off-screen posters from all fetching+decoding on first paint.
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (

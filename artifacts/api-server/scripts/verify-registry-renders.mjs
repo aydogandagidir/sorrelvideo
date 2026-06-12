@@ -12,6 +12,7 @@
  * table + a FAIL list so broken templates can be excluded before seeding.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const CWD = process.cwd(); // artifacts/api-server
@@ -19,7 +20,13 @@ const COMPOSITIONS_DIR = path.join(CWD, "src", "compositions");
 const MANIFEST = path.join(COMPOSITIONS_DIR, "registry-templates.generated.json");
 const CORE_SRC = path.join(CWD, "node_modules", "@hyperframes", "core", "dist");
 const CORE_DEST = path.join(CWD, "core", "dist");
-const WORK = path.join(CWD, "renders", "__verify__");
+// Scratch lives under the OS temp dir, NOT in the (already deep) worktree:
+// the producer mkdtemps a `work-<uuid>-XXXXXX` INSIDE the per-slug dir, and a
+// long slug like `code-snippet-apple-terminal-silver-aerogel` blew past
+// Windows' 260-char MAX_PATH when nested under the worktree path → ENAMETOOLONG.
+// os.tmpdir() (~40 chars) keeps every path well under the limit. (Prod renders
+// use `renders/<numeric-id>/`, which is short — this only ever bit the verifier.)
+const WORK = path.join(os.tmpdir(), "hf-verify");
 const FPS = 8; // reduced — smoke for "renders without error", not visual fidelity
 
 // A distinctive sample brand so a glance at the output proves any injected
