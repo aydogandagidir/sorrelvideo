@@ -25,7 +25,7 @@
  *     into renderQueue.ts) is owned by a DIFFERENT milestone and lives under
  *     artifacts/api-server. It is NOT in this package.
  *
- * Verified against @hyperframes/aws-lambda@0.6.65 published types (the `^0.6.6`
+ * Verified against @hyperframes/aws-lambda@0.6.91 published types (the `^0.6.6`
  * dependency resolves into the 0.6.x line). The construct's surface that this
  * file depends on:
  *   - import: `@hyperframes/aws-lambda/cdk` (NOT the package root — root re-exports
@@ -47,7 +47,7 @@ import { HyperframesRenderStack } from "@hyperframes/aws-lambda/cdk";
 
 /**
  * Chromium binary source for the render Lambda. Mirrors the construct's
- * `chromeSource` prop exactly (@hyperframes/aws-lambda@0.6.65). NOTE: the literal
+ * `chromeSource` prop exactly (@hyperframes/aws-lambda@0.6.91). NOTE: the literal
  * is `"sparticuz"`, NOT the npm package name `"@sparticuz/chromium"` — the
  * construct maps this short token to the layer internally.
  */
@@ -71,7 +71,7 @@ export class SorrelRenderStack extends cdk.Stack {
     // ---------------------------------------------------------------------
     // 1. Hyperframes render state machine (Step Functions + Lambda workers).
     // ---------------------------------------------------------------------
-    // RESOLVED against @hyperframes/aws-lambda@0.6.65: the construct OWNS its S3
+    // RESOLVED against @hyperframes/aws-lambda@0.6.91: the construct OWNS its S3
     // bucket — there is no `bucket`/`renderBucket` prop to inject. We read the
     // bucket back via `render.bucket` below and scope IAM to it. Concurrency is
     // `reservedConcurrency` (not `maxConcurrency`); there is no `sdrOnly` prop
@@ -165,7 +165,7 @@ export class SorrelRenderStack extends cdk.Stack {
         // NOTE: scoped to ALL objects in `render.bucket` (`<bucket>/*`) rather
         // than to `output/` + `chunks/` prefixes. The previous scaffold scoped
         // by prefix, but the construct owns the bucket and its published types
-        // (@hyperframes/aws-lambda@0.6.65) do NOT document the object key layout
+        // (@hyperframes/aws-lambda@0.6.91) do NOT document the object key layout
         // it writes under — hard-coding `output/`/`chunks/` here would risk
         // either over- or under-granting if the engine's keys differ. The grant
         // is still tightly bounded: a single dedicated bucket, no ListBucket, no
@@ -220,7 +220,7 @@ export class SorrelRenderStack extends cdk.Stack {
   /**
    * Validate + resolve the Chromium source from context. Constrained to the two
    * values accepted by the construct's `chromeSource` prop (verified against
-   * @hyperframes/aws-lambda@0.6.65) so a typo can't silently produce an
+   * @hyperframes/aws-lambda@0.6.91) so a typo can't silently produce an
    * oversized (or nonexistent) Lambda layer.
    */
   private resolveChromeSource(): ChromeSource {

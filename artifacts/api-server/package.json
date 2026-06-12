@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
+    "@hyperframes/aws-lambda": "0.6.91",
     "@hyperframes/core": "0.6.91",
     "@hyperframes/producer": "0.6.91",
     "@hyperframes/shader-transitions": "0.6.91",

@@ -741,7 +741,7 @@ export async function buildCompositionHtml(project: {
  * order matters: the watermark is appended AFTER the template merge so it is
  * never substituted/escaped and always wins the stacking context.
  */
-async function prepareCompositionFor(
+export async function prepareCompositionFor(
   project: {
     id: number;
     userId: string;

@@ -26,7 +26,7 @@ Lambda" path has somewhere to run; the finished MP4 is handed back to the app.
 | **IAM runtime policy + user**  | Least-privilege for the api-server (drive one state machine + read/delete its bucket artifacts). Keys → Railway. |
 | **CfnOutputs**                 | Bucket name, state-machine ARN, render function name, runtime user name.                                  |
 
-> ✅ **API verified against `@hyperframes/aws-lambda@0.6.65`** (the declared
+> ✅ **API verified against `@hyperframes/aws-lambda@0.6.91`** (the declared
 > `^0.6.6` dependency resolves into that 0.6.x build; types read from the npm
 > CDN). All five prior `TODO(verify …)` markers are resolved. Key corrections
 > the verification forced:
@@ -62,7 +62,7 @@ Lambda" path has somewhere to run; the finished MP4 is handed back to the app.
 - **SDR only.** No HDR pipeline.
 - **No completion webhooks.** The api-server **polls** `getRenderProgress(opts)`.
   Poll cadence is `LAMBDA_PROGRESS_POLL_MS`. The real shapes (verified against
-  `@hyperframes/aws-lambda@0.6.65`) are in [Runtime SDK contract](#runtime-sdk-contract-api-server)
+  `@hyperframes/aws-lambda@0.6.91`) are in [Runtime SDK contract](#runtime-sdk-contract-api-server)
   below — `getRenderProgress` takes an options object keyed by `executionArn`
   (not a bare `renderId`) and returns a richer `RenderProgress`, not
   `{ status, progress, costCents? }`.
@@ -75,7 +75,7 @@ Lambda" path has somewhere to run; the finished MP4 is handed back to the app.
 
 Selected by `HYPERFRAMES_LAMBDA_CHROME_SOURCE` (runtime) and the `chromeSource`
 CDK context (build). NOTE: the construct's `chromeSource` prop takes the **short
-token `"sparticuz"`** — verified against `@hyperframes/aws-lambda@0.6.65` — not
+token `"sparticuz"`** — verified against `@hyperframes/aws-lambda@0.6.91` — not
 the npm package name `"@sparticuz/chromium"`. `cdk.json` and `resolveChromeSource()`
 use the short token; passing the npm name now fails synth with a clear error.
 
@@ -92,7 +92,7 @@ use the short token; passing the npm name now fails synth with a clear error.
   S3 lifecycle expiry (`chunks/` 24h, `output/` 2d) does **not** apply: the
   `HyperframesRenderStack` construct **owns its bucket** and exposes no lifecycle
   / SSE / public-access props (only `bucketRemovalPolicy`, verified against
-  `@hyperframes/aws-lambda@0.6.65`). We rely on the engine's own intermediate
+  `@hyperframes/aws-lambda@0.6.91`). We rely on the engine's own intermediate
   cleanup for flat storage. If lifecycle expiry becomes necessary, attach an L1
   lifecycle configuration to `render.bucket` post-construction or request an
   upstream prop — see the `NOTE:` in `lib/sorrel-render-stack.ts`.
@@ -204,7 +204,7 @@ Railway. The policy grants exactly:
 
 > **Why `<renderBucket>/*` and not `output/*` + `chunks/*`?** The earlier
 > scaffold scoped S3 by prefix, but the construct owns the bucket and its
-> published types (`@hyperframes/aws-lambda@0.6.65`) do **not** document the
+> published types (`@hyperframes/aws-lambda@0.6.91`) do **not** document the
 > object-key layout the engine writes under. Hard-coding `output/`/`chunks/`
 > would risk over- or under-granting if the engine's keys differ. The grant is
 > still tightly bounded — a single dedicated bucket, no `ListBucket`, no write.
@@ -347,7 +347,7 @@ render (AWS Lambda — Pro tier, optional)". Summary:
 
 > This is consumed by the api-server-side glue (a **different milestone**, under
 > `artifacts/api-server`), documented here because this package owns the contract.
-> Signatures **verified** against `@hyperframes/aws-lambda@0.6.65` — imported from
+> Signatures **verified** against `@hyperframes/aws-lambda@0.6.91` — imported from
 > the package **root** (`@hyperframes/aws-lambda`), distinct from the `/cdk`
 > subpath this CDK app imports.
 

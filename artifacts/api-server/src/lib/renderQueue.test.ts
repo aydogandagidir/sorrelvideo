@@ -58,6 +58,7 @@ beforeEach(() => {
   delete process.env.RENDER_BACKEND;
   delete process.env.AWS_REGION;
   delete process.env.HYPERFRAMES_S3_BUCKET;
+  delete process.env.HYPERFRAMES_STATE_MACHINE_ARN;
   h.executeRender.mockResolvedValue(undefined);
   h.queueAdd.mockResolvedValue(undefined);
   // BullMQ's Queue.remove resolves a numeric code: 1 = removed (or never
@@ -166,6 +167,7 @@ describe("enqueueRender", () => {
     vi.stubEnv("RENDER_BACKEND", "lambda");
     vi.stubEnv("AWS_REGION", "us-east-1");
     vi.stubEnv("HYPERFRAMES_S3_BUCKET", "sorrel-render-dev");
+    vi.stubEnv("HYPERFRAMES_STATE_MACHINE_ARN", "arn:aws:states:us-east-1:0:stateMachine:hf");
     const { enqueueRender } = await import("./renderQueue");
 
     await enqueueRender(99, "studio", null, "rj-99", "pro");
@@ -186,6 +188,7 @@ describe("enqueueRender", () => {
     vi.stubEnv("RENDER_BACKEND", "lambda");
     vi.stubEnv("AWS_REGION", "us-east-1");
     vi.stubEnv("HYPERFRAMES_S3_BUCKET", "sorrel-render-dev");
+    vi.stubEnv("HYPERFRAMES_STATE_MACHINE_ARN", "arn:aws:states:us-east-1:0:stateMachine:hf");
     const { enqueueRender } = await import("./renderQueue");
 
     await enqueueRender(5, "studio", null, "rj-5", "free");
@@ -199,6 +202,7 @@ describe("enqueueRender", () => {
     vi.stubEnv("RENDER_BACKEND", "lambda");
     vi.stubEnv("AWS_REGION", "us-east-1");
     vi.stubEnv("HYPERFRAMES_S3_BUCKET", "sorrel-render-dev");
+    vi.stubEnv("HYPERFRAMES_STATE_MACHINE_ARN", "arn:aws:states:us-east-1:0:stateMachine:hf");
     h.dispatchLambdaRender.mockRejectedValueOnce(
       new LambdaDispatchError("Too many in-flight Lambda renders"),
     );

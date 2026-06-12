@@ -1,3 +1,13 @@
+diff --git a/dist/distributed.js b/dist/distributed.js
+index a4d17efc6e31877771c0bcf9bb88aae820085fe8..ab3326fd112fd6d9ddef5b316d65cdc369abd10d 100644
+--- a/dist/distributed.js
++++ b/dist/distributed.js	
+@@ -1,4 +1,5 @@
+ import { createRequire as __cjsRequire } from 'module'; const require = __cjsRequire(import.meta.url);
++import { fileURLToPath as __sorrelFileURLToPath } from 'url'; import { dirname as __sorrelDirname } from 'path'; const __filename = __sorrelFileURLToPath(import.meta.url); const __dirname = __sorrelDirname(__filename);
+ var __create = Object.create;
+ var __defProp = Object.defineProperty;
+ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 diff --git a/dist/index.js b/dist/index.js
 index 9d7f6d084d916c392793f8e02513d10cba7f7336..0cca9c55ac3e005f25522e1c6020a0c39043c7a3 100644
 --- a/dist/index.js

@@ -988,17 +988,32 @@ Tracked here so it does not get rediscovered each time:
 8. **Sentry source map upload**: `sentry-cli releases files
 upload-sourcemaps` in the deploy workflow + strip `.map` from the
    shipped artifact.
-9. **Distributed render backend (M11)**: the render-backend abstraction
-   (`inline | bullmq | lambda`, recorded on `render_jobs.backend`) and the
-   `infra/` AWS CDK scaffold (S3 render bucket + Hyperframes Lambda / Step
-   Functions state machine, least-privilege IAM, `deploy-infra.yml`) exist as
-   scaffolding only. Still pending: adding `infra/*` to `pnpm-workspace.yaml` +
-   install, and aligning `@hyperframes/aws-lambda` (infra still pins `^0.6.6`)
-   with the engine line, which is now at `0.6.91` (core/producer/player bumped).
-   The api-server glue (`renderBackend.ts` / `lambdaBackend.ts` /
-   `lambdaProgressPoller.ts`) already ships boot-wired but degrades until the
-   package is installed. The `@hyperframes/aws-lambda` API used by the CDK stack
-   is developer-stated and unverified until then.
+9. **Distributed render backend (M11)** — **code-side landed**:
+   `@hyperframes/aws-lambda@0.6.91` is now an api-server `dependency`, so
+   `lambdaBackend.ts` compiles against the REAL SDK types (the ambient
+   `hyperframes-aws-lambda.d.ts` is deleted) and `RENDER_BACKEND=lambda` is
+   genuinely loadable. dispatch materializes the project dir via
+   `prepareCompositionFor` (sibling assets/voiceover included — the old
+   html-string dropped them), builds + `validateDistributedRenderConfig`s a
+   `SerializableDistributedRenderConfig`, guards gif (not a distributed format),
+   and calls the real `renderToLambda({ projectDir, config, bucketName,
+   stateMachineArn, region, executionName })`; reconcile reads the typed
+   `RenderProgress` (`SUCCEEDED/FAILED/…` union, `costs.accruedSoFarUsd`→cents,
+   `errors: RenderError[]`). New env: **`HYPERFRAMES_STATE_MACHINE_ARN`** (the
+   `RenderStateMachineArn` CfnOutput) — `lambdaEnvReady`/dispatch now require it
+   alongside `AWS_REGION` + `HYPERFRAMES_S3_BUCKET`. The aws-lambda package is
+   `external` in `build.mjs` (its `@sparticuz/chromium`/ffmpeg-static natives
+   never enter the bundle; loaded via a dynamic import behind the lambda gate),
+   and a loadability test pins the SDK surface. infra's CDK pin is aligned to
+   `0.6.91` and the stack's prop usage spot-checks against the installed
+   `./cdk` types (`HyperframesRenderStackProps`: `reservedConcurrency`,
+   `chromeSource`). STILL PENDING: (a) adding `infra/` to `pnpm-workspace.yaml`
+   — it triggers a pnpm rename bug on THIS Windows worktree (long+spaced path);
+   do it on Linux/CI so `pnpm --filter @workspace/infra run build` tsc-checks the
+   CDK stack; (b) a real cloud deploy. The container-based upstream
+   **`@hyperframes/gcp-cloud-run`** (0.6.79+, Terraform + Cloud Workflows, no
+   250MB Lambda zip ceiling) is the alternative to evaluate before any deploy —
+   it suits Sorrel's container model better than the Lambda zip.
 10. **Dependency security — residual dev-only `vitest` advisory**: `pnpm audit`
     is clean for production (`pnpm audit --prod` → no vulnerabilities). Transitive
     prod vulns (`qs` DoS, `uuid` bounds-check) and most dev ones (`undici`, `tmp`,
