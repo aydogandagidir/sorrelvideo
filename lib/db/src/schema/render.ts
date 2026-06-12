@@ -32,7 +32,7 @@ import { usersTable } from "./auth";
 import { projectsTable } from "./projects";
 
 export type RenderQuality = "draft" | "standard" | "high";
-export type RenderFormat = "mp4" | "webm" | "mov" | "png-sequence";
+export type RenderFormat = "mp4" | "webm" | "mov" | "png-sequence" | "gif";
 export type RenderFps = 24 | 30 | 60;
 export type RenderResolution =
   | "landscape"

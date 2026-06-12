@@ -173,6 +173,7 @@ export const RenderSettingsFormat = {
   webm: 'webm',
   mov: 'mov',
   'png-sequence': 'png-sequence',
+  gif: 'gif',
 } as const;
 
 export type RenderSettingsResolution = typeof RenderSettingsResolution[keyof typeof RenderSettingsResolution];
@@ -355,6 +356,7 @@ export const RenderSettingsInputFormat = {
   webm: 'webm',
   mov: 'mov',
   'png-sequence': 'png-sequence',
+  gif: 'gif',
 } as const;
 
 export type RenderSettingsInputResolution = typeof RenderSettingsInputResolution[keyof typeof RenderSettingsInputResolution];

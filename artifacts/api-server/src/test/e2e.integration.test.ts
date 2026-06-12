@@ -138,6 +138,28 @@ describe.runIf(INTEGRATION_AVAILABLE)("E2E — projects + tenant isolation", () 
     expect(patch.status).toBe(403);
     expect(patch.body.reason).toBe("upgrade_required");
   });
+
+  it("allows a Free user to select the gif format (the Free-tier social hook)", async () => {
+    const { agent } = await signup("gif-free@test.local");
+    const create = await agent
+      .post("/api/projects")
+      .send({ name: "Giffable", module: "studio" });
+    const projectId = create.body.id as number;
+
+    const patch = await agent
+      .patch(`/api/projects/${projectId}/render-settings`)
+      .send({ format: "gif" });
+    expect(patch.status).toBe(200);
+    // The route returns the full project; the resolved settings carry the format.
+    expect(patch.body.renderSettings.format).toBe("gif");
+
+    // webm (an alpha/Pro format) is still gated for the same Free user.
+    const webm = await agent
+      .patch(`/api/projects/${projectId}/render-settings`)
+      .send({ format: "webm" });
+    expect(webm.status).toBe(403);
+    expect(webm.body.reason).toBe("upgrade_required");
+  });
 });
 
 describe.runIf(INTEGRATION_AVAILABLE)("E2E — Track F avatar endpoints", () => {

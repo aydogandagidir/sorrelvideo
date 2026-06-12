@@ -22,8 +22,37 @@ import {
 } from "@workspace/db";
 
 const QUALITIES: readonly RenderQuality[] = ["draft", "standard", "high"];
-const FORMATS: readonly RenderFormat[] = ["mp4", "webm", "mov", "png-sequence"];
+const FORMATS: readonly RenderFormat[] = [
+  "mp4",
+  "webm",
+  "mov",
+  "png-sequence",
+  "gif",
+];
 const FPS_VALUES: readonly RenderFps[] = [24, 30, 60];
+
+/**
+ * Formats that carry a real alpha channel. `transparent` is only meaningful
+ * for these; the producer derives transparency FROM the format. mp4 and gif
+ * are opaque (gif's 1-bit transparency is not the alpha workflow we expose).
+ * Was an inline `format !== "mp4"` — now an explicit set so gif joins mp4 on
+ * the opaque side without a second special-case.
+ */
+const ALPHA_FORMATS: ReadonlySet<RenderFormat> = new Set<RenderFormat>([
+  "webm",
+  "mov",
+  "png-sequence",
+]);
+
+/**
+ * Formats a Free user may export. The monetization floor reproduces today's
+ * output (mp4) PLUS gif — a small, shareable, watermark-friendly format that's
+ * a deliberate Free-tier growth hook. Everything else stays Pro.
+ */
+const FREE_FORMATS: ReadonlySet<RenderFormat> = new Set<RenderFormat>([
+  "mp4",
+  "gif",
+]);
 const RESOLUTIONS: readonly RenderResolution[] = [
   "landscape",
   "portrait",
@@ -233,6 +262,17 @@ export function resolveSettings(
   const captions = sanitizeCaptions(r.captions);
   const voiceover = sanitizeVoiceover(r.voiceover);
   const transitions = sanitizeTransitions(r.transitions);
+  const format = FORMATS.includes(r.format as RenderFormat)
+    ? (r.format as RenderFormat)
+    : DEFAULT_RENDER_SETTINGS.format;
+  // Transparency is only meaningful on an alpha-capable format. Coerce it off
+  // for any opaque format (mp4/gif) at this ONE choke point — it fixes the new
+  // gif case AND the pre-existing latent bug where `transparent:true` +
+  // `format:"mp4"` passed the gate but threw in toEngineConfig at render time.
+  const requestedTransparent =
+    typeof r.transparent === "boolean"
+      ? r.transparent
+      : DEFAULT_RENDER_SETTINGS.transparent;
   return {
     fps: FPS_VALUES.includes(r.fps as RenderFps)
       ? (r.fps as RenderFps)
@@ -240,16 +280,11 @@ export function resolveSettings(
     quality: QUALITIES.includes(r.quality as RenderQuality)
       ? (r.quality as RenderQuality)
       : DEFAULT_RENDER_SETTINGS.quality,
-    format: FORMATS.includes(r.format as RenderFormat)
-      ? (r.format as RenderFormat)
-      : DEFAULT_RENDER_SETTINGS.format,
+    format,
     resolution: RESOLUTIONS.includes(r.resolution as RenderResolution)
       ? (r.resolution as RenderResolution)
       : DEFAULT_RENDER_SETTINGS.resolution,
-    transparent:
-      typeof r.transparent === "boolean"
-        ? r.transparent
-        : DEFAULT_RENDER_SETTINGS.transparent,
+    transparent: requestedTransparent && ALPHA_FORMATS.has(format),
     watermark:
       typeof r.watermark === "boolean"
         ? r.watermark
@@ -288,7 +323,8 @@ export function assertRenderSettingsAllowed(
   if (settings.quality === "high") proOnly.push("High quality");
   if (settings.fps === 60) proOnly.push("60 fps");
   if (settings.resolution.endsWith("-4k")) proOnly.push("4K resolution");
-  if (settings.format !== "mp4") proOnly.push(`${settings.format} export`);
+  if (!FREE_FORMATS.has(settings.format))
+    proOnly.push(`${settings.format} export`);
   if (settings.transparent) proOnly.push("Transparent background");
   if (!settings.watermark) proOnly.push("Watermark removal");
   if ((settings.transitions?.length ?? 0) > 1)
@@ -308,14 +344,13 @@ export function assertRenderSettingsAllowed(
 }
 
 /**
- * Whether a container format can carry a true alpha channel. mp4 is always
- * opaque (H.264/H.265); webm (VP9 yuva420p), mov (ProRes 4444), and
- * png-sequence (RGBA) all carry alpha. Mirrors the producer's
- * `needsAlpha = webm | mov | png-sequence` and the frontend's
- * `formatSupportsAlpha`.
+ * Whether a container format can carry a true alpha channel. mp4 and gif are
+ * opaque; webm (VP9 yuva420p), mov (ProRes 4444), and png-sequence (RGBA) all
+ * carry alpha. Mirrors the producer's `needsAlpha = webm | mov | png-sequence`
+ * and the frontend's `formatSupportsAlpha`.
  */
 export function formatSupportsAlpha(format: RenderFormat): boolean {
-  return format !== "mp4";
+  return ALPHA_FORMATS.has(format);
 }
 
 /** Pixel dimensions for a resolution preset (from the engine's CANVAS_DIMENSIONS). */
@@ -393,7 +428,11 @@ export function toEngineConfig(
     entryFile,
     // Cap parallel render workers so one render can't OOM-crash a small box.
     workers: resolveRenderWorkers(),
-    // Alpha output forbids a deviceScaleFactor override; omit it there.
+    // Alpha output forbids a deviceScaleFactor override; omit it there. gif is
+    // opaque, so it keeps the preset like mp4.
     ...(alpha ? {} : { outputResolution: settings.resolution }),
+    // GIF loops forever (Netscape loop count 0) — the natural short-form social
+    // behavior. Only meaningful when format === "gif" (ignored otherwise).
+    ...(settings.format === "gif" ? { gifLoop: 0 } : {}),
   };
 }

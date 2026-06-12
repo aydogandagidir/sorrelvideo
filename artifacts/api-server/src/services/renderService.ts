@@ -160,11 +160,12 @@ export function renderDirFor(projectId: number): string {
 /** Fixed filename of the talking-host narration inside the render dir. */
 export const VOICEOVER_FILENAME = "voice.mp3";
 
-/** Output filename per video container format (no leading directory). */
+/** Output filename per single-file format (png-sequence is a directory). */
 const OUTPUT_FILENAME: Record<Exclude<RenderFormat, "png-sequence">, string> = {
   mp4: "output.mp4",
   webm: "output.webm",
   mov: "output.mov",
+  gif: "output.gif",
 };
 
 /**

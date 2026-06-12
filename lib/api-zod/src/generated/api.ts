@@ -274,7 +274,7 @@ export const ListProjectsResponseItem = zod.object({
   "renderSettings": zod.union([zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
   "quality": zod.enum(['draft', 'standard', 'high']),
-  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']),
   "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
   "transparent": zod.boolean(),
   "watermark": zod.boolean(),
@@ -356,7 +356,7 @@ export const GetProjectResponse = zod.object({
   "renderSettings": zod.union([zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
   "quality": zod.enum(['draft', 'standard', 'high']),
-  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']),
   "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
   "transparent": zod.boolean(),
   "watermark": zod.boolean(),
@@ -430,7 +430,7 @@ export const UpdateProjectResponse = zod.object({
   "renderSettings": zod.union([zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
   "quality": zod.enum(['draft', 'standard', 'high']),
-  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']),
   "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
   "transparent": zod.boolean(),
   "watermark": zod.boolean(),
@@ -514,7 +514,7 @@ export const CancelProjectRenderResponse = zod.object({
   "renderSettings": zod.union([zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
   "quality": zod.enum(['draft', 'standard', 'high']),
-  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']),
   "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
   "transparent": zod.boolean(),
   "watermark": zod.boolean(),
@@ -589,7 +589,7 @@ export const updateProjectRenderSettingsBodyBackgroundAudioVolumeMax = 100;
 export const UpdateProjectRenderSettingsBody = zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]).optional(),
   "quality": zod.enum(['draft', 'standard', 'high']).optional(),
-  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']).optional(),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']).optional(),
   "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']).optional(),
   "transparent": zod.boolean().optional(),
   "watermark": zod.boolean().optional(),
@@ -639,7 +639,7 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
   "renderSettings": zod.union([zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
   "quality": zod.enum(['draft', 'standard', 'high']),
-  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']),
   "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
   "transparent": zod.boolean(),
   "watermark": zod.boolean(),
@@ -1272,7 +1272,7 @@ export const GetStatsResponse = zod.object({
   "renderSettings": zod.union([zod.object({
   "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
   "quality": zod.enum(['draft', 'standard', 'high']),
-  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']),
   "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
   "transparent": zod.boolean(),
   "watermark": zod.boolean(),

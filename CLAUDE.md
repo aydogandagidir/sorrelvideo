@@ -575,15 +575,23 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   `stripe_subscriptions` table itself still comes from Drizzle schema push
 - `users.plan` and `users.stripeSubscriptionId` are reserved schema columns;
   never use them as the source of truth
-- **Render-settings capability matrix**: the Free floor reproduces today's render
-  output — `draft|standard` quality, `24|30` fps, ≤1080p (non-4k), `mp4`, opaque,
-  watermarked, ≤1 transition. Everything else (high quality, 60fps, any `-4k`
+- **Render-settings capability matrix**: the Free floor is `draft|standard` quality,
+  `24|30` fps, ≤1080p (non-4k), **`mp4` OR `gif`** export, opaque, watermarked, ≤1
+  transition. GIF is a deliberate Free-tier growth hook — small, shareable,
+  watermark-friendly — encoded by the producer's two-pass palette (`gifLoop: 0` =
+  infinite), and being opaque it joins mp4 on the non-alpha side (the `FREE_FORMATS`
+  + `ALPHA_FORMATS` sets in `renderSettingsService`, replacing the old inline
+  `format !== "mp4"` checks). Everything else (high quality, 60fps, any `-4k`
   resolution, webm/mov/png-sequence export, transparent background, watermark removal,
   >1 transition) is Pro. `assertRenderSettingsAllowed` enforces this, reusing the
   existing `getUserPlan` + `403 { reason: "upgrade_required" }` pattern (byte-identical
   to the premium-template / quota rejections, so the same `UpgradeModal` fires). The
   gate runs at PATCH time AND again at render time (defense in depth — a user who
-  downgrades must not render a previously-saved Pro config).
+  downgrades must not render a previously-saved Pro config). **Transparency is coerced
+  at one choke point**: `resolveSettings` forces `transparent → false` for any opaque
+  format (mp4/gif), which also closed a latent bug where `transparent:true` +
+  `format:"mp4"` passed the gate but threw in `toEngineConfig` at render time (the
+  defensive throw remains, now unreachable by design).
 
 ## Render pipeline
 

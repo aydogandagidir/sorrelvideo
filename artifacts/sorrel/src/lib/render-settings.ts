@@ -63,6 +63,7 @@ export const FPS_OPTIONS: ReadonlyArray<Option<RenderFps>> = [
 
 export const FORMAT_OPTIONS: ReadonlyArray<Option<RenderFormat>> = [
   { value: RenderSettingsFormat.mp4, label: "MP4", hint: "H.264 video" },
+  { value: RenderSettingsFormat.gif, label: "GIF", hint: "Animated · no audio" },
   { value: RenderSettingsFormat.webm, label: "WebM", hint: "Alpha capable" },
   { value: RenderSettingsFormat.mov, label: "MOV", hint: "ProRes / alpha" },
   {
@@ -252,10 +253,16 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
 /**
  * The Free plan floor. Anything outside this set is Pro-only. This MUST stay in
  * lockstep with the server's `assertRenderSettingsAllowed`:
- *   quality draft|standard, fps 24|30, resolution non-4k, format mp4,
+ *   quality draft|standard, fps 24|30, resolution non-4k, format mp4|gif,
  *   transparent=false, watermark=true, ≤1 transition.
  */
 export const FREE_MAX_TRANSITIONS = 1;
+
+/** Formats a Free user may export — mirrors the server's FREE_FORMATS. */
+const FREE_FORMATS: ReadonlySet<RenderFormat> = new Set<RenderFormat>([
+  RenderSettingsFormat.mp4,
+  RenderSettingsFormat.gif,
+]);
 
 const FREE_QUALITIES: ReadonlySet<RenderQuality> = new Set<RenderQuality>([
   RenderSettingsQuality.draft,
@@ -286,7 +293,7 @@ export function isProOnly(field: ProGatedField, value: unknown): boolean {
     case "resolution":
       return isFourK(value as RenderResolution);
     case "format":
-      return value !== RenderSettingsFormat.mp4;
+      return !FREE_FORMATS.has(value as RenderFormat);
     case "transparent":
       // Only turning transparency ON is a Pro action.
       return value === true;

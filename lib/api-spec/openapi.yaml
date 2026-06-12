@@ -1762,7 +1762,7 @@ components:
           enum: [draft, standard, high]
         format:
           type: string
-          enum: [mp4, webm, mov, png-sequence]
+          enum: [mp4, webm, mov, png-sequence, gif]
         resolution:
           type: string
           enum: [landscape, portrait, square, landscape-4k, portrait-4k, square-4k]
@@ -1835,7 +1835,7 @@ components:
           enum: [draft, standard, high]
         format:
           type: string
-          enum: [mp4, webm, mov, png-sequence]
+          enum: [mp4, webm, mov, png-sequence, gif]
         resolution:
           type: string
           enum: [landscape, portrait, square, landscape-4k, portrait-4k, square-4k]

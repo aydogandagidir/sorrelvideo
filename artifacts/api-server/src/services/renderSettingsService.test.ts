@@ -197,7 +197,10 @@ describe("assertRenderSettingsAllowed", () => {
     ["60 fps", { fps: 60 as const }],
     ["4K", { resolution: "portrait-4k" as const }],
     ["non-mp4 format", { format: "mov" as const }],
-    ["transparency", { transparent: true }],
+    // transparent only survives resolveSettings on an alpha format (it's coerced
+    // off for opaque mp4/gif), so the Pro-gated transparency case must pair it
+    // with one — which trips both the format AND the transparent gate.
+    ["transparency", { transparent: true, format: "webm" as const }],
     ["watermark removal", { watermark: false }],
     [
       "background audio",
@@ -236,6 +239,19 @@ describe("assertRenderSettingsAllowed", () => {
       voiceover: { objectPath: null, startAt: 0.9, volume: 100 },
     });
     expect(() => assertRenderSettingsAllowed(settings, "free")).not.toThrow();
+  });
+
+  it("allows gif for Free (the Free-tier social hook) while webm/mov/png stay Pro", () => {
+    expect(() =>
+      assertRenderSettingsAllowed(resolveSettings({ format: "gif" }), "free"),
+    ).not.toThrow();
+    for (const format of ["webm", "mov", "png-sequence"] as const) {
+      expect(
+        () =>
+          assertRenderSettingsAllowed(resolveSettings({ format }), "free"),
+        format,
+      ).toThrow(RenderSettingsUpgradeError);
+    }
   });
 });
 
@@ -285,11 +301,41 @@ describe("toEngineConfig", () => {
     }
   });
 
-  it("throws on the incoherent transparent+mp4 combo (never silently ships opaque)", () => {
-    const incoherent = resolveSettings({ transparent: true, format: "mp4" });
-    expect(() => toEngineConfig(incoherent, "composition.html")).toThrow(
-      /alpha-capable format/i,
+  it("resolveSettings coerces transparent off for opaque formats (mp4/gif)", () => {
+    // The incoherent transparent+opaque combo is now neutralized at the ONE
+    // choke point (resolveSettings), so toEngineConfig's defensive throw is
+    // unreachable by design — but still asserted below as belt-and-braces.
+    expect(resolveSettings({ transparent: true, format: "mp4" }).transparent).toBe(
+      false,
     );
+    expect(resolveSettings({ transparent: true, format: "gif" }).transparent).toBe(
+      false,
+    );
+    // Alpha formats keep it.
+    expect(
+      resolveSettings({ transparent: true, format: "webm" }).transparent,
+    ).toBe(true);
+  });
+
+  it("still throws if a hand-built incoherent transparent+mp4 reaches the engine", () => {
+    // Bypass resolveSettings to prove the defensive guard remains.
+    expect(() =>
+      toEngineConfig(
+        { ...DEFAULT_RENDER_SETTINGS, transparent: true, format: "mp4" },
+        "composition.html",
+      ),
+    ).toThrow(/alpha-capable format/i);
+  });
+
+  it("emits gif with gifLoop:0 (infinite) and keeps outputResolution (opaque)", () => {
+    const cfg = toEngineConfig(
+      resolveSettings({ format: "gif", resolution: "landscape" }),
+      "composition.html",
+    );
+    expect(cfg.format).toBe("gif");
+    expect(cfg.gifLoop).toBe(0);
+    // gif is opaque → the resolution preset is forwarded like mp4.
+    expect(cfg.outputResolution).toBe("landscape");
   });
 
   it("allows transparent on each alpha-capable format", () => {
@@ -335,8 +381,9 @@ describe("toEngineConfig", () => {
 });
 
 describe("formatSupportsAlpha", () => {
-  it("is false only for mp4", () => {
+  it("is false for the opaque formats (mp4, gif), true for the alpha set", () => {
     expect(formatSupportsAlpha("mp4")).toBe(false);
+    expect(formatSupportsAlpha("gif")).toBe(false);
     expect(formatSupportsAlpha("webm")).toBe(true);
     expect(formatSupportsAlpha("mov")).toBe(true);
     expect(formatSupportsAlpha("png-sequence")).toBe(true);

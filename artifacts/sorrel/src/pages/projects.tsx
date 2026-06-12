@@ -323,12 +323,24 @@ function ProjectDetail({
   const selectedAspect = baseAspect(settings.resolution);
   const ratioLabel =
     ASPECT_PRESETS.find((p) => p.value === selectedAspect)?.ratio ?? "9:16";
-  const downloadName = `${
+  // Download/share name + MIME track the project's render format. png-sequence
+  // streams as a zip (PR: png-seq download); every other format is a single
+  // file with its own extension + MIME.
+  const [downloadExt, downloadMime] = (
+    {
+      mp4: ["mp4", "video/mp4"],
+      webm: ["webm", "video/webm"],
+      mov: ["mov", "video/quicktime"],
+      gif: ["gif", "image/gif"],
+      "png-sequence": ["zip", "application/zip"],
+    } as const
+  )[settings.format];
+  const baseName =
     (project.name || "video")
       .replace(/[^a-z0-9-_]+/gi, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "video"
-  }.mp4`;
+      .slice(0, 60) || "video";
+  const downloadName = `${baseName}.${downloadExt}`;
 
   const invalidate = () =>
     void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
@@ -361,7 +373,7 @@ function ProjectDetail({
         const res = await fetch(videoSrc, { credentials: "include" });
         if (res.ok) {
           const blob = await res.blob();
-          const file = new File([blob], downloadName, { type: "video/mp4" });
+          const file = new File([blob], downloadName, { type: downloadMime });
           if (navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file], title: project.name || "Sorrel video" });
             return;
@@ -610,7 +622,8 @@ function ProjectDetail({
                 <>
                   <Button asChild>
                     <a href={videoSrc} download={downloadName}>
-                      <Download className="mr-2 h-4 w-4" /> Download mp4
+                      <Download className="mr-2 h-4 w-4" /> Download{" "}
+                      {downloadExt}
                     </a>
                   </Button>
                   <Button variant="outline" onClick={handleShare}>
