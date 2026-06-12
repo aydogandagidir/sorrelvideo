@@ -169,6 +169,16 @@ export function resolveEntryFile(module: string): string {
 }
 
 /**
+ * True when a module is a KNOWN composition (has its own entry in
+ * COMPOSITION_MAP), as opposed to `resolveEntryFile`'s default-fallback. The
+ * module-keyed preview route uses this to 404 an unknown module rather than
+ * silently serving the default composition.
+ */
+export function isKnownModule(module: string): boolean {
+  return module in COMPOSITION_MAP;
+}
+
+/**
  * The per-project render directory (`renders/<projectId>`). Exported so flows
  * that stage sibling files BEFORE a render (talkingHostService writes the TTS
  * `voice.mp3` at creation time) resolve the exact directory the pipeline reads.

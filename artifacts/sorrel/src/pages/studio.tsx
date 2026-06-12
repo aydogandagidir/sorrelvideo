@@ -19,16 +19,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { RenderSettingsForm } from "@/components/render-settings-form";
-import { CompositionPlayer } from "@/components/composition";
+import { HfPlayer } from "@/components/hf-player";
 import {
   DEFAULT_RENDER_SETTINGS,
   proViolations,
   ASPECT_PRESETS,
-  aspectRatioFor,
   baseAspect,
   type RenderSettings,
 } from "@/lib/render-settings";
 import { cn } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { b64UrlVars } from "@/lib/preview-vars";
 import { useBillingInfo } from "@/hooks/useBilling";
 
 const DEFAULT_ACCENT = "#cdfb45";
@@ -117,12 +118,23 @@ export default function StudioPage() {
 
   // Aspect ratio / publishing format drives both the render resolution and the
   // live preview frame, so the user sees exactly the shape they'll publish.
-  const previewAspect = aspectRatioFor(renderSettings.resolution);
   const selectedAspect = baseAspect(renderSettings.resolution);
   const ratioLabel =
     ASPECT_PRESETS.find((p) => p.value === selectedAspect)?.ratio ?? "9:16";
   const pickAspect = (value: RenderSettings["resolution"]) =>
     setRenderSettings((s) => ({ ...s, resolution: value }));
+
+  // Live preview: render the REAL composition module via the module-keyed
+  // preview route (no project id exists until submit). A spotlight clip switches
+  // to the video-spotlight module (without the hero clip — that's materialized
+  // only at render time). Debounce the user.* vars so a burst of keystrokes is
+  // one composition fetch; a changed `src` reloads the player iframe.
+  const previewModule = spotlightClip ? "video-spotlight" : "studio";
+  const previewVars = useDebouncedValue(
+    { "user.headline": headline, "user.bodyText": bodyText, "user.ctaText": ctaText },
+    600,
+  );
+  const previewSrc = `/api/compositions/${previewModule}/preview?resolution=${selectedAspect}&vars=${b64UrlVars(previewVars)}`;
 
   async function handleAiSuggest() {
     setAiError(null);
@@ -557,14 +569,14 @@ export default function StudioPage() {
                   })}
                 </div>
                 <div className="mx-auto w-full max-w-[300px] md:max-w-[380px] lg:max-w-[420px]">
-                  <CompositionPlayer
-                    vars={{ headline, body: bodyText, cta: ctaText }}
-                    brand={brandForComp}
-                    accent={accent}
-                    bg={COMP_BG}
-                    layout="center"
-                    aspect={previewAspect}
-                    ratioLabel={ratioLabel}
+                  <HfPlayer
+                    src={previewSrc}
+                    aspect={ratioLabel}
+                    muted
+                    autoplay
+                    loop
+                    controls
+                    className="w-full overflow-hidden rounded-xl border"
                   />
                 </div>
                 <p className="m-0 text-center text-[11.5px] text-muted-foreground">

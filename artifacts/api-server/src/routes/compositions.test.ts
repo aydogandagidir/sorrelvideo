@@ -22,3 +22,21 @@ describe("POST /api/compositions/lint", () => {
     expect(res.status).toBe(401);
   });
 });
+
+// GET /api/compositions/:module/preview — module-keyed live preview. The auth
+// guard runs first, so only the 401 path is reachable DB-less; the 200/404/400
+// cases (which need a session for the brand-kit merge) live in the integration
+// tier below.
+describe("GET /api/compositions/:module/preview", () => {
+  it("returns 401 when no session is present", async () => {
+    const res = await request(app).get("/api/compositions/studio/preview");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 before resolving the module (auth gate is first)", async () => {
+    const res = await request(app).get(
+      "/api/compositions/not-a-real-module/preview",
+    );
+    expect(res.status).toBe(401);
+  });
+});

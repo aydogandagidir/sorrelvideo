@@ -211,7 +211,23 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
   runs every `compositionVars` value that resolves into a URL/attribute/color
   context through `isSafeLogoUrl` / a strict color pattern — because
   `renderCompositionTemplate`'s `escapeMarkup` does **not** escape quotes (it can't:
-  `brand.fontFamily` is `'Inter'`, single-quoted, used in CSS).
+  `brand.fontFamily` is `'Inter'`, single-quoted, used in CSS). The SAME
+  `findUnsafeCompositionVar` gate runs on the **`?vars=` live-preview overrides**
+  of `GET /projects/:id/composition` AND the module-keyed
+  `GET /compositions/:module/preview` — both substitute the override into the
+  composition, so an un-gated value would be reflected XSS against whoever opens
+  the (guessable) preview link.
+
+- **Live composition preview**: `GET /projects/:id/composition` (owner-scoped,
+  brand-merged, `?vars=` override-able) and `GET /compositions/:module/preview`
+  (auth-only, module-keyed via `isKnownModule`, the user's default brand kit +
+  `STUDIO_FALLBACKS`, optional `?resolution=`) render the REAL composition HTML
+  for a same-origin `<hyperframes-player>` iframe. The Studio create page (no
+  project id pre-submit) uses the module route with debounced `user.*` vars; the
+  projects detail dialog points a draft/failed project's `HfPlayer` at its own
+  composition route (unsaved typed-parameter edits ride along as `?vars=`). A
+  changed `src` reloads the iframe; the old presentational rAF mock
+  (`CompositionPlayer`/`CompositionLoading`) is deleted.
 
 ## Development workflow
 
