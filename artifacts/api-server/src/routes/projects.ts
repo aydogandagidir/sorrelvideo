@@ -40,8 +40,26 @@ import {
 import { startProjectRender } from "../services/renderStartService";
 import { getUserPlan } from "../services/billingService";
 import { findUnsafeCompositionVar } from "../lib/compositionVars";
+import { findInvalidTypedVar } from "../lib/typedVars";
+import { variablesForModule } from "../services/registryTemplates";
 import { logger } from "../lib/logger";
 import { serveTemplateAsset } from "../lib/templateAssets";
+
+/**
+ * Validate a project's compositionVars against the typed variables its module
+ * declares. Returns the first violation's `{ reason }` or null. No-op when the
+ * vars are absent or the module declares no typed variables.
+ */
+function findInvalidTypedVars(
+  module: string,
+  vars: Record<string, string> | null | undefined,
+): { reason: string } | null {
+  if (!vars) return null;
+  const typed = variablesForModule(module);
+  if (!typed) return null;
+  const invalid = findInvalidTypedVar(vars, typed);
+  return invalid ? { reason: invalid.reason } : null;
+}
 
 const router: IRouter = Router();
 
@@ -118,6 +136,19 @@ router.post("/projects", async (req, res): Promise<void> => {
     return;
   }
 
+  // Typed-variable validation: if the template module declares typed variables,
+  // every supplied compositionVar matching one must satisfy its type (number
+  // bounds, enum membership, safe color, …). Closes the gap where a typed color
+  // — not in compositionVars' fixed COLOR_KEYS — would reach the render unchecked.
+  const typedInvalid = findInvalidTypedVars(
+    parsed.data.module,
+    parsed.data.compositionVars,
+  );
+  if (typedInvalid) {
+    res.status(400).json({ error: typedInvalid.reason });
+    return;
+  }
+
   const [project] = await db
     .insert(projectsTable)
     .values({ ...parsed.data, userId: req.user.id })
@@ -185,7 +216,7 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
   }
 
   const [existing] = await db
-    .select({ userId: projectsTable.userId })
+    .select({ userId: projectsTable.userId, module: projectsTable.module })
     .from(projectsTable)
     .where(eq(projectsTable.id, params.data.id));
 
@@ -196,6 +227,17 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
 
   if (existing.userId !== req.user.id) {
     res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  // Typed-variable validation against the project's module (resolved after the
+  // ownership gate, since the module lives on the existing row).
+  const typedInvalid = findInvalidTypedVars(
+    existing.module,
+    parsed.data.compositionVars,
+  );
+  if (typedInvalid) {
+    res.status(400).json({ error: typedInvalid.reason });
     return;
   }
 

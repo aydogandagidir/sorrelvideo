@@ -104,6 +104,40 @@ export interface HealthStatus {
   status: string;
 }
 
+export type CompositionVariableType = typeof CompositionVariableType[keyof typeof CompositionVariableType];
+
+
+export const CompositionVariableType = {
+  string: 'string',
+  number: 'number',
+  color: 'color',
+  boolean: 'boolean',
+  enum: 'enum',
+} as const;
+
+export type CompositionVariableOptionsItem = {
+  value: string;
+  label: string;
+};
+
+/**
+ * A typed editable parameter declared by a composition. Mirrors @hyperframes/core's CompositionVariable union as one object plus a `type` discriminator; the option/min/max fields apply per type.
+ */
+export interface CompositionVariable {
+  id: string;
+  type: CompositionVariableType;
+  label: string;
+  description?: string;
+  default: string | number | boolean;
+  placeholder?: string;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  options?: CompositionVariableOptionsItem[];
+}
+
 export interface Template {
   id: number;
   name: string;
@@ -118,6 +152,8 @@ export interface Template {
   tags?: string[];
   /** True when the template's composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services/transitionCapableTemplates.ts) — the editor disables the transitions picker when false. */
   supportsTransitions?: boolean;
+  /** Typed editable parameters the composition declares via the engine's native data-composition-variables. Present only for parametric templates (e.g. data-chart); the Studio form renders one control per entry's type. Derived from the manifest at read time (not persisted). */
+  variables?: CompositionVariable[];
   createdAt?: string;
 }
 

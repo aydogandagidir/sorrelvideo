@@ -5,6 +5,7 @@
  * Sorrel - Modular Video Production Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { CompositionVariable } from './compositionVariable';
 
 export interface Template {
   id: number;
@@ -20,5 +21,7 @@ export interface Template {
   tags?: string[];
   /** True when the template's composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services/transitionCapableTemplates.ts) — the editor disables the transitions picker when false. */
   supportsTransitions?: boolean;
+  /** Typed editable parameters the composition declares via the engine's native data-composition-variables. Present only for parametric templates (e.g. data-chart); the Studio form renders one control per entry's type. Derived from the manifest at read time (not persisted). */
+  variables?: CompositionVariable[];
   createdAt?: string;
 }

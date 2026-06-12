@@ -214,3 +214,39 @@ describe.runIf(INTEGRATION_AVAILABLE)(
     });
   },
 );
+
+/**
+ * GET /api/templates(/:id) read-time `variables` enrichment: a parametric
+ * template (data-chart) exposes its typed variables from the manifest; a
+ * non-parametric one omits the field. Never persisted — derived per request.
+ */
+describe.runIf(INTEGRATION_AVAILABLE)("typed variables enrichment", () => {
+  it("includes variables for a parametric module in the list + detail", async () => {
+    const userId = await createFreeUser();
+    const sid = await authFor(userId);
+    const chart = await insertPlatformTemplate({ module: "data-chart" });
+    const plain = await insertPlatformTemplate({ module: "product-launch" });
+
+    const list = await request(app)
+      .get("/api/templates")
+      .set("Authorization", `Bearer ${sid}`);
+    expect(list.status).toBe(200);
+    const chartRow = list.body.find(
+      (t: { id: number }) => t.id === chart.id,
+    );
+    const plainRow = list.body.find(
+      (t: { id: number }) => t.id === plain.id,
+    );
+    expect(Array.isArray(chartRow.variables)).toBe(true);
+    expect(chartRow.variables.length).toBeGreaterThan(0);
+    expect(chartRow.variables[0]).toHaveProperty("type");
+    // A non-parametric template omits the field entirely.
+    expect(plainRow.variables).toBeUndefined();
+
+    const detail = await request(app)
+      .get(`/api/templates/${chart.id}`)
+      .set("Authorization", `Bearer ${sid}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.variables.length).toBeGreaterThan(0);
+  });
+});

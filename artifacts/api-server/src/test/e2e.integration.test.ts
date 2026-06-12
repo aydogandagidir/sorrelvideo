@@ -160,6 +160,28 @@ describe.runIf(INTEGRATION_AVAILABLE)("E2E — projects + tenant isolation", () 
     expect(webm.status).toBe(403);
     expect(webm.body.reason).toBe("upgrade_required");
   });
+
+  it("rejects a compositionVar that violates its template's typed declaration", async () => {
+    const { agent } = await signup("typedvars@test.local");
+    // data-chart declares maxRevenue as number (min 1); create a project on it.
+    const create = await agent
+      .post("/api/projects")
+      .send({ name: "Chart", module: "data-chart" });
+    expect(create.status).toBe(201);
+    const projectId = create.body.id as number;
+
+    // A non-numeric value for the typed number var → 400 at the write path.
+    const bad = await agent
+      .patch(`/api/projects/${projectId}`)
+      .send({ compositionVars: { maxRevenue: "abc" } });
+    expect(bad.status).toBe(400);
+
+    // A valid numeric value within bounds is accepted.
+    const ok = await agent
+      .patch(`/api/projects/${projectId}`)
+      .send({ compositionVars: { maxRevenue: "12" } });
+    expect(ok.status).toBe(200);
+  });
 });
 
 describe.runIf(INTEGRATION_AVAILABLE)("E2E — Track F avatar endpoints", () => {
