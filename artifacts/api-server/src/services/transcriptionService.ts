@@ -14,6 +14,7 @@
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { logger } from "../lib/logger";
+import { isLocalMediaEnabled } from "../lib/localMediaEnabled";
 
 export interface TranscriptWord {
   text: string;
@@ -49,7 +50,10 @@ const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
 /** Whether an ASR key is configured (used to hide the UI affordance). */
 export function isTranscriptionConfigured(): boolean {
-  return Boolean(process.env.WHISPER_API_KEY ?? process.env.OPENAI_API_KEY);
+  return (
+    Boolean(process.env.WHISPER_API_KEY ?? process.env.OPENAI_API_KEY) ||
+    isLocalMediaEnabled()
+  );
 }
 
 /** A buffer transcription: the timed words plus the clip's total duration. */
@@ -69,7 +73,15 @@ export async function transcribeBuffer(
   contentType: string,
 ): Promise<TranscriptionResult> {
   const apiKey = process.env.WHISPER_API_KEY ?? process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new TranscriptionNotConfiguredError();
+  if (!apiKey) {
+    // No key: fall back to the local Whisper model when enabled (dev only).
+    // An OpenAI/Whisper key always wins — this branch only runs when absent.
+    if (isLocalMediaEnabled()) {
+      const { transcribeBufferLocal } = await import("./localMediaService");
+      return transcribeBufferLocal(buf);
+    }
+    throw new TranscriptionNotConfiguredError();
+  }
   if (buf.byteLength > MAX_AUDIO_BYTES) {
     throw new TranscriptionError(
       "Audio exceeds the 25MB transcription limit",
