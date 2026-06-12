@@ -68,6 +68,13 @@ export interface RenderSettingsFormProps {
   onUpgrade?: () => void;
   /** Disable the whole form (e.g. while the parent is submitting). */
   disabled?: boolean;
+  /**
+   * Whether the project's template can host scene transitions (the server
+   * derives it from the shipped composition — `Template.supportsTransitions`).
+   * `false` disables the picker with an explanatory hint; `undefined` (callers
+   * without template context) keeps the picker enabled unchanged.
+   */
+  supportsTransitions?: boolean;
 }
 
 const ProBadge = () => (
@@ -82,8 +89,10 @@ export function RenderSettingsForm({
   plan,
   onUpgrade,
   disabled = false,
+  supportsTransitions,
 }: RenderSettingsFormProps) {
   const isFree = plan === "free";
+  const transitionsUnsupported = supportsTransitions === false;
   const patch = (partial: Partial<RenderSettings>) =>
     onChange({ ...value, ...partial });
 
@@ -544,7 +553,10 @@ export function RenderSettingsForm({
         </fieldset>
 
         {/* Transitions */}
-        <fieldset className="space-y-3" disabled={disabled}>
+        <fieldset
+          className="space-y-3"
+          disabled={disabled || transitionsUnsupported}
+        >
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
@@ -555,13 +567,24 @@ export function RenderSettingsForm({
               variant="outline"
               size="sm"
               onClick={addTransition}
+              disabled={transitionsUnsupported}
             >
               <Plus className="h-4 w-4" />
               Add transition
             </Button>
           </div>
 
-          {isFree && (
+          {transitionsUnsupported && (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="transitions-unsupported-hint"
+            >
+              This template doesn&apos;t have scene transitions yet — try Brand
+              Story for a real shader transition.
+            </p>
+          )}
+
+          {isFree && !transitionsUnsupported && (
             <p className="text-xs text-muted-foreground">
               Free plan supports up to {FREE_MAX_TRANSITIONS} transition.
               <span className="ml-1 inline-flex items-center">
@@ -572,7 +595,9 @@ export function RenderSettingsForm({
 
           {transitions.length === 0 ? (
             <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-              No transitions yet. Add one to blend between scenes.
+              {transitionsUnsupported
+                ? "Transitions are unavailable for this template."
+                : "No transitions yet. Add one to blend between scenes."}
             </p>
           ) : (
             <Tabs defaultValue="0" className="w-full">

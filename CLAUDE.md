@@ -639,6 +639,30 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   preset is effectively ignored — the editor should disable 4K when transparent is on.
   NOTE: the watermark is burned only on the RENDER path, not the live-preview
   `GET /:id/composition` route (preview stays clean — intentional).
+- **Shader transitions actually render (M8)** (they were billed-but-inert before —
+  `RenderSettings.transitions` persisted and Pro-gated but nothing consumed it):
+  `resolveSettings` now CONTENT-validates the array via `sanitizeTransitions`
+  (shader ∈ `TRANSITION_SHADERS` — the 14 upstream `@hyperframes/shader-transitions`
+  names + Sorrel's `fade-dissolve` CSS-crossfade entry; time/duration clamped; ease
+  charset-checked; sorted; ≤20), and `prepareCompositionFor` injects, LAST in the
+  injection order, the package's `dist/index.global.js` (inlined, ~250 KB,
+  `window.HyperShader`) + a bootstrap that hands the composition's ROOT
+  `window.__timelines` timeline to `HyperShader.init()` (mandatory — initless
+  registration would clobber the root timeline), collects `.scene[id]` elements,
+  snaps a single transition to the root's `data-scene-boundary` (start = boundary −
+  duration/2), maps `fade-dissolve` by omitting `shader`, and reads
+  `--sorrel-bg`/`--sorrel-accent` for shader colors. **Capability handshake**: a
+  transition-capable composition declares ≥2 `class="scene"` elements + the
+  boundary attr and branches its own HARD-CUT wiring on the substituted
+  `{{sorrel.transitionsActive}}` var ("0" default → composition cuts; "1" → the
+  bootstrap owns the boundary, falling back via `window.__sorrelWireHardCuts()` if
+  its preconditions fail). `brand-story` is the first capable template;
+  `services/transitionCapableTemplates.ts` is the code-side capability set, surfaced
+  as `Template.supportsTransitions` (read-time enrichment, never persisted) so the
+  render-settings form disables the picker elsewhere (the Studio create page passes
+  `false` — its `studio`/`video-spotlight` modules are single-scene). Verified by
+  the RENDER_SMOKE-gated `transitionsRenderSmoke.test.ts` (real Chrome+FFmpeg
+  render + boundary frame extraction). Free keeps ≤1 transition (unchanged gate).
 - **Cancel now genuinely aborts** an in-flight render (it was documented-but-false):
   `executeRender` creates an `AbortController`, passes `ac.signal` to `executeRenderJob`,
   and the progress callback polls `isCancelRequested(renderJobId)` → `ac.abort()`. The

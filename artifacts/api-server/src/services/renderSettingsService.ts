@@ -17,6 +17,7 @@ import {
   type RenderFormat,
   type RenderFps,
   type RenderCaptionWord,
+  type RenderTransition,
   type RenderVoiceover,
 } from "@workspace/db";
 
@@ -139,12 +140,99 @@ function sanitizeVoiceover(raw: unknown): RenderVoiceover | undefined {
   };
 }
 
+/**
+ * The shader vocabulary the transitions picker may persist. The 14 real WebGL
+ * shaders mirror `@hyperframes/shader-transitions`' `SHADER_NAMES` (verified
+ * against 0.6.91 — a drift-guard test greps the installed bundle); kept local
+ * for the same reason as `CANVAS_DIMENSIONS` (no runtime import from the
+ * engine in unit-testable code). `fade-dissolve` is Sorrel's 15th entry: the
+ * library's documented CSS-crossfade fallback, requested by OMITTING the
+ * `shader` field at injection time (renderService maps it).
+ */
+export const TRANSITION_SHADERS = [
+  "domain-warp",
+  "ridged-burn",
+  "whip-pan",
+  "sdf-iris",
+  "ripple-waves",
+  "gravitational-lens",
+  "cinematic-zoom",
+  "chromatic-split",
+  "glitch",
+  "swirl-vortex",
+  "thermal-distortion",
+  "flash-through-white",
+  "cross-warp-morph",
+  "light-leak",
+  "fade-dissolve",
+] as const;
+
+const TRANSITION_SHADER_SET: ReadonlySet<string> = new Set(TRANSITION_SHADERS);
+
+/** Bounds for a single transition; values outside are clamped, junk dropped. */
+const TRANSITION_MAX_COUNT = 20;
+const TRANSITION_MAX_TIME_S = 600;
+const TRANSITION_MIN_DURATION_S = 0.3;
+const TRANSITION_MAX_DURATION_S = 10;
+const TRANSITION_DEFAULT_DURATION_S = 0.7;
+const TRANSITION_DEFAULT_EASE = "power2.inOut";
+const TRANSITION_EASE_RE = /^[a-zA-Z0-9.()]{1,40}$/;
+
+/**
+ * Coerce a raw transitions blob into a clean, render-safe `RenderTransition[]`
+ * (or undefined when nothing valid remains). Until M8 this field passed
+ * through `resolveSettings` content-unvalidated (`Array.isArray` only) — now
+ * that the render path actually injects it into composition HTML, every field
+ * is validated here at the choke point: unknown shaders are DROPPED (never
+ * guessed), `time`/`duration` are clamped to sane bounds, `ease` must look
+ * like a GSAP ease name (it lands inside an injected `<script>` as a JSON
+ * string — the strict charset is defense in depth on top of JSON.stringify),
+ * entries are sorted by time and capped.
+ */
+function sanitizeTransitions(raw: unknown): RenderTransition[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const clean: RenderTransition[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const t = entry as {
+      time?: unknown;
+      shader?: unknown;
+      duration?: unknown;
+      ease?: unknown;
+    };
+    if (typeof t.shader !== "string" || !TRANSITION_SHADER_SET.has(t.shader)) {
+      continue;
+    }
+    const time =
+      typeof t.time === "number" && Number.isFinite(t.time)
+        ? Math.max(0, Math.min(TRANSITION_MAX_TIME_S, t.time))
+        : 0;
+    const duration =
+      typeof t.duration === "number" && Number.isFinite(t.duration)
+        ? Math.max(
+            TRANSITION_MIN_DURATION_S,
+            Math.min(TRANSITION_MAX_DURATION_S, t.duration),
+          )
+        : TRANSITION_DEFAULT_DURATION_S;
+    const ease =
+      typeof t.ease === "string" && TRANSITION_EASE_RE.test(t.ease)
+        ? t.ease
+        : TRANSITION_DEFAULT_EASE;
+    clean.push({ time, shader: t.shader, duration, ease });
+    if (clean.length >= TRANSITION_MAX_COUNT) break;
+  }
+  if (clean.length === 0) return undefined;
+  clean.sort((a, b) => a.time - b.time);
+  return clean;
+}
+
 export function resolveSettings(
   raw: Partial<RenderSettings> | null | undefined,
 ): RenderSettings {
   const r = raw ?? {};
   const captions = sanitizeCaptions(r.captions);
   const voiceover = sanitizeVoiceover(r.voiceover);
+  const transitions = sanitizeTransitions(r.transitions);
   return {
     fps: FPS_VALUES.includes(r.fps as RenderFps)
       ? (r.fps as RenderFps)
@@ -166,7 +254,7 @@ export function resolveSettings(
       typeof r.watermark === "boolean"
         ? r.watermark
         : DEFAULT_RENDER_SETTINGS.watermark,
-    ...(Array.isArray(r.transitions) ? { transitions: r.transitions } : {}),
+    ...(transitions ? { transitions } : {}),
     // Background audio (Track C): keep only a well-formed, "/objects/"-shaped
     // path. Ownership is enforced at the route AND re-checked at render time
     // (which skips silently on any failure); volume is clamped 0–100.

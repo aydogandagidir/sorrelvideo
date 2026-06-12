@@ -163,8 +163,12 @@ export function baseAspect(resolution: RenderResolution): RenderResolution {
 }
 
 /**
- * The 15 shader transition names (verified @hyperframes/core 0.6.6). A row in
- * the transition picker maps `shader` to one of these.
+ * The transition vocabulary: the 14 real WebGL shaders mirror
+ * `@hyperframes/shader-transitions`' SHADER_NAMES (verified against 0.6.91 —
+ * the server keeps the authoritative copy in renderSettingsService and a
+ * drift-guard test greps the installed bundle), plus Sorrel's `fade-dissolve`,
+ * the library's documented CSS-crossfade fallback (injected with the `shader`
+ * field omitted). A row in the transition picker maps `shader` to one of these.
  */
 export const TRANSITION_SHADERS = [
   "domain-warp",

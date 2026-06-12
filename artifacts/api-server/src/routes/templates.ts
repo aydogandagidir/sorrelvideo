@@ -19,6 +19,7 @@ import {
   GetProjectResponse,
 } from "@workspace/api-zod";
 import { getUserPlan } from "../services/billingService";
+import { supportsTransitions } from "../services/transitionCapableTemplates";
 import {
   resolveEntryFile,
   renderCompositionTemplate,
@@ -112,6 +113,16 @@ function userTemplatesFilter(userId: string) {
   return or(isNull(templatesTable.userId), eq(templatesTable.userId, userId));
 }
 
+/**
+ * Read-time enrichment: `supportsTransitions` is a property of the SHIPPED
+ * composition (>=2 .scene elements + data-scene-boundary), derived from the
+ * code-side capability set — never persisted, so already-seeded environments
+ * can't go stale. Applied before the zod parse so the field survives it.
+ */
+function withTransitionCapability<T extends { module: string }>(row: T): T {
+  return { ...row, supportsTransitions: supportsTransitions(row.module) };
+}
+
 router.get("/templates", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Unauthorized" });
@@ -137,7 +148,11 @@ router.get("/templates", async (req, res): Promise<void> => {
     .where(and(...conditions))
     .orderBy(templatesTable.id);
 
-  res.json(ListTemplatesResponse.parse(serializeDates(templates)));
+  res.json(
+    ListTemplatesResponse.parse(
+      serializeDates(templates.map(withTransitionCapability)),
+    ),
+  );
 });
 
 // GET /api/templates/thumbnails/:slug — serve a platform template's self-hosted
@@ -200,7 +215,13 @@ router.post("/templates", async (req, res): Promise<void> => {
     .insert(templatesTable)
     .values({ ...parsed.data, userId: req.user.id })
     .returning();
-  res.status(201).json(GetTemplateResponse.parse(serializeDates(template)));
+  res
+    .status(201)
+    .json(
+      GetTemplateResponse.parse(
+        serializeDates(withTransitionCapability(template)),
+      ),
+    );
 });
 
 router.get("/templates/:id", async (req, res): Promise<void> => {
@@ -248,7 +269,11 @@ router.get("/templates/:id", async (req, res): Promise<void> => {
     }
   }
 
-  res.json(GetTemplateResponse.parse(serializeDates(template)));
+  res.json(
+    GetTemplateResponse.parse(
+      serializeDates(withTransitionCapability(template)),
+    ),
+  );
 });
 
 // GET /api/templates/:id/composition — serve a template's BASE composition HTML

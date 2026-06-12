@@ -193,6 +193,7 @@ export const ListTemplatesResponseItem = zod.object({
   "duration": zod.number().describe('Duration in seconds'),
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
+  "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
   "createdAt": zod.string().optional()
 })
 export const ListTemplatesResponse = zod.array(ListTemplatesResponseItem)
@@ -230,6 +231,7 @@ export const GetTemplateResponse = zod.object({
   "duration": zod.number().describe('Duration in seconds'),
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
+  "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
   "createdAt": zod.string().optional()
 })
 

@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { describe, expect, it } from "vitest";
 import {
+  buildTransitionsInjection,
   injectWatermark,
   renderCompositionTemplate,
   renderDirFor,
@@ -12,6 +13,7 @@ import {
   VOICEOVER_FILENAME,
   VoiceoverUnavailableError,
 } from "./renderService";
+import { TRANSITION_SHADERS } from "./renderSettingsService";
 
 describe("renderCompositionTemplate", () => {
   it("substitutes simple {{key}} placeholders", () => {
@@ -212,5 +214,60 @@ describe("resolveVoiceoverTag", () => {
         html,
       ),
     ).rejects.toBeInstanceOf(VoiceoverUnavailableError);
+  });
+});
+
+describe("buildTransitionsInjection (M8)", () => {
+  const TWO_SCENES =
+    `<html><body><div data-composition-id="x" data-scene-boundary="4">` +
+    `<section class="scene" id="a"></section>` +
+    `<section class="scene" id="b"></section>` +
+    `</div></body></html>`;
+  const ONE_SCENE =
+    `<html><body><div data-composition-id="x">` +
+    `<section class="scene" id="a"></section>` +
+    `</div></body></html>`;
+  const T = [
+    { time: 4, shader: "whip-pan", duration: 0.6, ease: "power2.inOut" },
+  ];
+
+  it("returns '' with no transitions or on a single-scene composition", () => {
+    expect(buildTransitionsInjection(TWO_SCENES, [])).toBe("");
+    expect(buildTransitionsInjection(ONE_SCENE, T)).toBe("");
+  });
+
+  it("inlines the HyperShader library + a bootstrap wired to the ROOT timeline", () => {
+    const out = buildTransitionsInjection(TWO_SCENES, T);
+    expect(out).not.toBe("");
+    // The IIFE bundle defines the global; the bootstrap calls into it.
+    expect(out).toContain("HyperShader");
+    expect(out).toContain("window.HyperShader.init");
+    // The root-timeline handoff is mandatory (init() without a timeline would
+    // register its own under the composition id, clobbering the real one).
+    expect(out).toContain("timeline:tl");
+    // Boundary snap + the hard-cut fallback hook are present.
+    expect(out).toContain("data-scene-boundary");
+    expect(out).toContain("__sorrelWireHardCuts");
+    // The sanitized payload rides along verbatim.
+    expect(out).toContain('"shader":"whip-pan"');
+  });
+
+  it("escapes '<' in the JSON payload (script-context safety)", () => {
+    // The sanitizer's whitelists exclude '<' today; this pins the defense in
+    // depth at the injection layer regardless.
+    const out = buildTransitionsInjection(TWO_SCENES, [
+      { time: 1, shader: "glitch", duration: 0.5, ease: "power2.inOut" },
+    ]);
+    const payloadPart = out.slice(out.indexOf("var specs="));
+    expect(payloadPart.includes("</script>")).toBe(true); // closing tags of OUR scripts only
+    expect(out.match(/<\/script>/g)?.length).toBe(2); // lib + bootstrap, nothing injected
+  });
+
+  it("drift-guard: every real shader name exists in the installed library bundle", () => {
+    const out = buildTransitionsInjection(TWO_SCENES, T);
+    for (const name of TRANSITION_SHADERS) {
+      if (name === "fade-dissolve") continue; // Sorrel-side CSS-crossfade entry
+      expect(out, `shader "${name}" missing from @hyperframes/shader-transitions bundle`).toContain(name);
+    }
   });
 });
