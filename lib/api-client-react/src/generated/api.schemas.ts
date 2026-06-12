@@ -255,6 +255,8 @@ export type RenderSettingsCaptions = {
   start: number;
   end: number;
 }[];
+  /** Caption visual preset. Absent === classic. */
+  style?: 'classic' | 'pill-karaoke' | 'neon-accent' | 'kinetic-slam';
 } | null;
 
 /**
@@ -431,6 +433,8 @@ export type RenderSettingsInputCaptions = {
   start: number;
   end: number;
 }[];
+  /** Caption visual preset. Absent === classic. */
+  style?: 'classic' | 'pill-karaoke' | 'neon-accent' | 'kinetic-slam';
 } | null;
 
 /**

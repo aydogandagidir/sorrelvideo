@@ -20,6 +20,7 @@ import {
   type RenderVoiceover,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { buildCaptionOverlay } from "../lib/captionStyles";
 import { getBrandKit, getDefaultBrandKit } from "./brandKitService";
 import {
   resolveSettings,
@@ -497,34 +498,6 @@ async function downloadSpotlightVideo(
 }
 
 /**
- * Build a caption overlay (Track E): absolutely-positioned word spans (only the
- * active word is opacity 1) + a script that appends opacity tweens to the
- * composition's ROOT timeline so words reveal in sync. The engine only seeks the
- * root timeline (+ element-matched sub-timelines), so a standalone timeline would
- * never play — appending to the root (which our script grabs by data-composition-id)
- * is the verified approach. Word text is HTML-escaped; time windows are numbers.
- * Returns "" when there are no words.
- */
-function buildCaptionOverlay(
-  words: { text: string; start: number; end: number }[],
-): string {
-  if (words.length === 0) return "";
-  const spans = words
-    .map(
-      (w) =>
-        `<span class="__cap" style="position:absolute;left:0;right:0;text-align:center;opacity:0;">${escapeHtml(
-          w.text,
-        )}</span>`,
-    )
-    .join("");
-  const windows = JSON.stringify(words.map((w) => [w.start, w.end]));
-  return (
-    `<div data-sorrel-captions style="position:fixed;left:0;right:0;bottom:9%;z-index:2147483646;pointer-events:none;padding:0 6%;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-weight:800;font-size:5.2vh;line-height:1.15;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,0.85);">${spans}</div>` +
-    `<script>(function(){var C=document.querySelector('[data-sorrel-captions]');if(!C)return;var r=document.querySelector('[data-composition-id]');var id=r&&r.getAttribute('data-composition-id');var tl=(window.__timelines||{})[id];if(!tl||!tl.to)return;var W=${windows};var s=C.querySelectorAll('.__cap');for(var i=0;i<s.length&&i<W.length;i++){tl.to(s[i],{opacity:1,duration:0.08,ease:'none'},W[i][0]);tl.to(s[i],{opacity:0,duration:0.08,ease:'none'},W[i][1]);}})();</script>`
-  );
-}
-
-/**
  * The `@hyperframes/shader-transitions` IIFE bundle (defines
  * `window.HyperShader`), read from node_modules and INLINED into the per-render
  * composition — the engine's file server only serves the render dir, and the
@@ -863,7 +836,10 @@ async function prepareCompositionFor(
   // Captions (Track E): an overlay whose opacity tweens append to the root
   // timeline. After the composition's own script (so the root timeline exists).
   if (options.captions?.words?.length) {
-    const overlay = buildCaptionOverlay(options.captions.words);
+    const overlay = buildCaptionOverlay(
+      options.captions.words,
+      options.captions.style,
+    );
     if (overlay) rendered = injectBeforeBodyEnd(rendered, overlay);
   }
 

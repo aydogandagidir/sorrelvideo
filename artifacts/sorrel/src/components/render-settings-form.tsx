@@ -523,9 +523,46 @@ export function RenderSettingsForm({
           />
 
           {captionWordCount > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {captionWordCount} words captioned — revealed word by word, in sync.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {captionWordCount} words captioned — revealed word by word, in
+                sync.
+              </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="rs-caption-style" className="text-xs">
+                  Caption style
+                </Label>
+                <Select
+                  value={value.captions?.style ?? "classic"}
+                  onValueChange={(v) =>
+                    patch({
+                      captions: {
+                        ...(value.captions ?? { words: [] }),
+                        // "classic" is the default — drop the key so the resolved
+                        // settings stay byte-identical (mirrors the server).
+                        ...(v === "classic"
+                          ? { style: undefined }
+                          : {
+                              style: v as NonNullable<
+                                RenderSettings["captions"]
+                              >["style"],
+                            }),
+                      },
+                    })
+                  }
+                >
+                  <SelectTrigger id="rs-caption-style">
+                    <SelectValue placeholder="Caption style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="classic">Classic</SelectItem>
+                    <SelectItem value="pill-karaoke">Pill karaoke</SelectItem>
+                    <SelectItem value="neon-accent">Neon accent</SelectItem>
+                    <SelectItem value="kinetic-slam">Kinetic slam</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           ) : (
             <div className="space-y-1.5">
               <Button

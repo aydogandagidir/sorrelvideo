@@ -106,6 +106,22 @@ describe("RenderSettingsForm — Free plan gating", () => {
   });
 });
 
+describe("RenderSettingsForm — caption style", () => {
+  it("shows the caption-style picker once captions have words", () => {
+    // Pro plan (captions are Pro-gated); seed words so the "captioned" state renders.
+    setup("pro", {
+      captions: { words: [{ text: "hi", start: 0, end: 1 }] },
+    });
+    expect(screen.getByText(/caption style/i)).toBeInTheDocument();
+    expect(screen.getByText(/words captioned/i)).toBeInTheDocument();
+  });
+
+  it("does not show the picker when there are no caption words", () => {
+    setup("pro");
+    expect(screen.queryByText(/caption style/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("RenderSettingsForm — Pro plan", () => {
   it("does NOT badge quality options for a Pro user", () => {
     setup("pro");
