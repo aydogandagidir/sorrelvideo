@@ -29,6 +29,13 @@ catalog:
 
 minimumReleaseAge: 1440
 
+# The engine packages are pinned to EXACT versions (no caret) and bumped only
+# deliberately, in lockstep with the producer patch + core/dist runtime copy —
+# the 1-day quarantine adds nothing there, and a fresh engine release would
+# otherwise block the coordinated bump for 24h.
+minimumReleaseAgeExclude:
+  - '@hyperframes/*'
+
 onlyBuiltDependencies:
   - '@swc/core'
   - esbuild

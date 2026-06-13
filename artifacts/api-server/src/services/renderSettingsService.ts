@@ -34,7 +34,7 @@ const RESOLUTIONS: readonly RenderResolution[] = [
 
 /**
  * Pixel dimensions per resolution preset. Mirrors `@hyperframes/core`'s
- * `CANVAS_DIMENSIONS` (verified against 0.6.6) but kept local on purpose:
+ * `CANVAS_DIMENSIONS` (verified against 0.6.91) but kept local on purpose:
  * core's ESM `dist` uses extensionless relative imports that Node's native
  * ESM loader (used by vitest) can't resolve, so importing a runtime value from
  * core breaks unit tests. When M3/M4 need runtime core (compiler/lint), add
@@ -245,7 +245,7 @@ export function resolveDimensions(resolution: RenderResolution): {
  * `outputResolution` reuses the shared CanvasResolution names.
  *
  * TRANSPARENT BACKGROUND is *format-derived*, not a separate config field. The
- * producer (verified against 0.6.6) computes `needsAlpha = webm | mov |
+ * producer (verified against 0.6.91) computes `needsAlpha = webm | mov |
  * png-sequence` and, for those formats, auto-injects transparent-background CSS
  * (`initTransparentBackground`) + forces screenshot capture — there is NO
  * `RenderConfig.transparent` knob to set. So `settings.transparent` is realized

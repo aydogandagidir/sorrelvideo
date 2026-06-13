@@ -1,0 +1,29 @@
+diff --git a/dist/index.js b/dist/index.js
+index 9d7f6d084d916c392793f8e02513d10cba7f7336..0cca9c55ac3e005f25522e1c6020a0c39043c7a3 100644
+--- a/dist/index.js
++++ b/dist/index.js	
+@@ -1,4 +1,8 @@
+ import { createRequire as __cjsRequire } from 'module'; const require = __cjsRequire(import.meta.url);
++// Sorrel patch: the bundle's inlined emscripten/wawoff2 (fontCompression) reads
++// __dirname at module init, which is undefined in Node ESM scope — upstream
++// shimmed require (line above) but not __dirname/__filename. Define both.
++import { fileURLToPath as __sorrelFileURLToPath } from 'url'; import { dirname as __sorrelDirname } from 'path'; const __filename = __sorrelFileURLToPath(import.meta.url); const __dirname = __sorrelDirname(__filename);
+ var __create = Object.create;
+ var __defProp = Object.defineProperty;
+ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+@@ -132593,6 +132597,7 @@ function buildEncoderArgs(options, inputArgs, outputPath, gpuEncoder = null) {
+     } else {
+       const encoderName = codec === "h264" ? "libx264" : "libx265";
+       args.push("-c:v", encoderName, "-preset", preset);
++      args.push("-threads", process.env.PRODUCER_FFMPEG_THREADS || "4");
+       if (bitrate) args.push("-b:v", bitrate);
+       else args.push("-crf", String(quality));
+       const lockGop = options.lockGopForChunkConcat === true;
+@@ -133140,6 +133145,7 @@ function buildStreamingArgs(options, outputPath, gpuEncoder = null) {
+     } else {
+       const encoderName = codec === "h264" ? "libx264" : "libx265";
+       args.push("-c:v", encoderName, "-preset", preset);
++      args.push("-threads", process.env.PRODUCER_FFMPEG_THREADS || "4");
+       if (bitrate) args.push("-b:v", bitrate);
+       else args.push("-crf", String(quality));
+       if (codec === "h264") {

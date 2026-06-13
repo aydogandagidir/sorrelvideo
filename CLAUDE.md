@@ -660,13 +660,33 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   timestamps. CRUD + lifecycle setters live in `services/renderJobsService.ts`;
   `recoverStuckRenders()` now reconciles orphaned `render_jobs` rows alongside stuck
   projects, and `truncateAll()` clears the table.
-- **Hyperframes API (verified against 0.6.6)**: producer `RenderConfig.fps` is an exact
+- **Hyperframes API (verified against 0.6.91)**: producer `RenderConfig.fps` is an exact
   rational `{ num, den }` (NOT an enum); `format` ∈ `mp4|webm|mov|png-sequence` (webm/mov/
   png-sequence carry true alpha); `executeRenderJob(job, dir, out, onProgress?, abortSignal?)`
   accepts an `AbortSignal` and throws `RenderCancelledError` on cancel (treated as a
   rollback-to-draft, not a failure). Resolution presets mirror core's `CANVAS_DIMENSIONS`
   (the 6 named presets above); dimensions are composition-authored, with
-  `RenderConfig.outputResolution` (a `CanvasResolution`) as the override.
+  `RenderConfig.outputResolution` (a `CanvasResolution`) as the override. 0.6.91 also
+  adds optional `RenderConfig` fields we don't expose yet — `format: "gif"` + `gifLoop`,
+  `crf`/`videoBitrate` overrides, `hdrMode` — adopt deliberately, not by accident.
+- **Engine version pinning**: `@hyperframes/core`/`producer` (api-server) and
+  `@hyperframes/player` (sorrel) are pinned EXACT (`0.6.91`, no caret) and must move in
+  lockstep with `patches/@hyperframes__producer@<version>.patch` (a pnpm patch keyed by
+  exact version) and the local `core/dist` runtime copy. The patch carries TWO fixes:
+  (1) an ffmpeg `-threads` cap via `PRODUCER_FFMPEG_THREADS` (still absent upstream at
+  0.6.91), inserted after BOTH `args.push("-c:v", encoderName, "-preset", preset);`
+  anchors; (2) an ESM `__dirname`/`__filename` shim at the top of `dist/index.js` —
+  the 0.6.81+ font-embedding inlines emscripten/wawoff2 which reads `__dirname` at
+  module init, crashing EVERY plain Node-ESM import (vitest, smoke-render, tsx dev);
+  upstream shipped a `require` shim but forgot `__dirname` (works on bun / in CJS
+  bundles, so they don't see it). Bump procedure: update pins → temporarily empty
+  `pnpm.patchedDependencies` → `pnpm install` → `pnpm patch @hyperframes/producer@<v>`
+  → re-apply both fixes in the session dir → `pnpm patch-commit` (expect
+  `grep -c PRODUCER_FFMPEG_THREADS dist/index.js` == 2 and
+  `node --input-type=module -e "import('@hyperframes/producer')"` to succeed) →
+  refresh `core/dist` → run smoke:render + verify-beginframe + verify-registry-renders.
+  `@hyperframes/*` is excluded from pnpm's `minimumReleaseAge` quarantine
+  (`pnpm-workspace.yaml`) because exact pins make the 1-day delay pure friction.
 
 ## Known gotchas
 
@@ -705,7 +725,7 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   (used by vitest) cannot — so any module that imports a **runtime** value from core
   needs `server.deps.inline: [/@hyperframes\/core/]` in `vitest.config.ts`.
   `renderSettingsService` sidesteps this today by keeping a local `CANVAS_DIMENSIONS`
-  copy (verified against 0.6.6) instead of importing it
+  copy (verified against 0.6.91) instead of importing it
 - CORS is permissive in dev (`origin: true`); in production it enforces
   `ALLOWED_ORIGINS` strictly. **`ALLOWED_ORIGINS` must include the app's own
   public origin** — the api-server serves the SPA same-origin, and Vite tags its
@@ -898,11 +918,12 @@ upload-sourcemaps` in the deploy workflow + strip `.map` from the
    `infra/` AWS CDK scaffold (S3 render bucket + Hyperframes Lambda / Step
    Functions state machine, least-privilege IAM, `deploy-infra.yml`) exist as
    scaffolding only. Still pending: adding `infra/*` to `pnpm-workspace.yaml` +
-   install, the api-server glue (`renderBackend.ts` / `lambdaBackend.ts` plugging
-   into `renderQueue.ts`), and a deliberate `@hyperframes/*` version alignment
-   (`0.6.6` → `0.6.65`) once the player / studio / `aws-lambda` packages are
-   adopted. The `@hyperframes/aws-lambda` API used by the CDK stack is
-   developer-stated and unverified until then.
+   install, and aligning `@hyperframes/aws-lambda` (infra still pins `^0.6.6`)
+   with the engine line, which is now at `0.6.91` (core/producer/player bumped).
+   The api-server glue (`renderBackend.ts` / `lambdaBackend.ts` /
+   `lambdaProgressPoller.ts`) already ships boot-wired but degrades until the
+   package is installed. The `@hyperframes/aws-lambda` API used by the CDK stack
+   is developer-stated and unverified until then.
 10. **Dependency security — residual dev-only `vitest` advisory**: `pnpm audit`
     is clean for production (`pnpm audit --prod` → no vulnerabilities). Transitive
     prod vulns (`qs` DoS, `uuid` bounds-check) and most dev ones (`undici`, `tmp`,

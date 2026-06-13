@@ -64,7 +64,7 @@
       "esbuild@<=0.24.2": "^0.25.0"
     },
     "patchedDependencies": {
-      "@hyperframes/producer@0.6.6": "patches/@hyperframes__producer@0.6.6.patch"
+      "@hyperframes/producer@0.6.91": "patches/@hyperframes__producer@0.6.91.patch"
     }
   }
 }
