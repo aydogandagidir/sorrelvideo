@@ -1,5 +1,40 @@
 [
   {
+    "slug": "app-showcase",
+    "name": "App Showcase",
+    "description": "Fitness app product showcase with three floating smartphone screens",
+    "category": "Showcase",
+    "isPremium": false,
+    "duration": 6,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "showcase",
+      "app",
+      "3d"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/app-showcase.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/app-showcase.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/app-showcase"
+  },
+  {
+    "slug": "chromatic-radial-split",
+    "name": "Chromatic Radial Split",
+    "description": "Shader transition with chromatic aberration radial split",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/chromatic-radial-split.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/chromatic-radial-split.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/chromatic-radial-split"
+  },
+  {
     "slug": "cinematic-zoom",
     "name": "Cinematic Zoom",
     "description": "Shader transition with dramatic zoom blur",
@@ -14,7 +49,175 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/cinematic-zoom.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/cinematic-zoom.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/cinematic-zoom"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/cinematic-zoom"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-basic",
+    "name": "Code Snippet - Apple Terminal Basic",
+    "description": "Apple Terminal Basic profile: white background, black text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": false,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-basic.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-basic.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-basic"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-clear-dark",
+    "name": "Code Snippet - Apple Terminal Clear Dark",
+    "description": "Apple Terminal Clear Dark profile: semi-transparent dark background, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": false,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-clear-dark.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-clear-dark.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-clear-dark"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-clear-light",
+    "name": "Code Snippet - Apple Terminal Clear Light",
+    "description": "Apple Terminal Clear Light profile: semi-transparent light background, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": false,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-clear-light.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-clear-light.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-clear-light"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-grass",
+    "name": "Code Snippet - Apple Terminal Grass",
+    "description": "Apple Terminal Grass profile: black background with green text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-grass.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-grass.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-grass"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-homebrew",
+    "name": "Code Snippet - Apple Terminal Homebrew",
+    "description": "Apple Terminal Homebrew profile: black background with bright green text and lime cursor, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-homebrew.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-homebrew.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-homebrew"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-man-page",
+    "name": "Code Snippet - Apple Terminal Man Page",
+    "description": "Apple Terminal Man Page profile: pale yellow background with black text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-man-page.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-man-page.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-man-page"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-novel",
+    "name": "Code Snippet - Apple Terminal Novel",
+    "description": "Apple Terminal Novel profile: warm parchment background with dark brown text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-novel.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-novel.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-novel"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-ocean",
+    "name": "Code Snippet - Apple Terminal Ocean",
+    "description": "Apple Terminal Ocean profile: deep blue background with white text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-ocean.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-ocean.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-ocean"
   },
   {
     "slug": "code-snippet-apple-terminal-pro",
@@ -35,7 +238,87 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-pro.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-pro.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/code-snippet-apple-terminal-pro"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-pro"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-red-sands",
+    "name": "Code Snippet - Apple Terminal Red Sands",
+    "description": "Apple Terminal Red Sands profile: deep red background with sandy text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-red-sands.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-red-sands.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-red-sands"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-silver-aerogel",
+    "name": "Code Snippet - Apple Terminal Silver Aerogel",
+    "description": "Apple Terminal Silver Aerogel profile: dark grey background with white text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-silver-aerogel.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-silver-aerogel.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-silver-aerogel"
+  },
+  {
+    "slug": "code-snippet-apple-terminal-solid-colors",
+    "name": "Code Snippet - Apple Terminal Solid Colors",
+    "description": "Apple Terminal Solid Colors profile: deep purple background with white text, per-character typing animation of a shell session.",
+    "category": "Code",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "code",
+      "developer",
+      "showcase",
+      "terminal",
+      "apple",
+      "apple-terminal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/code-snippet-apple-terminal-solid-colors.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-snippet-apple-terminal-solid-colors.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-solid-colors"
+  },
+  {
+    "slug": "cross-warp-morph",
+    "name": "Cross Warp Morph",
+    "description": "Shader transition with cross-warped morphing",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/cross-warp-morph.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/cross-warp-morph.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/cross-warp-morph"
   },
   {
     "slug": "data-chart",
@@ -53,7 +336,7 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/data-chart.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/data-chart.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/data-chart",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/data-chart",
     "variables": [
       {
         "id": "title",
@@ -90,6 +373,77 @@
     ]
   },
   {
+    "slug": "domain-warp-dissolve",
+    "name": "Domain Warp Dissolve",
+    "description": "Shader transition with fractal noise domain warping",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/domain-warp-dissolve.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/domain-warp-dissolve.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/domain-warp-dissolve"
+  },
+  {
+    "slug": "flash-through-white",
+    "name": "Flash Through White",
+    "description": "Shader transition with white flash crossfade",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/flash-through-white.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/flash-through-white.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/flash-through-white"
+  },
+  {
+    "slug": "flowchart",
+    "name": "Flowchart",
+    "description": "Animated decision tree with SVG connectors, sticky-note nodes, cursor interaction, and typing correction",
+    "category": "Diagram",
+    "isPremium": false,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "diagram",
+      "flowchart",
+      "interactive"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/flowchart.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/flowchart.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/flowchart"
+  },
+  {
+    "slug": "flowchart-vertical",
+    "name": "Flowchart Vertical",
+    "description": "Portrait animated decision tree with SVG connectors, sticky-note nodes, cursor interaction, and typing correction",
+    "category": "Diagram",
+    "isPremium": false,
+    "duration": 12,
+    "width": 1440,
+    "height": 2560,
+    "tags": [
+      "diagram",
+      "flowchart",
+      "interactive",
+      "portrait"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/flowchart-vertical.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/flowchart-vertical.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/flowchart-vertical"
+  },
+  {
     "slug": "glitch",
     "name": "Glitch",
     "description": "Shader transition with digital glitch artifacts",
@@ -104,7 +458,24 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/glitch.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/glitch.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/glitch"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/glitch"
+  },
+  {
+    "slug": "gravitational-lens",
+    "name": "Gravitational Lens",
+    "description": "Shader transition with gravitational lensing distortion",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/gravitational-lens.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/gravitational-lens.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/gravitational-lens"
   },
   {
     "slug": "light-leak",
@@ -121,7 +492,7 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/light-leak.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/light-leak.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/light-leak"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/light-leak"
   },
   {
     "slug": "logo-outro",
@@ -139,7 +510,25 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/logo-outro.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/logo-outro.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/logo-outro"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/logo-outro"
+  },
+  {
+    "slug": "macos-notification",
+    "name": "macOS Notification",
+    "description": "Animated macOS-style notification banner with app icon and message",
+    "category": "Social",
+    "isPremium": false,
+    "duration": 5,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "social",
+      "overlay",
+      "notification"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/macos-notification.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/macos-notification.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/macos-notification"
   },
   {
     "slug": "reddit-post",
@@ -157,7 +546,79 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/reddit-post.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/reddit-post.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/reddit-post"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/reddit-post"
+  },
+  {
+    "slug": "ridged-burn",
+    "name": "Ridged Burn",
+    "description": "Shader transition with ridged turbulence burn effect",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/ridged-burn.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/ridged-burn.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/ridged-burn"
+  },
+  {
+    "slug": "ripple-waves",
+    "name": "Ripple Waves",
+    "description": "Shader transition with concentric ripple wave distortion",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/ripple-waves.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/ripple-waves.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/ripple-waves"
+  },
+  {
+    "slug": "sdf-iris",
+    "name": "SDF Iris",
+    "description": "Shader transition with signed distance field iris reveal",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/sdf-iris.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/sdf-iris.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/sdf-iris"
+  },
+  {
+    "slug": "spain-map",
+    "name": "Spain Map",
+    "description": "Animated Spain choropleth by autonomous community with staggered reveals and gradient legend — D3 conic conformal projection",
+    "category": "Data",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "data",
+      "map",
+      "geography",
+      "spain",
+      "europe",
+      "choropleth"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/spain-map.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/spain-map.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/spain-map"
   },
   {
     "slug": "spotify-card",
@@ -175,7 +636,7 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/spotify-card.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/spotify-card.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/spotify-card"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/spotify-card"
   },
   {
     "slug": "swirl-vortex",
@@ -192,7 +653,283 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/swirl-vortex.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/swirl-vortex.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/swirl-vortex"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/swirl-vortex"
+  },
+  {
+    "slug": "thermal-distortion",
+    "name": "Thermal Distortion",
+    "description": "Shader transition with heat haze thermal distortion",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/thermal-distortion.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/thermal-distortion.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/thermal-distortion"
+  },
+  {
+    "slug": "transitions-3d",
+    "name": "3D Transitions",
+    "description": "Showcase of 3D perspective flip and rotate transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 11,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-3d.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-3d.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-3d"
+  },
+  {
+    "slug": "transitions-blur",
+    "name": "Blur Transitions",
+    "description": "Showcase of blur-based transitions between scenes",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 20,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-blur.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-blur.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-blur"
+  },
+  {
+    "slug": "transitions-cover",
+    "name": "Cover Transitions",
+    "description": "Showcase of cover/uncover slide transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 21,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-cover.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-cover.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-cover"
+  },
+  {
+    "slug": "transitions-destruction",
+    "name": "Destruction Transitions",
+    "description": "Showcase of destructive break-apart transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 14,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-destruction.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-destruction.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-destruction"
+  },
+  {
+    "slug": "transitions-dissolve",
+    "name": "Dissolve Transitions",
+    "description": "Showcase of dissolve and fade transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 24,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-dissolve.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-dissolve.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-dissolve"
+  },
+  {
+    "slug": "transitions-distortion",
+    "name": "Distortion Transitions",
+    "description": "Showcase of warp and distortion transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 21,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-distortion.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-distortion.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-distortion"
+  },
+  {
+    "slug": "transitions-grid",
+    "name": "Grid Transitions",
+    "description": "Showcase of grid-based tile transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 11,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-grid.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-grid.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-grid"
+  },
+  {
+    "slug": "transitions-light",
+    "name": "Light Transitions",
+    "description": "Showcase of light-based glow and flash transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 21,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-light.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-light.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-light"
+  },
+  {
+    "slug": "transitions-mechanical",
+    "name": "Mechanical Transitions",
+    "description": "Showcase of mechanical shutter and iris transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 15,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-mechanical.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-mechanical.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-mechanical"
+  },
+  {
+    "slug": "transitions-other",
+    "name": "Other Transitions",
+    "description": "Showcase of miscellaneous creative transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 20,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-other.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-other.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-other"
+  },
+  {
+    "slug": "transitions-push",
+    "name": "Push Transitions",
+    "description": "Showcase of push and slide transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 24,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-push.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-push.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-push"
+  },
+  {
+    "slug": "transitions-radial",
+    "name": "Radial Transitions",
+    "description": "Showcase of radial wipe and reveal transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 20,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-radial.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-radial.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-radial"
+  },
+  {
+    "slug": "transitions-scale",
+    "name": "Scale Transitions",
+    "description": "Showcase of scale and zoom transitions",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 15,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "showcase"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/transitions-scale.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/transitions-scale.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-scale"
+  },
+  {
+    "slug": "ui-3d-reveal",
+    "name": "3D UI Reveal",
+    "description": "Perspective 3D reveal animation for UI elements",
+    "category": "Showcase",
+    "isPremium": true,
+    "duration": 13,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "showcase",
+      "3d",
+      "reveal"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/ui-3d-reveal.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/ui-3d-reveal.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/ui-3d-reveal"
+  },
+  {
+    "slug": "us-map",
+    "name": "US Map",
+    "description": "Animated US choropleth map with staggered state reveals, value labels, and gradient legend — pure inline SVG with GSAP",
+    "category": "Data",
+    "isPremium": false,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "data",
+      "map",
+      "geography",
+      "usa",
+      "choropleth"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/us-map.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/us-map.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/us-map"
   },
   {
     "slug": "us-map-bubble",
@@ -213,7 +950,138 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/us-map-bubble.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/us-map-bubble.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/us-map-bubble"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/us-map-bubble"
+  },
+  {
+    "slug": "us-map-flow",
+    "name": "US Flow Map",
+    "description": "Animated connection arcs between US cities over a base map — composable origin-destination flow visualization",
+    "category": "Data",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "data",
+      "map",
+      "geography",
+      "usa",
+      "flow",
+      "connections",
+      "arcs"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/us-map-flow.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/us-map-flow.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/us-map-flow"
+  },
+  {
+    "slug": "us-map-hex",
+    "name": "US Hex Grid Map",
+    "description": "Animated hexagonal tile grid map — each state as an equal-weight hex with data fill and abbreviation label",
+    "category": "Data",
+    "isPremium": true,
+    "duration": 10,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "data",
+      "map",
+      "geography",
+      "usa",
+      "hexgrid",
+      "tilegrid"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/us-map-hex.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/us-map-hex.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/us-map-hex"
+  },
+  {
+    "slug": "vfx-liquid-background",
+    "name": "Liquid Background",
+    "description": "Organic liquid simulation with vertex displacement on a subdivided plane. HTML content floats above rippling fluid surface with real-time wave dynamics.",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "html-in-canvas",
+      "liquid",
+      "webgl",
+      "displacement",
+      "background"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/vfx-liquid-background.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/vfx-liquid-background.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/vfx-liquid-background"
+  },
+  {
+    "slug": "vfx-magnetic",
+    "name": "Magnetic",
+    "description": "VFX composition block",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 15,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "html-in-canvas",
+      "webgl"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/vfx-magnetic.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/vfx-magnetic.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/vfx-magnetic"
+  },
+  {
+    "slug": "vfx-portal",
+    "name": "Portal",
+    "description": "VFX composition block",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 10,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "html-in-canvas",
+      "webgl"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/vfx-portal.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/vfx-portal.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/vfx-portal"
+  },
+  {
+    "slug": "vfx-shatter",
+    "name": "Shatter",
+    "description": "VFX composition block",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 12,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "html-in-canvas",
+      "webgl"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/vfx-shatter.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/vfx-shatter.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/vfx-shatter"
+  },
+  {
+    "slug": "whip-pan",
+    "name": "Whip Pan",
+    "description": "Shader transition simulating a fast camera whip pan",
+    "category": "Effects",
+    "isPremium": true,
+    "duration": 4,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "transition",
+      "shader"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/whip-pan.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/whip-pan.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/whip-pan"
   },
   {
     "slug": "world-map",
@@ -233,7 +1101,7 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/world-map.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/world-map.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/world-map"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/world-map"
   },
   {
     "slug": "x-post",
@@ -251,6 +1119,6 @@
     ],
     "thumbnailUrl": "/api/templates/thumbnails/x-post.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/x-post.png",
-    "source": "https://github.com/heygen-com/hyperframes/tree/main/registry/blocks/x-post"
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/x-post"
   }
 ]
