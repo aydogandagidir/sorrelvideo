@@ -712,8 +712,8 @@ importers:
         specifier: ^0.100.1
         version: 0.100.1(zod@4.4.3)
       openai:
-        specifier: ^5.0.0
-        version: 5.23.2(ws@8.20.1)(zod@4.4.3)
+        specifier: ^6.42.0
+        version: 6.42.0(ws@8.20.1)(zod@4.4.3)
     devDependencies:
       zod:
         specifier: 'catalog:'
@@ -6471,12 +6471,11 @@ packages:
   onnxruntime-web@1.26.0-dev.20260416-b7804b056c:
     resolution: {integrity: sha512-MD6Ss4GSpQBo6zqoJzyT9LRbKYs7x/JVN23FT24EcEvlqF4VuzPOeH6X38orZPKHQDbprn7K+SBpu0/mj2CQiw==}
 
-  openai@5.23.2:
-    resolution: {integrity: sha512-MQBzmTulj+MM5O8SKEk/gL8a7s5mktS9zUtAkU257WjvobGc9nKcBuVwjyEEcb9SI8a8Y2G/mzn3vm9n1Jlleg==}
-    hasBin: true
+  openai@6.42.0:
+    resolution: {integrity: sha512-1WFEt/uXMXOLhYRNkgJWo08Y2YNvNwpVU72K7ibrWgWpNOXd4VojXLbe6SQ4bLiUQ3Y8jz4IiyVkylJCL1DtZg==}
     peerDependencies:
       ws: ^8.18.0
-      zod: ^3.23.8
+      zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       ws:
         optional: true
@@ -14095,7 +14094,7 @@ snapshots:
       platform: 1.3.6
       protobufjs: 7.5.8
 
-  openai@5.23.2(ws@8.20.1)(zod@4.4.3):
+  openai@6.42.0(ws@8.20.1)(zod@4.4.3):
     optionalDependencies:
       ws: 8.20.1
       zod: 4.4.3
