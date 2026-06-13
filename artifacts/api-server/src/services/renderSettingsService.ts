@@ -17,6 +17,8 @@ import {
   type RenderFormat,
   type RenderFps,
   type RenderCaptionWord,
+  type RenderCaptions,
+  type RenderCaptionStyle,
   type RenderTransition,
   type RenderVoiceover,
 } from "@workspace/db";
@@ -115,9 +117,14 @@ function clampAudioVolume(v: unknown): number {
  * bound the injected overlay, and drops everything else. Untrusted text is
  * HTML-escaped later at injection (renderService), not here.
  */
-function sanitizeCaptions(
-  raw: unknown,
-): { words: RenderCaptionWord[] } | undefined {
+/** The non-default caption styles `sanitizeCaptions` keeps. */
+const CAPTION_STYLES = new Set<RenderCaptionStyle>([
+  "pill-karaoke",
+  "neon-accent",
+  "kinetic-slam",
+]);
+
+function sanitizeCaptions(raw: unknown): RenderCaptions | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const words = (raw as { words?: unknown }).words;
   if (!Array.isArray(words)) return undefined;
@@ -136,7 +143,19 @@ function sanitizeCaptions(
         : 0;
     if (text.length > 0 && end > start) clean.push({ text, start, end });
   }
-  return clean.length > 0 ? { words: clean.slice(0, 2000) } : undefined;
+  if (clean.length === 0) return undefined;
+  // Keep `style` only when it's a known non-classic preset. "classic", an
+  // unknown value, or absence → omit the key, so every existing project/test
+  // resolves byte-identically (the classic overlay is the default branch).
+  const rawStyle = (raw as { style?: unknown }).style;
+  const style =
+    typeof rawStyle === "string" && CAPTION_STYLES.has(rawStyle as RenderCaptionStyle)
+      ? (rawStyle as RenderCaptionStyle)
+      : undefined;
+  return {
+    words: clean.slice(0, 2000),
+    ...(style ? { style } : {}),
+  };
 }
 
 /**

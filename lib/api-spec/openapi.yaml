@@ -1857,6 +1857,10 @@ components:
                     type: number
                   end:
                     type: number
+            style:
+              type: string
+              enum: [classic, pill-karaoke, neon-accent, kinetic-slam]
+              description: Caption visual preset. Absent === classic.
         voiceover:
           type: [object, "null"]
           description: >
@@ -1930,6 +1934,10 @@ components:
                     type: number
                   end:
                     type: number
+            style:
+              type: string
+              enum: [classic, pill-karaoke, neon-accent, kinetic-slam]
+              description: Caption visual preset. Absent === classic.
 
     LintMessage:
       type: object

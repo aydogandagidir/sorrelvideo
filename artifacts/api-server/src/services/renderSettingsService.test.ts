@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RENDER_SETTINGS, type RenderSettings } from "@workspace/db";
+import {
+  DEFAULT_RENDER_SETTINGS,
+  type RenderSettings,
+  type RenderCaptionStyle,
+} from "@workspace/db";
 import {
   resolveSettings,
   assertRenderSettingsAllowed,
@@ -127,6 +131,27 @@ describe("resolveSettings", () => {
     // No valid words → no captions at all.
     expect(resolveSettings({ captions: { words: [] } }).captions).toBeUndefined();
     expect(resolveSettings({}).captions).toBeUndefined();
+  });
+
+  it("keeps a known caption style but drops classic/unknown (byte-identical default)", () => {
+    const words = [{ text: "hi", start: 0, end: 1 }];
+    expect(
+      resolveSettings({ captions: { words, style: "pill-karaoke" } }).captions
+        ?.style,
+    ).toBe("pill-karaoke");
+    // "classic", an unknown value, or absence all omit the key so existing
+    // projects resolve byte-identically (the classic overlay is the default).
+    expect(
+      resolveSettings({ captions: { words, style: "classic" } }).captions,
+    ).not.toHaveProperty("style");
+    expect(
+      resolveSettings({
+        captions: { words, style: "bogus" as RenderCaptionStyle },
+      }).captions,
+    ).not.toHaveProperty("style");
+    expect(resolveSettings({ captions: { words } }).captions).not.toHaveProperty(
+      "style",
+    );
   });
 
   it("preserves a well-formed voiceover (the talking-host narration MUST survive re-resolve)", () => {

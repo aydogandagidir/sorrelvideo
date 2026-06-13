@@ -71,9 +71,23 @@ export interface RenderCaptionWord {
   end: number;
 }
 
+/**
+ * Caption visual style. `classic` (or absent) is the original single-line
+ * bottom-center karaoke overlay; the rest are richer presets. Kept free of any
+ * `@hyperframes/*` import — these are Sorrel's own product names, mapped to
+ * per-style HTML in the api-server's `lib/captionStyles`.
+ */
+export type RenderCaptionStyle =
+  | "classic"
+  | "pill-karaoke"
+  | "neon-accent"
+  | "kinetic-slam";
+
 /** Word-timed captions burned into the render (Track E). */
 export interface RenderCaptions {
   words: RenderCaptionWord[];
+  /** Visual preset. Absent === "classic" (byte-identical legacy output). */
+  style?: RenderCaptionStyle;
 }
 
 /**

@@ -327,7 +327,8 @@ export const ListProjectsResponseItem = zod.object({
   "text": zod.string(),
   "start": zod.number(),
   "end": zod.number()
-}))
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
 }).nullish().describe('Optional word-timed captions (Pro). null → none.'),
   "voiceover": zod.object({
   "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
@@ -409,7 +410,8 @@ export const GetProjectResponse = zod.object({
   "text": zod.string(),
   "start": zod.number(),
   "end": zod.number()
-}))
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
 }).nullish().describe('Optional word-timed captions (Pro). null → none.'),
   "voiceover": zod.object({
   "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
@@ -483,7 +485,8 @@ export const UpdateProjectResponse = zod.object({
   "text": zod.string(),
   "start": zod.number(),
   "end": zod.number()
-}))
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
 }).nullish().describe('Optional word-timed captions (Pro). null → none.'),
   "voiceover": zod.object({
   "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
@@ -567,7 +570,8 @@ export const CancelProjectRenderResponse = zod.object({
   "text": zod.string(),
   "start": zod.number(),
   "end": zod.number()
-}))
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
 }).nullish().describe('Optional word-timed captions (Pro). null → none.'),
   "voiceover": zod.object({
   "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
@@ -642,7 +646,8 @@ export const UpdateProjectRenderSettingsBody = zod.object({
   "text": zod.string(),
   "start": zod.number(),
   "end": zod.number()
-}))
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
 }).nullish().describe('Optional word-timed captions (Pro). null → none.')
 }).describe('Partial render settings; omitted fields keep their current value.')
 
@@ -692,7 +697,8 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
   "text": zod.string(),
   "start": zod.number(),
   "end": zod.number()
-}))
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
 }).nullish().describe('Optional word-timed captions (Pro). null → none.'),
   "voiceover": zod.object({
   "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
@@ -1325,7 +1331,8 @@ export const GetStatsResponse = zod.object({
   "text": zod.string(),
   "start": zod.number(),
   "end": zod.number()
-}))
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
 }).nullish().describe('Optional word-timed captions (Pro). null → none.'),
   "voiceover": zod.object({
   "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
