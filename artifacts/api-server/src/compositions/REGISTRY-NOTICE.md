@@ -8,6 +8,7 @@ platform templates; the original copyright and license are retained.
 | Template | Source |
 | --- | --- |
 | `app-showcase.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/app-showcase |
+| `apple-money-count.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/apple-money-count |
 | `chromatic-radial-split.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/chromatic-radial-split |
 | `cinematic-zoom.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/cinematic-zoom |
 | `code-snippet-apple-terminal-basic.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/code-snippet-apple-terminal-basic |
@@ -30,6 +31,7 @@ platform templates; the original copyright and license are retained.
 | `flowchart-vertical.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/flowchart-vertical |
 | `glitch.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/glitch |
 | `gravitational-lens.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/gravitational-lens |
+| `instagram-follow.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/instagram-follow |
 | `light-leak.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/light-leak |
 | `logo-outro.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/logo-outro |
 | `macos-notification.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/macos-notification |
@@ -41,6 +43,7 @@ platform templates; the original copyright and license are retained.
 | `spotify-card.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/spotify-card |
 | `swirl-vortex.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/swirl-vortex |
 | `thermal-distortion.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/thermal-distortion |
+| `tiktok-follow.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/tiktok-follow |
 | `transitions-3d.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-3d |
 | `transitions-blur.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-blur |
 | `transitions-cover.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/transitions-cover |
@@ -66,5 +69,6 @@ platform templates; the original copyright and license are retained.
 | `whip-pan.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/whip-pan |
 | `world-map.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/world-map |
 | `x-post.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/x-post |
+| `yt-lower-third.html` | https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/yt-lower-third |
 
 See https://www.apache.org/licenses/LICENSE-2.0 for the full license text.

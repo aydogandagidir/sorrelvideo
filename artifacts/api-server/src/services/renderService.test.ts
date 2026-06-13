@@ -4,6 +4,7 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   buildTransitionsInjection,
+  copyTemplateAssets,
   injectWatermark,
   outputPathFor,
   renderCompositionTemplate,
@@ -14,6 +15,7 @@ import {
   VOICEOVER_FILENAME,
   VoiceoverUnavailableError,
 } from "./renderService";
+import { assetsForModule } from "./registryTemplates";
 import { TRANSITION_SHADERS } from "./renderSettingsService";
 
 describe("renderCompositionTemplate", () => {
@@ -166,6 +168,40 @@ describe("outputPathFor", () => {
 
   it("maps png-sequence to the frames directory", () => {
     expect(outputPathFor(dir, "png-sequence")).toBe(path.join(dir, "frames"));
+  });
+});
+
+describe("copyTemplateAssets", () => {
+  it("copies a multi-file module's vendored assets into <dir>/assets/", () => {
+    // Pick a real asset-bearing module from the manifest so this tracks the
+    // committed assets dir, not a hardcoded slug.
+    const slug = ["instagram-follow", "apple-money-count", "tiktok-follow"].find(
+      (s) => assetsForModule(s).length > 0,
+    );
+    expect(slug, "an asset-bearing module exists").toBeDefined();
+    if (!slug) return;
+
+    const dest = fs.mkdtempSync(path.join(os.tmpdir(), "sorrel-assets-"));
+    try {
+      copyTemplateAssets(slug, dest);
+      for (const name of assetsForModule(slug)) {
+        const copied = path.join(dest, "assets", name);
+        expect(fs.existsSync(copied), copied).toBe(true);
+        expect(fs.statSync(copied).size).toBeGreaterThan(0);
+      }
+    } finally {
+      fs.rmSync(dest, { recursive: true, force: true });
+    }
+  });
+
+  it("is a no-op for a single-file / non-registry module (no assets dir)", () => {
+    const dest = fs.mkdtempSync(path.join(os.tmpdir(), "sorrel-noassets-"));
+    try {
+      copyTemplateAssets("studio", dest);
+      expect(fs.existsSync(path.join(dest, "assets"))).toBe(false);
+    } finally {
+      fs.rmSync(dest, { recursive: true, force: true });
+    }
   });
 });
 

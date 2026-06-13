@@ -279,8 +279,12 @@ const CURATION = [
       },
     ],
   },
-  { slug: "code-snippet-dark-modern", category: "Code", isPremium: false },
-  { slug: "code-snippet-light-modern", category: "Code", isPremium: false },
+  // code-snippet-{dark,light}-modern (VSCode-theme blocks, background.jpeg
+  // asset) are DROPPED: their createVSCodeThemeComposition setup leaves
+  // window.__timelines empty in the Sorrel render env (silent zero-duration, no
+  // console error) → render fails. The asset pipeline itself is proven by the
+  // social avatars + apple-money-count sfx, which render fine. Re-add if a
+  // future engine bump fixes their timeline registration.
   {
     slug: "code-snippet-apple-terminal-pro",
     category: "Code",
@@ -384,10 +388,45 @@ function needsLocalAssets(html) {
   );
 }
 
+// Static-asset extensions we can vendor as sibling files (images + audio). A
+// `hyperframes:asset` file outside this set (e.g. a `.glb` model, a `lib/*.js`
+// runtime) means the block isn't a pure static-asset block — skip it.
+const VENDORABLE_ASSET_EXT = new Set([
+  ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".wav", ".mp3",
+]);
+
+const ASSETS_DIR = path.join(COMPOSITIONS_DIR, "assets");
+
 async function fetchText(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
   return res.text();
+}
+
+async function fetchBinary(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/**
+ * Rewrite every reference to a vendored asset's BASENAME to the canonical
+ * `assets/<name>` form the render dir + preview routes serve. Covers the two
+ * shapes upstream uses: `url("../assets/background.jpeg")` (parent-relative,
+ * code-snippet blocks) and `src="assets/avatar.jpg"` (already canonical, social
+ * blocks). Also catches a bare `url(background.jpeg)` / `src="background.jpeg"`.
+ */
+function rewriteAssetRefs(html, assetNames) {
+  let out = html;
+  for (const name of assetNames) {
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // `../assets/N`, `./assets/N`, `assets/N`, or a bare `N` inside src=/url().
+    out = out.replace(
+      new RegExp(`(\\.\\.?/)?(assets/)?${esc}`, "g"),
+      `assets/${name}`,
+    );
+  }
+  return out;
 }
 
 function attributionHeader(slug, item) {
@@ -424,17 +463,56 @@ async function main() {
         skipped.push({ slug, reason: "no composition file in registry-item" });
         continue;
       }
-      // Only single-file (self-contained) compositions: more files ⇒ assets.
-      if ((item.files || []).length > 1) {
-        skipped.push({ slug, reason: `${item.files.length} files (needs assets)` });
+      // Partition the non-composition files: vendor a block whose extra files
+      // are ALL static `hyperframes:asset`s with a vendorable extension (images
+      // + audio). Anything else (a `.glb` model, a `lib/*.js` runtime, an
+      // unknown type) means it's not a pure static-asset block → skip.
+      const assetFiles = (item.files || []).filter((f) => f !== compFile);
+      const unvendorable = assetFiles.find(
+        (f) =>
+          f.type !== "hyperframes:asset" ||
+          !VENDORABLE_ASSET_EXT.has(path.extname(f.path).toLowerCase()),
+      );
+      if (unvendorable) {
+        skipped.push({
+          slug,
+          reason: `non-vendorable file ${path.basename(unvendorable.path)} (${unvendorable.type})`,
+        });
         continue;
       }
 
-      const html = await fetchText(
+      let html = await fetchText(
         RAW(`registry/blocks/${slug}/${path.basename(compFile.path)}`),
       );
-      if (needsLocalAssets(html)) {
-        skipped.push({ slug, reason: "references local assets" });
+
+      // Download + write each asset as a sibling under compositions/assets/<slug>/,
+      // then normalize the composition's refs to the canonical `assets/<name>`
+      // form (served at render time + by the asset routes).
+      const assetNames = assetFiles.map((f) => path.basename(f.path));
+      if (assetNames.length > 0) {
+        const slugAssetDir = path.join(ASSETS_DIR, slug);
+        fs.mkdirSync(slugAssetDir, { recursive: true });
+        for (const f of assetFiles) {
+          const name = path.basename(f.path);
+          const bin = await fetchBinary(RAW(`registry/blocks/${slug}/${f.path}`));
+          fs.writeFileSync(path.join(slugAssetDir, name), bin);
+        }
+        html = rewriteAssetRefs(html, assetNames);
+      }
+
+      // After vendoring + rewriting, any REMAINING local ref (one we did not
+      // vendor) is still a blocker. Mask the vendored `assets/<name>` refs, then
+      // run the generic check so a genuinely un-vendored relative ref skips.
+      let masked = html;
+      for (const name of assetNames) {
+        masked = masked.replaceAll(`assets/${name}`, "data:vendored");
+      }
+      if (needsLocalAssets(masked)) {
+        // Roll back the just-written assets so a skip leaves no orphans.
+        if (assetNames.length > 0) {
+          fs.rmSync(path.join(ASSETS_DIR, slug), { recursive: true, force: true });
+        }
+        skipped.push({ slug, reason: "references un-vendored local assets" });
         continue;
       }
 
@@ -474,6 +552,10 @@ async function main() {
         // the `data-composition-variables` baked into the HTML; consumed by the
         // typed loader (registryTemplates.ts) for a future Studio form.
         ...(variables && variables.length ? { variables } : {}),
+        // Vendored sibling assets (under compositions/assets/<slug>/), copied
+        // into the render dir + served by the template/project asset routes.
+        // Omitted for single-file blocks → existing rows stay byte-identical.
+        ...(assetNames.length ? { assets: assetNames.map((n) => ({ name: n })) } : {}),
       });
       console.log(`[import] ✓ ${slug} (${imported.at(-1).width}x${imported.at(-1).height}, ${imported.at(-1).duration}s)`);
     } catch (err) {

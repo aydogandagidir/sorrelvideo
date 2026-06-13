@@ -18,6 +18,31 @@
     "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/app-showcase"
   },
   {
+    "slug": "apple-money-count",
+    "name": "Apple Money Count",
+    "description": "Apple-style finance counter that counts from $0 to $10,000, flashes green, and bursts money icons with sound.",
+    "category": "Data",
+    "isPremium": false,
+    "duration": 5,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "showcase",
+      "finance",
+      "kinetic",
+      "youtube",
+      "sfx"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/apple-money-count.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/apple-money-count.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/apple-money-count",
+    "assets": [
+      {
+        "name": "sfx-production.wav"
+      }
+    ]
+  },
+  {
     "slug": "chromatic-radial-split",
     "name": "Chromatic Radial Split",
     "description": "Shader transition with chromatic aberration radial split",
@@ -478,6 +503,29 @@
     "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/gravitational-lens"
   },
   {
+    "slug": "instagram-follow",
+    "name": "Instagram Follow",
+    "description": "Animated Instagram follow overlay with profile card and follow button",
+    "category": "Social",
+    "isPremium": false,
+    "duration": 5,
+    "width": 1080,
+    "height": 1920,
+    "tags": [
+      "social",
+      "overlay",
+      "instagram"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/instagram-follow.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/instagram-follow.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/instagram-follow",
+    "assets": [
+      {
+        "name": "avatar.jpg"
+      }
+    ]
+  },
+  {
     "slug": "light-leak",
     "name": "Light Leak",
     "description": "Shader transition with cinematic light leak overlay",
@@ -671,6 +719,29 @@
     "thumbnailUrl": "/api/templates/thumbnails/thermal-distortion.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/thermal-distortion.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/thermal-distortion"
+  },
+  {
+    "slug": "tiktok-follow",
+    "name": "TikTok Follow",
+    "description": "Animated TikTok follow overlay with profile card and follow button",
+    "category": "Social",
+    "isPremium": true,
+    "duration": 5,
+    "width": 1080,
+    "height": 1920,
+    "tags": [
+      "social",
+      "overlay",
+      "tiktok"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/tiktok-follow.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/tiktok-follow.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/tiktok-follow",
+    "assets": [
+      {
+        "name": "avatar.jpg"
+      }
+    ]
   },
   {
     "slug": "transitions-3d",
@@ -1120,5 +1191,28 @@
     "thumbnailUrl": "/api/templates/thumbnails/x-post.png",
     "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/x-post.png",
     "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/x-post"
+  },
+  {
+    "slug": "yt-lower-third",
+    "name": "YouTube Lower Third",
+    "description": "Animated YouTube subscribe lower third with avatar and channel info",
+    "category": "Social",
+    "isPremium": false,
+    "duration": 5,
+    "width": 1920,
+    "height": 1080,
+    "tags": [
+      "social",
+      "overlay",
+      "youtube"
+    ],
+    "thumbnailUrl": "/api/templates/thumbnails/yt-lower-third.png",
+    "cdnThumbnailUrl": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/yt-lower-third.png",
+    "source": "https://github.com/heygen-com/hyperframes/tree/c52165d1b63cf11955ceb4e2265cbe34b0718852/registry/blocks/yt-lower-third",
+    "assets": [
+      {
+        "name": "avatar.jpg"
+      }
+    ]
   }
 ]
