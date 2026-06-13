@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTransitionsInjection,
   injectWatermark,
+  outputPathFor,
   renderCompositionTemplate,
   renderDirFor,
   resolveEntryFile,
@@ -150,6 +151,21 @@ describe("resolveEntryFile", () => {
 describe("renderDirFor", () => {
   it("resolves the per-project directory under RENDERS_DIR", () => {
     expect(renderDirFor(42)).toBe(path.join(RENDERS_DIR, "42"));
+  });
+});
+
+describe("outputPathFor", () => {
+  const dir = path.join(os.tmpdir(), "out");
+
+  it("maps each single-file format to output.<ext>", () => {
+    expect(outputPathFor(dir, "mp4")).toBe(path.join(dir, "output.mp4"));
+    expect(outputPathFor(dir, "webm")).toBe(path.join(dir, "output.webm"));
+    expect(outputPathFor(dir, "mov")).toBe(path.join(dir, "output.mov"));
+    expect(outputPathFor(dir, "gif")).toBe(path.join(dir, "output.gif"));
+  });
+
+  it("maps png-sequence to the frames directory", () => {
+    expect(outputPathFor(dir, "png-sequence")).toBe(path.join(dir, "frames"));
   });
 });
 

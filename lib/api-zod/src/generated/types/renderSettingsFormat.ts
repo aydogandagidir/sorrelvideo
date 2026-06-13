@@ -14,4 +14,5 @@ export const RenderSettingsFormat = {
   webm: 'webm',
   mov: 'mov',
   'png-sequence': 'png-sequence',
+  gif: 'gif',
 } as const;

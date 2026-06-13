@@ -498,15 +498,19 @@ router.get("/projects/:id/video", async (req, res): Promise<void> => {
   }
 
   // Per-format MIME + extension for the Content-Type / Content-Disposition.
-  const VIDEO_MIME: Record<"mp4" | "webm" | "mov", string> = {
+  // png-sequence is handled above (409); every other format is a single file.
+  type StreamFormat = Exclude<typeof format, "png-sequence">;
+  const VIDEO_MIME: Record<StreamFormat, string> = {
     mp4: "video/mp4",
     webm: "video/webm",
     mov: "video/quicktime",
+    gif: "image/gif",
   };
-  const EXT: Record<"mp4" | "webm" | "mov", string> = {
+  const EXT: Record<StreamFormat, string> = {
     mp4: "mp4",
     webm: "webm",
     mov: "mov",
+    gif: "gif",
   };
 
   // Stream with HTTP range support (browser <video> seeking issues range
