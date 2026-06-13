@@ -62,6 +62,12 @@ async function buildAll() {
       "@grpc/*",
       "@swc/*",
       "@aws-sdk/*",
+      // @hyperframes/aws-lambda is a runtime-only dep of the lambda backend
+      // (loaded via a dynamic import behind the lambda-env gate). It pulls in
+      // heavy natives (@sparticuz/chromium, ffmpeg-static, the AWS SDKs) that
+      // must NOT be inlined — keep it external so the bundle stays lean and the
+      // import resolves from node_modules only on a lambda-configured host.
+      "@hyperframes/aws-lambda",
       "@azure/*",
       "@opentelemetry/*",
       // Sentry pulls in a large OpenTelemetry graph with dynamic requires that

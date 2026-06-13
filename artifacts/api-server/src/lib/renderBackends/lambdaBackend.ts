@@ -2,21 +2,21 @@
  * Lambda render backend (M11) — dispatch + reconcile against the Hyperframes
  * distributed render fleet (`@hyperframes/aws-lambda`, Step Functions + Lambda).
  *
- * DEPENDENCY ISOLATION: `@hyperframes/aws-lambda` is NOT installed (see
- * CLAUDE.md → Future work / M11). EVERY reference to it — and to the AWS SDK —
- * goes through a dynamic `await import(...)`, reached only when the lambda
- * backend is actually selected (Pro + AWS env). The module's types come from the
- * ambient declaration in `src/types/hyperframes-aws-lambda.d.ts`, so this file
- * compiles with the package absent; the runtime import only fires on a host
- * where the operator has deployed the CDK stack and installed the package.
- * Importing THIS module is always safe (no top-level AWS import).
+ * DEPENDENCY ISOLATION: `@hyperframes/aws-lambda` IS now a dependency (so this
+ * file's types are the REAL ones), but it is still loaded only through a dynamic
+ * `await import(...)` reached when the lambda backend is actually selected
+ * (Pro + AWS env). That keeps its heavy native deps (@sparticuz/chromium,
+ * ffmpeg-static, the AWS SDKs) out of the esbuild bundle (they're `external`)
+ * and out of the dev/test/CI hot path. Importing THIS module is always safe.
  *
  * Two entry points:
- *   - `dispatchLambdaRender(...)`  — start a remote render: build the composition
- *     HTML, run the safety guards (max-frames + in-flight cap), call
- *     `renderToLambda`, and persist the execution ARN + flip the ledger row to
- *     `rendering`. Mirrors the inline path's status transitions on the PROJECT
- *     so the existing 3-second frontend poll keeps working.
+ *   - `dispatchLambdaRender(...)`  — start a remote render: materialize the
+ *     project dir (composition + sibling assets via `prepareCompositionFor`),
+ *     run the safety guards (gif/max-frames/in-flight), build + validate a
+ *     `SerializableDistributedRenderConfig`, call `renderToLambda`, and persist
+ *     the execution ARN + flip the ledger row to `rendering`. Mirrors the inline
+ *     path's status transitions on the PROJECT so the 3-second frontend poll
+ *     keeps working.
  *   - `reconcileLambdaJob(row)`    — one-shot `getRenderProgress` for a single
  *     in-flight row: write progress/cost, and on a terminal state finalize
  *     (ready/failed) BOTH the ledger row and the project. Called by the poller.
@@ -29,11 +29,8 @@ import {
   type RenderSettings,
 } from "@workspace/db";
 import { logger } from "../logger";
-import {
-  buildCompositionHtml,
-  injectWatermark,
-} from "../../services/renderService";
-import { toEngineConfig } from "../../services/renderSettingsService";
+import { prepareCompositionFor } from "../../services/renderService";
+import { resolveDimensions } from "../../services/renderSettingsService";
 import {
   getActiveLambdaJobs,
   markExternalId,
@@ -42,6 +39,7 @@ import {
   markReady,
 } from "../../services/renderJobsService";
 import type { RenderProgress } from "@hyperframes/aws-lambda";
+import type { SerializableDistributedRenderConfig } from "@hyperframes/producer/distributed";
 
 /**
  * Hard ceiling on total frames a single Lambda render may produce. A runaway
@@ -148,7 +146,14 @@ export async function dispatchLambdaRender(
     );
   }
 
-  // --- Guard 2: max-frames ceiling (refuse pathologically large renders). ---
+  // --- Guard 2: gif is not a distributed format. The producer's own
+  // validateDistributedRenderConfig (ALLOWED = mp4|mov|png-sequence|webm) would
+  // reject it anyway, but a clear early message beats a wire-boundary throw. ---
+  if (settings.format === "gif") {
+    throw new LambdaDispatchError("GIF renders run locally, not on Lambda");
+  }
+
+  // --- Guard 3: max-frames ceiling (refuse pathologically large renders). ---
   const maxFrames = estimateMaxFrames(settings);
   if (maxFrames > RENDER_MAX_FRAMES) {
     throw new LambdaDispatchError(
@@ -156,9 +161,17 @@ export async function dispatchLambdaRender(
     );
   }
 
-  // Re-read the project's compositionVars/module so the rendered HTML matches
-  // what the inline path would produce (buildCompositionHtml merges brand kit +
-  // vars). `userId` comes from the (gated) ledger row, the authoritative owner.
+  const bucketName = process.env.HYPERFRAMES_S3_BUCKET;
+  const stateMachineArn = process.env.HYPERFRAMES_STATE_MACHINE_ARN;
+  if (!bucketName || !stateMachineArn) {
+    throw new LambdaDispatchError(
+      "Lambda backend is not configured (HYPERFRAMES_S3_BUCKET + HYPERFRAMES_STATE_MACHINE_ARN required)",
+    );
+  }
+
+  // Re-read the project so the materialized dir matches what the inline path
+  // produces (buildCompositionHtml merges brand kit + vars). `userId` comes from
+  // the (gated) ledger row, the authoritative owner.
   const [project] = await db
     .select({
       id: projectsTable.id,
@@ -173,39 +186,55 @@ export async function dispatchLambdaRender(
     throw new LambdaDispatchError(`Project ${projectId} not found`);
   }
 
-  const baseHtml = await buildCompositionHtml({
-    id: project.id,
-    userId,
-    module: project.module || module,
-    compositionVars: project.compositionVars,
-    compositionHtml: project.compositionHtml,
-    brandKitId: project.brandKitId,
-  });
-  // Burn in the watermark on the same terms as the inline/bullmq path so the
-  // monetization lever is backend-agnostic (always on for Free, removable on
-  // Pro). Keeps "the rendered HTML matches what the inline path would produce".
-  const html = settings.watermark ? injectWatermark(baseHtml) : baseHtml;
+  // Materialize the per-project render dir (composition.html + sibling assets +
+  // voiceover/bg-audio/transitions) EXACTLY like the inline path — renderToLambda
+  // tars this dir + PUTs it to S3, so the remote render sees the same files. The
+  // old html-string dispatch silently dropped those siblings.
+  const { dir } = await prepareCompositionFor(
+    {
+      id: project.id,
+      userId,
+      module: project.module || module,
+      compositionVars: project.compositionVars,
+      compositionHtml: project.compositionHtml,
+      brandKitId: project.brandKitId,
+      renderSettings: settings,
+    },
+    {
+      watermark: settings.watermark,
+      backgroundAudio: settings.backgroundAudio,
+      captions: settings.captions,
+      voiceover: settings.voiceover,
+      transitions: settings.transitions,
+    },
+  );
 
-  // The engine config (fps rational, format, resolution preset). entryFile is
-  // irrelevant for the Lambda transport (we send the HTML inline), so pass a
-  // stable placeholder; only the non-entryFile fields are forwarded below.
-  const engine = toEngineConfig(settings, "composition.html");
+  // Build + client-side-validate the distributed config (integer fps, explicit
+  // pixel dims, distributed-supported format). gif is already excluded above.
+  const dims = resolveDimensions(settings.resolution);
+  const config: SerializableDistributedRenderConfig = {
+    fps: settings.fps,
+    width: dims.width,
+    height: dims.height,
+    format: settings.format,
+    quality: settings.quality,
+  };
 
   // DYNAMIC import — only reached when the lambda backend is selected, so the
-  // (uninstalled) package is never required by dev/test/CI.
-  const { renderToLambda } = await loadAwsLambda();
+  // heavy native deps are never loaded by dev/test/CI.
+  const { renderToLambda, validateDistributedRenderConfig } =
+    await loadAwsLambda();
+  validateDistributedRenderConfig(config);
 
   await setProjectStatus(projectId, "rendering");
 
   const handle = await renderToLambda({
-    html,
-    fps: engine.fps,
-    format: settings.format,
-    quality: settings.quality,
-    outputResolution: settings.resolution,
-    transparent: settings.transparent,
-    bucket: process.env.HYPERFRAMES_S3_BUCKET,
-    correlationId: renderJobId,
+    projectDir: dir,
+    config,
+    bucketName,
+    stateMachineArn,
+    region: process.env.AWS_REGION,
+    executionName: `sorrel-${renderJobId}`,
   });
 
   // Persist the execution ARN, flip the row to rendering, AND (re)tag it as a
@@ -223,50 +252,34 @@ export async function dispatchLambdaRender(
   );
 }
 
-/** Normalized terminal classification of a remote execution status string. */
+/** Normalized terminal classification of a remote execution status. */
 type Terminal = "ready" | "failed" | "running";
 
-/** Status tokens that mean the render finished successfully (case-insensitive). */
-const READY_STATUSES = new Set([
-  "SUCCEEDED",
-  "SUCCESS",
-  "COMPLETE",
-  "COMPLETED",
-  "READY",
-]);
-
-/** Status tokens that mean the render terminated unsuccessfully. */
-const FAILED_STATUSES = new Set([
-  "FAILED",
-  "ERROR",
-  "TIMED_OUT",
-  "ABORTED",
-  "CANCELLED",
-  "CANCELED",
-]);
-
 /**
- * Classify a developer-stated `getRenderProgress().status` string. The exact
- * vocabulary is unverified (see ambient types), so we match defensively on the
- * known Step Functions + likely engine tokens and treat ANYTHING else as still
- * running — never prematurely failing a render on an unrecognized status.
+ * Classify the real `RenderStatus` union from `getRenderProgress`:
+ *   SUCCEEDED → ready; FAILED|TIMED_OUT|ABORTED → failed;
+ *   RUNNING|PENDING_REDRIVE (and any future addition) → running.
+ * Defaults to "running" so an unrecognized status never prematurely fails a
+ * render — the next poll re-checks.
  */
-function classifyStatus(status: string): Terminal {
-  const s = status.trim().toUpperCase();
-  if (READY_STATUSES.has(s)) return "ready";
-  if (FAILED_STATUSES.has(s)) return "failed";
+function classifyStatus(status: RenderProgress["status"]): Terminal {
+  if (status === "SUCCEEDED") return "ready";
+  if (status === "FAILED" || status === "TIMED_OUT" || status === "ABORTED") {
+    return "failed";
+  }
   return "running";
 }
 
-/**
- * Scale a developer-stated `overallProgress` (could be 0..1 OR 0..100) to an
- * integer percentage. Values ≤ 1 are treated as a 0..1 fraction; larger values
- * are assumed to already be a percentage. Clamped to 0..100.
- */
-function toPercent(overall: number | undefined): number {
-  if (overall === undefined || Number.isNaN(overall)) return 0;
-  const pct = overall <= 1 ? overall * 100 : overall;
-  return Math.max(0, Math.min(100, Math.round(pct)));
+/** `overallProgress` is guaranteed [0,1] by the SDK → integer percent, clamped. */
+function toPercent(overall: number): number {
+  if (Number.isNaN(overall)) return 0;
+  return Math.max(0, Math.min(100, Math.round(overall * 100)));
+}
+
+/** USD accrued → integer cents for the ledger's `costCents`. */
+function usdToCents(usd: number | undefined): number | undefined {
+  if (usd === undefined || !Number.isFinite(usd)) return undefined;
+  return Math.round(usd * 100);
 }
 
 /**
@@ -304,7 +317,7 @@ export async function reconcileLambdaJob(row: RenderJobRow): Promise<void> {
   }
 
   const terminal = classifyStatus(progress.status);
-  const costCents = progress.costs?.totalCents;
+  const costCents = usdToCents(progress.costs?.accruedSoFarUsd);
 
   if (terminal === "running") {
     await markProgressAndCost(
@@ -318,7 +331,7 @@ export async function reconcileLambdaJob(row: RenderJobRow): Promise<void> {
   if (terminal === "ready") {
     const outputPath = progress.outputFile?.s3Uri;
     await markReady(row.id, {
-      ...(outputPath !== undefined ? { outputPath } : {}),
+      ...(outputPath ? { outputPath } : {}),
       ...(costCents !== undefined ? { costCents } : {}),
     });
     await setProjectStatus(row.projectId, "ready", {
@@ -331,10 +344,10 @@ export async function reconcileLambdaJob(row: RenderJobRow): Promise<void> {
     return;
   }
 
-  // terminal === "failed"
+  // terminal === "failed" — RenderError[] are objects; format them readably.
   const renderError =
-    progress.errors && progress.errors.length > 0
-      ? progress.errors.join("; ")
+    progress.errors.length > 0
+      ? progress.errors.map((e) => `${e.state}: ${e.error}`).join("; ")
       : "Lambda render failed";
   await markFailed(row.id, renderError);
   await setProjectStatus(row.projectId, "failed", { renderError });

@@ -18,7 +18,7 @@
  *   - "inline"  → always inline.
  *   - "bullmq"  → bullmq if REDIS_URL is set, else degrade to inline.
  *   - "lambda"  → lambda ONLY when the plan is "pro" AND the AWS env is present
- *                 (AWS_REGION + HYPERFRAMES_S3_BUCKET). Otherwise degrade:
+ *                 (AWS_REGION + HYPERFRAMES_S3_BUCKET + HYPERFRAMES_STATE_MACHINE_ARN). Otherwise degrade:
  *                 bullmq if REDIS_URL, else inline.
  *   - "auto"    → prefer the richest available backend FOR THE PLAN: lambda for
  *                 pro when AWS env is present, else bullmq when REDIS_URL is set,
@@ -26,7 +26,8 @@
  *
  * Hard invariants (covered by renderBackend.test.ts):
  *   - lambda is NEVER selected for a free plan.
- *   - lambda is NEVER selected without BOTH AWS_REGION and HYPERFRAMES_S3_BUCKET.
+ *   - lambda is NEVER selected without AWS_REGION + HYPERFRAMES_S3_BUCKET +
+ *     HYPERFRAMES_STATE_MACHINE_ARN.
  */
 import { logger } from "./logger";
 
@@ -42,13 +43,18 @@ function redisAvailable(): boolean {
 
 /**
  * True when the AWS env needed to dispatch a Lambda render is present. We require
- * BOTH a region and the render bucket — the `@hyperframes/aws-lambda` SDK streams
- * everything through that S3 bucket, so without it a dispatch is dead on arrival.
- * (Access keys are read by the AWS SDK itself; their absence surfaces at call
- * time, not here — but region + bucket are the two we can cheaply pre-check.)
+ * the render bucket AND the Step Functions state machine ARN — `renderToLambda`
+ * hard-requires both (`bucketName` + `stateMachineArn`) — plus a region. Without
+ * any of the three a dispatch is dead on arrival. (Access keys are read by the
+ * AWS SDK itself; their absence surfaces at call time, not here — but these
+ * three are the ones we can cheaply pre-check.)
  */
 export function lambdaEnvReady(): boolean {
-  return Boolean(process.env.AWS_REGION && process.env.HYPERFRAMES_S3_BUCKET);
+  return Boolean(
+    process.env.AWS_REGION &&
+      process.env.HYPERFRAMES_S3_BUCKET &&
+      process.env.HYPERFRAMES_STATE_MACHINE_ARN,
+  );
 }
 
 /** Read + validate RENDER_BACKEND, defaulting to "inline" on unset/garbage. */
@@ -106,7 +112,7 @@ export function selectBackend(plan: "free" | "pro"): RenderBackend {
         },
         plan !== "pro"
           ? "RENDER_BACKEND=lambda requested for a non-Pro plan — degrading"
-          : "RENDER_BACKEND=lambda but AWS env (AWS_REGION + HYPERFRAMES_S3_BUCKET) is incomplete — degrading",
+          : "RENDER_BACKEND=lambda but AWS env (AWS_REGION + HYPERFRAMES_S3_BUCKET + HYPERFRAMES_STATE_MACHINE_ARN) is incomplete — degrading",
       );
       return fallback;
     }

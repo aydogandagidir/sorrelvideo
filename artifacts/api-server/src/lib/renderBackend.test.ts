@@ -13,6 +13,7 @@ const ENV_KEYS = [
   "REDIS_URL",
   "AWS_REGION",
   "HYPERFRAMES_S3_BUCKET",
+  "HYPERFRAMES_STATE_MACHINE_ARN",
 ] as const;
 const saved: Record<string, string | undefined> = {};
 
@@ -37,6 +38,7 @@ type Env = {
   REDIS_URL?: string;
   AWS_REGION?: string;
   HYPERFRAMES_S3_BUCKET?: string;
+  HYPERFRAMES_STATE_MACHINE_ARN?: string;
 };
 
 function applyEnv(env: Env): void {
@@ -46,10 +48,17 @@ function applyEnv(env: Env): void {
   if (env.AWS_REGION !== undefined) process.env.AWS_REGION = env.AWS_REGION;
   if (env.HYPERFRAMES_S3_BUCKET !== undefined)
     process.env.HYPERFRAMES_S3_BUCKET = env.HYPERFRAMES_S3_BUCKET;
+  if (env.HYPERFRAMES_STATE_MACHINE_ARN !== undefined)
+    process.env.HYPERFRAMES_STATE_MACHINE_ARN =
+      env.HYPERFRAMES_STATE_MACHINE_ARN;
 }
 
 const REDIS = "redis://localhost:6379";
-const AWS: Env = { AWS_REGION: "us-east-1", HYPERFRAMES_S3_BUCKET: "b" };
+const AWS: Env = {
+  AWS_REGION: "us-east-1",
+  HYPERFRAMES_S3_BUCKET: "b",
+  HYPERFRAMES_STATE_MACHINE_ARN: "arn:aws:states:us-east-1:0:stateMachine:hf",
+};
 
 describe("selectBackend", () => {
   // Exhaustive (preference × plan × env) table. `want` is the expected backend.
@@ -156,6 +165,16 @@ describe("selectBackend", () => {
       plan: "pro",
       want: "inline",
     },
+    {
+      name: "lambda + pro + region + bucket but NO state-machine ARN → degrade",
+      env: {
+        RENDER_BACKEND: "lambda",
+        AWS_REGION: "us-east-1",
+        HYPERFRAMES_S3_BUCKET: "b",
+      },
+      plan: "pro",
+      want: "inline",
+    },
 
     // ---- auto -----------------------------------------------------------------
     {
@@ -250,6 +269,8 @@ describe("isLambdaBackendActive", () => {
     process.env.RENDER_BACKEND = "inline";
     process.env.AWS_REGION = "us-east-1";
     process.env.HYPERFRAMES_S3_BUCKET = "b";
+    process.env.HYPERFRAMES_STATE_MACHINE_ARN =
+      "arn:aws:states:us-east-1:0:stateMachine:hf";
     expect(isLambdaBackendActive()).toBe(false);
 
     // lambda preference but incomplete env → false.

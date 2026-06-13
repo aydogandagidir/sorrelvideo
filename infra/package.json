@@ -10,8 +10,8 @@
     "deploy": "cdk deploy"
   },
   "dependencies": {
-    "//": "Pinned to the Hyperframes 0.6.x line that api-server uses (@hyperframes/core + @hyperframes/producer are ^0.6.6). The orchestrator aligns this exact version when wiring infra into the workspace — keep it in lockstep with the engine, since renderToLambda / HyperframesRenderStack must match the deployed render runtime.",
-    "@hyperframes/aws-lambda": "^0.6.6"
+    "//": "Pinned EXACT to the engine line api-server runs (core/producer/player 0.6.91). renderToLambda / HyperframesRenderStack must match the deployed render runtime, so keep this in lockstep with the engine bump.",
+    "@hyperframes/aws-lambda": "0.6.91"
   },
   "devDependencies": {
     "aws-cdk": "^2.166.0",
