@@ -15,6 +15,7 @@
  * change can't break the request.
  */
 import { logger } from "../lib/logger";
+import { isLocalMediaEnabled } from "../lib/localMediaEnabled";
 
 /** The OpenAI speech-voice catalog (gpt-4o-mini-tts / tts-1 family). */
 export const TTS_VOICES = [
@@ -57,7 +58,10 @@ export class TtsError extends Error {
 
 /** Whether a TTS key is configured (used to hide the UI affordance). */
 export function isTtsConfigured(): boolean {
-  return Boolean(process.env.TTS_API_KEY ?? process.env.OPENAI_API_KEY);
+  return (
+    Boolean(process.env.TTS_API_KEY ?? process.env.OPENAI_API_KEY) ||
+    isLocalMediaEnabled()
+  );
 }
 
 /**
@@ -71,7 +75,15 @@ export async function synthesizeSpeech(opts: {
   instructions?: string;
 }): Promise<Buffer> {
   const apiKey = process.env.TTS_API_KEY ?? process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new TtsNotConfiguredError();
+  if (!apiKey) {
+    // No key: fall back to the local Kokoro model when enabled (dev only).
+    // An OpenAI key always wins — this branch only runs when one is absent.
+    if (isLocalMediaEnabled()) {
+      const { synthesizeSpeechLocal } = await import("./localMediaService");
+      return synthesizeSpeechLocal({ input: opts.input, voice: opts.voice });
+    }
+    throw new TtsNotConfiguredError();
+  }
 
   const model = process.env.OPENAI_TTS_MODEL ?? DEFAULT_TTS_MODEL;
   const body: Record<string, string> = {

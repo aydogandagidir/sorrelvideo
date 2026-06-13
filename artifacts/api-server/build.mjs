@@ -56,6 +56,12 @@ async function buildAll() {
       "typeorm",
       "protobufjs",
       "onnxruntime-node",
+      // Dev-only local media models (kokoro-js TTS + @huggingface/transformers
+      // Whisper). Loaded ONLY via lazy `await import` inside the LOCAL_MEDIA_MODELS
+      // flag branch (localMediaService), so the bundle builds + prod boots without
+      // them resolvable. Keep external so their native onnxruntime deps never bundle.
+      "kokoro-js",
+      "@huggingface/transformers",
       "@tensorflow/*",
       "@prisma/client",
       "@mikro-orm/*",
