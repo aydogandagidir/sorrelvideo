@@ -27,6 +27,7 @@ import {
 import { serveTemplateAsset } from "../lib/templateAssets";
 import {
   resolutionForModule,
+  variablesForModule,
   REGISTRY_TEMPLATES,
 } from "../services/registryTemplates";
 
@@ -115,13 +116,19 @@ function userTemplatesFilter(userId: string) {
 }
 
 /**
- * Read-time enrichment: `supportsTransitions` is a property of the SHIPPED
- * composition (>=2 .scene elements + data-scene-boundary), derived from the
- * code-side capability set — never persisted, so already-seeded environments
- * can't go stale. Applied before the zod parse so the field survives it.
+ * Read-time enrichment: `supportsTransitions` + the typed `variables` are
+ * properties of the SHIPPED composition / the manifest, derived code-side and
+ * never persisted, so already-seeded environments can't go stale. Applied
+ * before the zod parse so the fields survive it. `variables` is omitted (not
+ * `undefined`-set) for templates that declare none, keeping the payload lean.
  */
 function withTransitionCapability<T extends { module: string }>(row: T): T {
-  return { ...row, supportsTransitions: supportsTransitions(row.module) };
+  const variables = variablesForModule(row.module);
+  return {
+    ...row,
+    supportsTransitions: supportsTransitions(row.module),
+    ...(variables ? { variables } : {}),
+  };
 }
 
 router.get("/templates", async (req, res): Promise<void> => {

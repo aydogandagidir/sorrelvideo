@@ -194,6 +194,23 @@ export const ListTemplatesResponseItem = zod.object({
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
   "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
+  "variables": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['string', 'number', 'color', 'boolean', 'enum']),
+  "label": zod.string(),
+  "description": zod.string().optional(),
+  "default": zod.union([zod.string(),zod.number(),zod.boolean()]),
+  "placeholder": zod.string().optional(),
+  "maxLength": zod.number().optional(),
+  "min": zod.number().optional(),
+  "max": zod.number().optional(),
+  "step": zod.number().optional(),
+  "unit": zod.string().optional(),
+  "options": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})).optional()
+}).describe('A typed editable parameter declared by a composition. Mirrors @hyperframes\/core\'s CompositionVariable union as one object plus a `type` discriminator; the option\/min\/max fields apply per type.')).optional().describe('Typed editable parameters the composition declares via the engine\'s native data-composition-variables. Present only for parametric templates (e.g. data-chart); the Studio form renders one control per entry\'s type. Derived from the manifest at read time (not persisted).'),
   "createdAt": zod.string().optional()
 })
 export const ListTemplatesResponse = zod.array(ListTemplatesResponseItem)
@@ -232,6 +249,23 @@ export const GetTemplateResponse = zod.object({
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
   "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
+  "variables": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['string', 'number', 'color', 'boolean', 'enum']),
+  "label": zod.string(),
+  "description": zod.string().optional(),
+  "default": zod.union([zod.string(),zod.number(),zod.boolean()]),
+  "placeholder": zod.string().optional(),
+  "maxLength": zod.number().optional(),
+  "min": zod.number().optional(),
+  "max": zod.number().optional(),
+  "step": zod.number().optional(),
+  "unit": zod.string().optional(),
+  "options": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})).optional()
+}).describe('A typed editable parameter declared by a composition. Mirrors @hyperframes\/core\'s CompositionVariable union as one object plus a `type` discriminator; the option\/min\/max fields apply per type.')).optional().describe('Typed editable parameters the composition declares via the engine\'s native data-composition-variables. Present only for parametric templates (e.g. data-chart); the Studio form renders one control per entry\'s type. Derived from the manifest at read time (not persisted).'),
   "createdAt": zod.string().optional()
 })
 

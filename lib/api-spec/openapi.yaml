@@ -1613,8 +1613,62 @@ components:
             data-scene-boundary). Derived server-side from the shipped
             composition (services/transitionCapableTemplates.ts) — the editor
             disables the transitions picker when false.
+        variables:
+          type: array
+          description: >-
+            Typed editable parameters the composition declares via the engine's
+            native data-composition-variables. Present only for parametric
+            templates (e.g. data-chart); the Studio form renders one control per
+            entry's type. Derived from the manifest at read time (not persisted).
+          items:
+            $ref: "#/components/schemas/CompositionVariable"
         createdAt:
           type: string
+
+    CompositionVariable:
+      type: object
+      description: >-
+        A typed editable parameter declared by a composition. Mirrors
+        @hyperframes/core's CompositionVariable union as one object plus a `type`
+        discriminator; the option/min/max fields apply per type.
+      required: [id, type, label, default]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [string, number, color, boolean, enum]
+        label:
+          type: string
+        description:
+          type: string
+        default:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+        placeholder:
+          type: string
+        maxLength:
+          type: integer
+        min:
+          type: number
+        max:
+          type: number
+        step:
+          type: number
+        unit:
+          type: string
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label]
+            properties:
+              value:
+                type: string
+              label:
+                type: string
 
     TemplateInput:
       type: object

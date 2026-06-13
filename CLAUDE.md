@@ -157,10 +157,21 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
   on `<html>` declares typed scalars (`CompositionVariable`: string|number|color|
   boolean|enum), read at runtime via `getVariables()` with defaults equal to the
   authored literals (so a no-vars render is byte-identical — sha256-proven). The
-  manifest carries a `variables?` field per template for a future Studio form. The
+  manifest carries a `variables?` field per template, **surfaced on the
+  `/templates` API** (`Template.variables`, read-time enrichment via
+  `variablesForModule` — never persisted) and rendered as a typed form
+  (`components/template-params-form.tsx`) on a draft project's detail dialog: one
+  control per `type` (string→Input/Textarea, number→number Input, color→color
+  picker, boolean→Switch, enum→Select), saved into `compositionVars` keyed by
+  variable id. The write path **type-validates** every supplied var against its
+  declaration (`lib/typedVars.ts` `findInvalidTypedVar`, wired into POST + PATCH
+  `/projects` → 400) — closing the gap where a typed `color` (not in
+  `compositionVars`' fixed COLOR_KEYS) would reach the render unchecked. The
   render path forwards `compositionVars` to `config.variables`, which the engine
   merges over the HTML-declared defaults (the typed schema has no array type, so
-  list-valued series stay code-side defaults overridable via `compositionVars`).
+  list-valued series stay code-side defaults overridable via `compositionVars`);
+  string-typed numeric values coerce correctly in the composition's arithmetic
+  (render-proven), so no composition-side `Number()` wrapping is needed.
 - **Direct Express video streaming**: `GET /api/projects/:id/video` streams
   from `artifacts/api-server/renders/<projectId>/output.<ext>` with HTTP range
   support (mp4/webm/mov/gif — `image/gif` for gif). A **png-sequence** render's

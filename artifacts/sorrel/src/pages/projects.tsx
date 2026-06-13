@@ -8,11 +8,14 @@ import {
   useDeleteProject,
   useStartProjectRender,
   useUpdateProjectRenderSettings,
+  useUpdateProject,
+  useListTemplates,
   useGetBrandKit,
   getListProjectsQueryKey,
   type Project,
   type BrandKit,
 } from "@workspace/api-client-react";
+import { TemplateParamsForm } from "@/components/template-params-form";
 import {
   ASPECT_PRESETS,
   aspectRatioFor,
@@ -306,11 +309,28 @@ function ProjectDetail({
   const deleteProject = useDeleteProject();
   const renderMutation = useStartProjectRender();
   const updateSettings = useUpdateProjectRenderSettings();
+  const updateProject = useUpdateProject();
   const { toast } = useToast();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<
     "render_limit" | "premium_template"
   >("render_limit");
+
+  // Typed template parameters (the engine's native composition variables). The
+  // templates list carries each template's `variables` (read-time enrichment);
+  // we match by module. A draft project with a parametric template gets an
+  // editable form; values persist into compositionVars keyed by variable id.
+  const { data: templates } = useListTemplates();
+  const templateVariables =
+    templates?.find((t) => t.module === project.module)?.variables ?? [];
+  const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
+    const vars = (project.compositionVars ?? {}) as Record<string, string>;
+    const out: Record<string, string> = {};
+    for (const variable of templateVariables) {
+      if (vars[variable.id] !== undefined) out[variable.id] = vars[variable.id];
+    }
+    return out;
+  });
 
   const isReady = project.status === "ready";
   const isRendering = project.status === "rendering";
@@ -344,6 +364,33 @@ function ProjectDetail({
 
   const invalidate = () =>
     void queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+
+  const handleSaveParams = () =>
+    updateProject.mutate(
+      {
+        id: project.id,
+        data: {
+          compositionVars: {
+            ...((project.compositionVars ?? {}) as Record<string, string>),
+            ...paramValues,
+          },
+        },
+      },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: "Parameters saved" });
+        },
+        onError: (err) => {
+          const e = err as { data?: { error?: string } };
+          toast({
+            title: "Couldn't save parameters",
+            description: e.data?.error,
+            variant: "destructive",
+          });
+        },
+      },
+    );
 
   const handleRender = () =>
     renderMutation.mutate(
@@ -615,6 +662,29 @@ function ProjectDetail({
 
             {project.status === "failed" && project.renderError && (
               <p className="text-xs text-destructive">{project.renderError}</p>
+            )}
+
+            {project.status === "draft" && templateVariables.length > 0 && (
+              <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs font-medium">Template parameters</p>
+                <TemplateParamsForm
+                  variables={templateVariables}
+                  values={paramValues}
+                  onChange={setParamValues}
+                  disabled={updateProject.isPending}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSaveParams}
+                  disabled={updateProject.isPending}
+                >
+                  {updateProject.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Save parameters
+                </Button>
+              </div>
             )}
 
             <div className="mt-auto flex flex-wrap gap-2 pt-2">

@@ -74,6 +74,19 @@ export function assetsForModule(module: string): string[] {
 }
 
 /**
+ * The native typed-variable declarations for a module (registry slug), or
+ * undefined for a module that declares none / a non-registry module. Surfaced
+ * on the /templates API (read-time enrichment — never persisted) so the Studio
+ * parameters form can render one control per variable.
+ */
+export function variablesForModule(
+  module: string,
+): CompositionVariable[] | undefined {
+  const t = REGISTRY_TEMPLATES.find((x) => x.slug === module);
+  return t?.variables;
+}
+
+/**
  * slug → composition filename, merged into renderService's COMPOSITION_MAP so a
  * project whose `module` is a registry slug resolves to the vendored
  * `<slug>.html` (which sits in the compositions dir alongside the hand-authored
