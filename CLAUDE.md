@@ -152,7 +152,13 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
   merges over the HTML-declared defaults (the typed schema has no array type, so
   list-valued series stay code-side defaults overridable via `compositionVars`).
 - **Direct Express video streaming**: `GET /api/projects/:id/video` streams
-  from `artifacts/api-server/renders/<projectId>/output.mp4`. There is no CDN yet.
+  from `artifacts/api-server/renders/<projectId>/output.<ext>` with HTTP range
+  support (mp4/webm/mov/gif — `image/gif` for gif). A **png-sequence** render's
+  artifact is a DIRECTORY of frames (not a streamable file), so the same route
+  streams it back as a `application/zip` attachment built on the fly with
+  `archiver` (STORE level 0 — PNGs are already compressed; constant memory via
+  backpressure; no Content-Length → chunked, Range ignored; `archive.directory`
+  also picks up the engine's optional `audio.aac` sidecar). There is no CDN yet.
 - **OpenAPI-driven contracts**: edit `openapi.yaml`, run codegen, then implement
   in the backend route. The frontend hook is auto-generated.
 - **Billing source of truth**: Stripe subscriptions, mirrored locally into

@@ -622,8 +622,10 @@ function ProjectDetail({
                 <>
                   <Button asChild>
                     <a href={videoSrc} download={downloadName}>
-                      <Download className="mr-2 h-4 w-4" /> Download{" "}
-                      {downloadExt}
+                      <Download className="mr-2 h-4 w-4" />{" "}
+                      {settings.format === "png-sequence"
+                        ? "Download frames (.zip)"
+                        : `Download ${downloadExt}`}
                     </a>
                   </Button>
                   <Button variant="outline" onClick={handleShare}>
