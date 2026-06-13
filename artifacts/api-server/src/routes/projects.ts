@@ -677,6 +677,18 @@ router.get("/projects/:id/composition", async (req, res): Promise<void> => {
       res.status(400).json({ error: "Invalid vars: expected a JSON object" });
       return;
     }
+    // Injection gate on the `?vars=` overrides (the SAME gate POST/PATCH apply).
+    // This route re-merges + substitutes into the composition, and the template
+    // layer's escaping does NOT escape quotes — so a crafted override (e.g. a
+    // brand.logoUrl breaking out of `src="…"`) would be reflected XSS against a
+    // victim who opens a guessed project's preview link. Reject it up front.
+    const unsafePreviewVar = findUnsafeCompositionVar(
+      overrides as Record<string, string>,
+    );
+    if (unsafePreviewVar) {
+      res.status(400).json({ error: unsafePreviewVar.reason });
+      return;
+    }
     mergedVars = {
       ...(project.compositionVars ?? {}),
       ...(overrides as Record<string, string>),

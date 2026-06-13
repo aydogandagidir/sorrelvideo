@@ -8,7 +8,7 @@
  * DELETE — Cancel must not). We mock at the fetch boundary (real Responses, so the
  * generated hooks run through `customFetch`) and assert on the issued request.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Projects from "./projects";
@@ -17,6 +17,16 @@ import {
   renderWithProviders,
   type ApiFetchRoute,
 } from "@/test/test-utils";
+
+// The draft/failed detail preview mounts <HfPlayer>, whose wrapper dynamically
+// imports the @hyperframes/player web component — which jsdom can't register.
+// Stub it to a plain div exposing the computed src so tests stay hermetic and
+// can assert the preview points at the project's composition route.
+vi.mock("@/components/hf-player", () => ({
+  HfPlayer: (props: { src: string }) => (
+    <div data-testid="hf-player" data-src={props.src} />
+  ),
+}));
 
 let fetchMock: ReturnType<typeof installApiFetchMock> | undefined;
 
@@ -132,6 +142,12 @@ describe("Projects — card → detail controls", () => {
     expect(
       within(dialog).getByRole("button", { name: /delete project/i }),
     ).toBeEnabled();
+    // The draft stage shows the REAL composition preview pointed at this
+    // project's composition route (not the generic mock thumbnail).
+    const preview = within(dialog).getByTestId("hf-player");
+    expect(preview.getAttribute("data-src")).toBe(
+      "/api/projects/1/composition",
+    );
   });
 
   it("a ready card opens a detail with Download + Re-render", async () => {

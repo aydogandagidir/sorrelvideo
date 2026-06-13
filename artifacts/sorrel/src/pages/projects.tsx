@@ -16,6 +16,8 @@ import {
   type BrandKit,
 } from "@workspace/api-client-react";
 import { TemplateParamsForm } from "@/components/template-params-form";
+import { HfPlayer } from "@/components/hf-player";
+import { b64UrlVars } from "@/lib/preview-vars";
 import {
   ASPECT_PRESETS,
   aspectRatioFor,
@@ -492,6 +494,30 @@ function ProjectDetail({
                   playerSize,
                 )}
               />
+            ) : project.status === "draft" || project.status === "failed" ? (
+              // Real, scrubbable preview of THIS project's composition (the route
+              // re-merges brand + vars). Unsaved template-parameter edits (PR8)
+              // ride along as a `?vars=` override so the picture matches before
+              // the user spends a render. rendering → the placeholder below.
+              <div
+                style={{ aspectRatio: aspect }}
+                className={cn(
+                  "overflow-hidden rounded-[16px] border border-primary/15 shadow-[0_24px_70px_rgba(0,0,0,.6)]",
+                  playerSize,
+                )}
+              >
+                <HfPlayer
+                  src={`/api/projects/${project.id}/composition${
+                    Object.keys(paramValues).length > 0
+                      ? `?vars=${b64UrlVars(paramValues)}`
+                      : ""
+                  }`}
+                  aspect={ratioLabel}
+                  controls
+                  muted
+                  className="h-full w-full"
+                />
+              </div>
             ) : (
               <div
                 style={{ aspectRatio: aspect }}
