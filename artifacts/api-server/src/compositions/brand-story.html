@@ -1,0 +1,264 @@
+<!doctype html>
+<!--
+  Brand Story — Sorrel's first TRANSITION-CAPABLE template (M8).
+
+  Two full-canvas scenes (intro → outro) joined at ONE declared boundary
+  (data-scene-boundary, seconds). Who owns the boundary is a handshake with the
+  render pipeline via the substituted {{sorrel.transitionsActive}} var:
+
+    "0" (default — live preview route, no transitions configured)
+        → this document wires its own HARD CUT (wireHardCuts below).
+    "1" (render path, RenderSettings.transitions present)
+        → renderService injects @hyperframes/shader-transitions + a bootstrap
+          that calls HyperShader.init() with THIS document's root timeline and
+          the .scene[id] elements; the library then owns scene visibility and
+          composites the shader across the boundary. If any bootstrap
+          precondition fails at runtime it calls window.__sorrelWireHardCuts()
+          (exported below) so the boundary still cuts cleanly.
+
+  Engine contract: a paused GSAP timeline registered at
+  window.__timelines["brand-story"]; all times in seconds; duration from
+  data-duration. Scene content tweens are authored at absolute times on the
+  root timeline so they advance identically in both ownership modes.
+-->
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: {{layout.width}}px;
+        height: {{layout.height}}px;
+        overflow: hidden;
+        background: {{brand.secondaryColor}};
+        font-family: {{brand.fontFamily}}, "Inter", "Segoe UI", system-ui, sans-serif;
+        color: #fff;
+      }
+      :root {
+        /* Read by the injected HyperShader bootstrap (shader bg + glow). */
+        --sorrel-bg: {{brand.secondaryColor}};
+        --sorrel-accent: {{brand.primaryColor}};
+      }
+      [data-composition-id="brand-story"] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 8% 9%;
+        background-color: {{brand.secondaryColor}};
+        overflow: hidden;
+      }
+      .glow {
+        position: absolute;
+        width: 72vmin;
+        height: 72vmin;
+        border-radius: 50%;
+        filter: blur(48px);
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      #scene-intro .glow {
+        background: radial-gradient(circle, {{brand.primaryColor}}66, transparent 70%);
+        top: -18%;
+        right: -16%;
+      }
+      #scene-outro .glow {
+        background: radial-gradient(circle, {{brand.accentColor}}55, transparent 70%);
+        bottom: -20%;
+        left: -18%;
+      }
+      .badge {
+        width: 13vmin;
+        height: 13vmin;
+        border-radius: 26%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, {{brand.primaryColor}}, {{brand.accentColor}});
+        font-size: 6.5vmin;
+        font-weight: 800;
+        margin-bottom: 4.5vmin;
+        box-shadow: 0 24px 80px {{brand.primaryColor}}55;
+      }
+      .badge img {
+        width: 72%;
+        height: 72%;
+        object-fit: contain;
+      }
+      /* No uploaded logo → keep the initial; a real logo hides it. */
+      .badge img[src=""] {
+        display: none;
+      }
+      .badge img:not([src=""]) + .badge-initial {
+        display: none;
+      }
+      .company {
+        font-size: 2.6vmin;
+        font-weight: 600;
+        letter-spacing: 0.42em;
+        text-transform: uppercase;
+        opacity: 0.7;
+        margin-bottom: 3.2vmin;
+      }
+      .headline {
+        font-size: 7.4vmin;
+        font-weight: 800;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        max-width: 86%;
+      }
+      .body-text {
+        font-size: 3.4vmin;
+        line-height: 1.5;
+        opacity: 0.85;
+        max-width: 78%;
+        margin-bottom: 5vmin;
+      }
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 1.4vmin;
+        padding: 2.1vmin 4.6vmin;
+        border-radius: 999px;
+        background: {{brand.primaryColor}};
+        color: {{brand.secondaryColor}};
+        font-size: 3vmin;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+      }
+      .cta::after {
+        content: "→";
+        font-weight: 800;
+      }
+      .footer-brand {
+        position: absolute;
+        bottom: 6%;
+        left: 0;
+        right: 0;
+        font-size: 2.1vmin;
+        letter-spacing: 0.36em;
+        text-transform: uppercase;
+        opacity: 0.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      data-composition-id="brand-story"
+      data-width="{{layout.width}}"
+      data-height="{{layout.height}}"
+      data-duration="8"
+      data-scene-boundary="4"
+    >
+      <section class="scene" id="scene-intro">
+        <div class="glow"></div>
+        <div class="badge">
+          <img src="{{brand.logoUrl}}" alt="" />
+          <span class="badge-initial">{{brand.initial}}</span>
+        </div>
+        <div class="company">{{brand.companyName}}</div>
+        <h1 class="headline">{{user.headline}}</h1>
+      </section>
+
+      <section class="scene" id="scene-outro">
+        <div class="glow"></div>
+        <p class="body-text">{{user.bodyText}}</p>
+        <div class="cta">{{user.ctaText}}</div>
+        <div class="footer-brand">{{brand.companyName}}</div>
+      </section>
+    </div>
+
+    <script>
+      (function () {
+        var BOUNDARY = 4; // seconds — keep equal to data-scene-boundary above.
+        var TRANSITIONS_ACTIVE = "{{sorrel.transitionsActive}}" === "1";
+
+        var tl = gsap.timeline({ paused: true });
+
+        // ── Scene 1 content (0 → BOUNDARY), absolute times ──
+        tl.fromTo(
+          "#scene-intro .badge",
+          { autoAlpha: 0, scale: 0.6, y: 40 },
+          { autoAlpha: 1, scale: 1, y: 0, duration: 0.7, ease: "back.out(1.6)" },
+          0.2,
+        );
+        tl.fromTo(
+          "#scene-intro .company",
+          { autoAlpha: 0, y: 24 },
+          { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out" },
+          0.55,
+        );
+        tl.fromTo(
+          "#scene-intro .headline",
+          { autoAlpha: 0, y: 46 },
+          { autoAlpha: 1, y: 0, duration: 0.8, ease: "power3.out" },
+          0.85,
+        );
+        tl.to(
+          "#scene-intro .glow",
+          { x: -60, y: 40, duration: 3.4, ease: "sine.inOut" },
+          0.4,
+        );
+
+        // ── Scene 2 content (BOUNDARY → 8), absolute times ──
+        tl.fromTo(
+          "#scene-outro .body-text",
+          { autoAlpha: 0, y: 38 },
+          { autoAlpha: 1, y: 0, duration: 0.7, ease: "power3.out" },
+          BOUNDARY + 0.25,
+        );
+        tl.fromTo(
+          "#scene-outro .cta",
+          { autoAlpha: 0, scale: 0.8 },
+          { autoAlpha: 1, scale: 1, duration: 0.6, ease: "back.out(1.8)" },
+          BOUNDARY + 0.85,
+        );
+        tl.fromTo(
+          "#scene-outro .footer-brand",
+          { autoAlpha: 0 },
+          { autoAlpha: 1, duration: 0.5, ease: "power2.out" },
+          BOUNDARY + 1.3,
+        );
+        tl.to(
+          "#scene-outro .glow",
+          { x: 70, y: -50, duration: 3.2, ease: "sine.inOut" },
+          BOUNDARY + 0.3,
+        );
+        // Pin the timeline out to the full duration so time() math stays sane.
+        tl.set({}, {}, 8);
+
+        // ── Boundary ownership handshake ──
+        // Hard cut: scene 2 hidden until BOUNDARY, then an instant swap. Only
+        // wired when the shader bootstrap does NOT own the boundary (or when
+        // its runtime preconditions fail and it hands ownership back).
+        var hardCutsWired = false;
+        function wireHardCuts() {
+          if (hardCutsWired) return;
+          hardCutsWired = true;
+          gsap.set("#scene-outro", { autoAlpha: 0 });
+          tl.set("#scene-intro", { autoAlpha: 0 }, BOUNDARY);
+          tl.set("#scene-outro", { autoAlpha: 1 }, BOUNDARY);
+        }
+        window.__sorrelWireHardCuts = wireHardCuts;
+        if (!TRANSITIONS_ACTIVE) wireHardCuts();
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["brand-story"] = tl;
+      })();
+    </script>
+  </body>
+</html>

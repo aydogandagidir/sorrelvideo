@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { createRequire } from "module";
 import {
   createRenderJob,
   executeRenderJob,
@@ -15,6 +16,7 @@ import {
   type RenderCaptions,
   type RenderResolution,
   type RenderSettings,
+  type RenderTransition,
   type RenderVoiceover,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
@@ -95,6 +97,10 @@ const COMPOSITION_MAP: Record<string, string> = {
   "product-3d": "product-3d.html",
   "lottie-reveal": "lottie-reveal.html",
   "video-spotlight": "video-spotlight.html",
+  // First transition-capable template (M8): two .scene elements + a declared
+  // data-scene-boundary; RenderSettings.transitions composite a shader across
+  // the boundary via the injected @hyperframes/shader-transitions bootstrap.
+  "brand-story": "brand-story.html",
   // Vendored Hyperframes registry blocks (Apache-2.0): each platform template's
   // `module` is its slug, resolving to the same-named <slug>.html composition.
   ...REGISTRY_COMPOSITION_MAP,
@@ -128,6 +134,13 @@ const STUDIO_FALLBACKS = {
   // website-showcase project (created before duration was selectable) rendering at
   // its original 9s instead of leaving the placeholder unresolved.
   duration: "9",
+  // Scene-transition handshake (M8): transition-capable compositions branch on
+  // this to decide who owns the scene boundary — "0" (default: previews, no
+  // transitions configured) → the composition wires its own hard cut; "1"
+  // (render path, transitions active) → the injected HyperShader bootstrap
+  // owns the boundary. The default keeps the live-preview route and every
+  // transitionless render byte-identical in behavior.
+  "sorrel.transitionsActive": "0",
 } as const;
 
 /** Resolve the HTML composition filename for a given module slug. */
@@ -480,6 +493,112 @@ function buildCaptionOverlay(
   );
 }
 
+/**
+ * The `@hyperframes/shader-transitions` IIFE bundle (defines
+ * `window.HyperShader`), read from node_modules and INLINED into the per-render
+ * composition — the engine's file server only serves the render dir, and the
+ * bundle is a browser artifact we must never import server-side (it inlines
+ * html2canvas). `createRequire` resolution rides the package's `require`
+ * condition (`dist/index.cjs`), then swaps to the sibling global build.
+ * Memoized: the file is ~250 KB and immutable for the process lifetime.
+ */
+let shaderLibCache: string | null = null;
+function readShaderTransitionsLib(): string {
+  if (shaderLibCache !== null) return shaderLibCache;
+  const entry = createRequire(import.meta.url).resolve(
+    "@hyperframes/shader-transitions",
+  );
+  shaderLibCache = fs.readFileSync(
+    path.join(path.dirname(entry), "index.global.js"),
+    "utf-8",
+  );
+  return shaderLibCache;
+}
+
+/**
+ * Build the shader-transitions injection (M8): the inlined HyperShader library
+ * + a bootstrap that wires the user's `RenderSettings.transitions` onto the
+ * composition's scene structure. Returns "" (transitions silently inactive,
+ * composition keeps its own hard cut) unless ALL preconditions hold:
+ *
+ *  - ≥1 sanitized transition (content was validated by `sanitizeTransitions`);
+ *  - the HTML declares ≥2 `class="scene"` elements (the server-side mirror of
+ *    the bootstrap's runtime check — single-scene compositions like the
+ *    studio seed can't host a scene transition);
+ *  - the library file is readable.
+ *
+ * The bootstrap (browser-side, runs AFTER the composition's own script):
+ *  - grabs the ROOT `window.__timelines[id]` and PASSES it to `init()` — the
+ *    engine only seeks the root timeline, and init() without a timeline would
+ *    REGISTER ITS OWN under the composition id, clobbering the real one;
+ *  - collects non-root `.scene[id]` elements in DOM order as the scene list;
+ *  - snaps a SINGLE transition onto the composition's declared boundary
+ *    (`data-scene-boundary` on the root): start = boundary − duration/2, the
+ *    upstream convention. Multiple transitions keep their user times;
+ *  - maps Sorrel's `fade-dissolve` to the library's CSS-crossfade fallback by
+ *    OMITTING the `shader` field;
+ *  - reads `--sorrel-bg` / `--sorrel-accent` custom props for the shader
+ *    background/accent colors (brand-derived in transition-capable templates);
+ *  - on ANY failed precondition calls the composition's exported
+ *    `window.__sorrelWireHardCuts()` so the boundary still cuts cleanly.
+ */
+export function buildTransitionsInjection(
+  renderedHtml: string,
+  transitions: RenderTransition[],
+): string {
+  if (transitions.length === 0) return "";
+  const sceneCount = (renderedHtml.match(/class="[^"]*\bscene\b[^"]*"/g) ?? [])
+    .length;
+  if (sceneCount < 2) return "";
+
+  let lib: string;
+  try {
+    lib = readShaderTransitionsLib();
+  } catch (err) {
+    logger.warn(
+      { err },
+      "shader-transitions library unavailable — rendering hard cut instead",
+    );
+    return "";
+  }
+
+  // JSON payload of the sanitized transitions; `<` escaped so a value can
+  // never terminate the surrounding <script> (defense in depth — the
+  // sanitizer's shader/ease whitelists already exclude `<`).
+  const payload = JSON.stringify(
+    transitions.map((t) => ({
+      time: t.time,
+      shader: t.shader,
+      duration: t.duration,
+      ease: t.ease,
+    })),
+  ).replace(/</g, "\\u003c");
+
+  const bootstrap =
+    `(function(){try{` +
+    `var root=document.querySelector('[data-composition-id]');` +
+    `var id=root&&root.getAttribute('data-composition-id');` +
+    `var tl=id&&window.__timelines&&window.__timelines[id];` +
+    `var scenes=Array.prototype.slice.call(document.querySelectorAll('.scene[id]')).filter(function(el){return el!==root;}).map(function(el){return el.id;});` +
+    `if(!tl||typeof gsap==='undefined'||!window.HyperShader||scenes.length<2){if(window.__sorrelWireHardCuts)window.__sorrelWireHardCuts();return;}` +
+    `var specs=${payload};` +
+    `specs=specs.slice(0,Math.max(0,scenes.length-1));` +
+    `if(!specs.length){if(window.__sorrelWireHardCuts)window.__sorrelWireHardCuts();return;}` +
+    `var boundary=parseFloat(root.getAttribute('data-scene-boundary')||'');` +
+    `var transitions=specs.map(function(t){` +
+    `var start=(isFinite(boundary)&&specs.length===1)?Math.max(0,boundary-t.duration/2):t.time;` +
+    `var spec={time:start,duration:t.duration,ease:t.ease};` +
+    `if(t.shader!=='fade-dissolve')spec.shader=t.shader;` +
+    `return spec;});` +
+    `var styles=getComputedStyle(document.documentElement);` +
+    `var bg=(styles.getPropertyValue('--sorrel-bg')||'').trim()||'#0b0b0f';` +
+    `var accent=(styles.getPropertyValue('--sorrel-accent')||'').trim();` +
+    `window.HyperShader.init({bgColor:bg,accentColor:accent||undefined,scenes:scenes.slice(0,transitions.length+1),transitions:transitions,timeline:tl,compositionId:id});` +
+    `}catch(e){if(window.__sorrelWireHardCuts)window.__sorrelWireHardCuts();}})();`;
+
+  return `<script>${lib}</script>\n<script>${bootstrap}</script>`;
+}
+
 interface BrandKitSnapshot {
   companyName: string | null;
   primaryColor: string | null;
@@ -633,11 +752,27 @@ async function prepareCompositionFor(
     backgroundAudio?: RenderAudioTrack | null;
     captions?: RenderCaptions | null;
     voiceover?: RenderVoiceover | null;
+    transitions?: RenderTransition[] | null;
   } = {
     watermark: true,
   },
 ): Promise<{ dir: string; file: string }> {
-  let rendered = await buildCompositionHtml(project);
+  // Scene transitions flip the handshake var BEFORE the template merge so the
+  // composition skips its own hard-cut wiring (the injected bootstrap owns the
+  // boundary — and hands ownership back via __sorrelWireHardCuts if any of its
+  // preconditions fail at runtime).
+  const transitionsActive = (options.transitions?.length ?? 0) > 0;
+  let rendered = await buildCompositionHtml(
+    transitionsActive
+      ? {
+          ...project,
+          compositionVars: {
+            ...(project.compositionVars ?? {}),
+            "sorrel.transitionsActive": "1",
+          },
+        }
+      : project,
+  );
   if (options.watermark) rendered = injectWatermark(rendered);
 
   const dir = path.join(RENDERS_DIR, String(project.id));
@@ -693,6 +828,16 @@ async function prepareCompositionFor(
   if (options.captions?.words?.length) {
     const overlay = buildCaptionOverlay(options.captions.words);
     if (overlay) rendered = injectBeforeBodyEnd(rendered, overlay);
+  }
+
+  // Scene transitions (M8): the inlined HyperShader library + bootstrap, LAST
+  // so the composition's root timeline and every scene element already exist.
+  // buildTransitionsInjection returns "" for unsupported compositions (then
+  // the handshake var above made the composition fall back to its hard cut
+  // via __sorrelWireHardCuts — wired by the bootstrap's guard paths).
+  if (transitionsActive && options.transitions) {
+    const injection = buildTransitionsInjection(rendered, options.transitions);
+    if (injection) rendered = injectBeforeBodyEnd(rendered, injection);
   }
 
   const file = "composition.html";
@@ -757,6 +902,7 @@ export async function executeRender(
       backgroundAudio: settings.backgroundAudio,
       captions: settings.captions,
       voiceover: settings.voiceover,
+      transitions: settings.transitions,
     });
 
     const format = settings.format;

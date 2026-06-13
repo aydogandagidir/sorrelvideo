@@ -6,7 +6,7 @@
  * `onChange`. These tests pin that contract plus the watermark-switch inversion.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RenderSettingsForm } from "./render-settings-form";
 import { DEFAULT_RENDER_SETTINGS } from "@/lib/render-settings";
@@ -154,6 +154,47 @@ describe("RenderSettingsForm — watermark switch inversion", () => {
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ watermark: false }),
+    );
+  });
+});
+
+describe("RenderSettingsForm — supportsTransitions flag", () => {
+  it("disables the transitions picker with a hint when the template can't host them", () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <RenderSettingsForm
+        value={DEFAULT_RENDER_SETTINGS}
+        onChange={onChange}
+        plan="pro"
+        supportsTransitions={false}
+      />,
+    );
+    expect(
+      screen.getByTestId("transitions-unsupported-hint"),
+    ).toBeInTheDocument();
+    const add = screen.getByRole("button", { name: /add transition/i });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the picker enabled when the flag is absent (callers without template context)", () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <RenderSettingsForm
+        value={DEFAULT_RENDER_SETTINGS}
+        onChange={onChange}
+        plan="pro"
+      />,
+    );
+    expect(
+      screen.queryByTestId("transitions-unsupported-hint"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /add transition/i }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transitions: [expect.objectContaining({ shader: expect.any(String) })],
+      }),
     );
   });
 });

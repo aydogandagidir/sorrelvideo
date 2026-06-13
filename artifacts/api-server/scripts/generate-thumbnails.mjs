@@ -226,6 +226,10 @@ async function main() {
     { slug: "video-spotlight", duration: 9 },
     // Renders its built-in DEMO narration (host.payload unsubstituted).
     { slug: "talking-host", duration: 9 },
+    // Transition-capable (M8): renders WITHOUT injected transitions here
+    // (sorrel.transitionsActive defaults to "0" → its own hard cut), so the
+    // poster is one of its two static scenes — exactly what the gallery wants.
+    { slug: "brand-story", duration: 8 },
   ];
 
   // Optional CLI filter: `node scripts/generate-thumbnails.mjs <slug> [<slug>…]`

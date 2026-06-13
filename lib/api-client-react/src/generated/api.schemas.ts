@@ -116,6 +116,8 @@ export interface Template {
   duration: number;
   isPremium: boolean;
   tags?: string[];
+  /** True when the template's composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services/transitionCapableTemplates.ts) — the editor disables the transitions picker when false. */
+  supportsTransitions?: boolean;
   createdAt?: string;
 }
 

@@ -457,6 +457,13 @@ export default function StudioPage() {
                     onChange={setRenderSettings}
                     plan={plan}
                     disabled={isSubmitting}
+                    // Studio creates `studio` / `video-spotlight` projects —
+                    // both single-scene compositions, so scene transitions
+                    // can't apply (the picker used to be configurable-but-
+                    // inert here; now it's honestly disabled). Transition-
+                    // capable templates (brand-story) get their settings UI
+                    // on the project page, with the real per-template flag.
+                    supportsTransitions={false}
                     onUpgrade={() => {
                       setUpgradeReason("render_quality");
                       setShowUpgrade(true);

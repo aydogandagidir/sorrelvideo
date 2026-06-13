@@ -45,10 +45,53 @@ describe("resolveSettings", () => {
     expect(resolveSettings(malformed)).toEqual(DEFAULT_RENDER_SETTINGS);
   });
 
-  it("keeps transitions only when an array", () => {
+  it("keeps well-formed transitions verbatim", () => {
     expect(resolveSettings({}).transitions).toBeUndefined();
     const t = [{ time: 1, shader: "whip-pan", duration: 0.5, ease: "power2.inOut" }];
     expect(resolveSettings({ transitions: t }).transitions).toEqual(t);
+  });
+
+  it("sanitizes transitions content now that the render path injects it (M8)", () => {
+    // Unknown shaders are DROPPED, never guessed.
+    expect(
+      resolveSettings({
+        transitions: [
+          { time: 1, shader: "evil-shader", duration: 0.5, ease: "linear" },
+        ],
+      }).transitions,
+    ).toBeUndefined();
+
+    // fade-dissolve (Sorrel's CSS-crossfade entry) is part of the vocabulary.
+    expect(
+      resolveSettings({
+        transitions: [
+          { time: 2, shader: "fade-dissolve", duration: 0.5, ease: "linear" },
+        ],
+      }).transitions,
+    ).toEqual([{ time: 2, shader: "fade-dissolve", duration: 0.5, ease: "linear" }]);
+
+    // time/duration clamp; junk ease falls back; entries sort by time.
+    const resolved = resolveSettings({
+      transitions: [
+        { time: 9999, shader: "glitch", duration: 99, ease: "alert(1)<" },
+        { time: -5, shader: "whip-pan", duration: 0.01, ease: "back.out(1.7)" },
+        "junk" as unknown as { time: number },
+        { time: 3, shader: 42 as unknown as string, duration: 1, ease: "linear" },
+      ] as never,
+    }).transitions;
+    expect(resolved).toEqual([
+      { time: 0, shader: "whip-pan", duration: 0.3, ease: "back.out(1.7)" },
+      { time: 600, shader: "glitch", duration: 10, ease: "power2.inOut" },
+    ]);
+
+    // Capped at 20 entries.
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      time: i,
+      shader: "glitch",
+      duration: 0.5,
+      ease: "linear",
+    }));
+    expect(resolveSettings({ transitions: many }).transitions).toHaveLength(20);
   });
 
   it("keeps a well-formed backgroundAudio (clamps volume); drops malformed", () => {

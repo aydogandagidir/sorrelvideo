@@ -70,6 +70,17 @@ export const HAND_AUTHORED_TEMPLATES: SeedTemplate[] = [
     isPremium: false,
     tags: ["ai", "voice", "avatar", "captions", "portrait"],
   },
+  {
+    module: "brand-story",
+    name: "Brand Story",
+    description:
+      "A two-scene brand intro → CTA outro joined by a real shader transition — pick the effect in render settings. Portrait 9:16.",
+    category: "Branding",
+    thumbnailUrl: "/api/templates/thumbnails/brand-story.png",
+    duration: 8,
+    isPremium: false,
+    tags: ["brand", "transitions", "intro", "cta", "portrait"],
+  },
 ];
 
 /** The vendored registry manifest, projected onto the seed shape. */
