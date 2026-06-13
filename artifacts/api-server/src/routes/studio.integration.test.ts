@@ -181,3 +181,106 @@ describe.runIf(INTEGRATION_AVAILABLE)(
     });
   },
 );
+
+/**
+ * Studio 0.6.91 surface: fonts, block catalog, render-file download, and the
+ * deliberate 501 stubs. The stubs must gate auth+ownership BEFORE the 501 so
+ * they leak no project existence; the catalog must serve the vendored manifest
+ * (never the live upstream registry).
+ */
+describe.runIf(INTEGRATION_AVAILABLE)(
+  "studio 0.6.91 surface (fonts / catalog / stubs)",
+  () => {
+    async function makeOwnedProject(): Promise<{ sid: string; id: number }> {
+      const userId = await createFreeUser();
+      const sid = await createSession({ userId });
+      const [project] = await db
+        .insert(projectsTable)
+        .values({ userId, name: "Stub target", module: "studio" })
+        .returning();
+      return { sid, id: project.id };
+    }
+
+    it("GET /fonts returns the installed font families", async () => {
+      const { sid } = await makeOwnedProject();
+      const res = await request(app)
+        .get("/api/studio/fonts")
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.fonts)).toBe(true);
+      for (const f of res.body.fonts) expect(typeof f).toBe("string");
+    });
+
+    it("GET /fonts/google returns a non-empty family list (fallback-backed)", async () => {
+      const { sid } = await makeOwnedProject();
+      const res = await request(app)
+        .get("/api/studio/fonts/google")
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(200);
+      // Offline/unreachable metadata degrades to the static fallback list, so
+      // a non-empty array is guaranteed either way.
+      expect(res.body.fonts.length).toBeGreaterThan(0);
+    });
+
+    it("GET /registry/blocks serves the vendored manifest as RegistryItem[]", async () => {
+      const { sid } = await makeOwnedProject();
+      const res = await request(app)
+        .get("/api/studio/registry/blocks")
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThan(0);
+      const chart = res.body.find(
+        (b: { name: string }) => b.name === "data-chart",
+      );
+      expect(chart).toBeDefined();
+      expect(chart.type).toBe("hyperframes:block");
+      expect(chart.title.length).toBeGreaterThan(0);
+      expect(Array.isArray(chart.files)).toBe(true);
+      expect(chart.preview.poster).toContain("/api/templates/thumbnails/");
+      expect(chart.dimensions.width).toBeGreaterThan(0);
+    });
+
+    it("file-mutations stub: 501 for the owner, 403 for a non-owner", async () => {
+      const { sid, id } = await makeOwnedProject();
+      const owner = await request(app)
+        .post(`/api/studio/projects/${id}/file-mutations/patch-element/index.html`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(owner.status).toBe(501);
+      expect(owner.body.error).toContain("Not supported");
+
+      const otherId = await createFreeUser();
+      const otherSid = await createSession({ userId: otherId });
+      const stranger = await request(app)
+        .post(`/api/studio/projects/${id}/file-mutations/patch-element/index.html`)
+        .set("Authorization", `Bearer ${otherSid}`);
+      expect(stranger.status).toBe(403);
+    });
+
+    it("gsap-mutations / waveform / registry-install stubs return 501 for the owner", async () => {
+      const { sid, id } = await makeOwnedProject();
+      const gsap = await request(app)
+        .post(`/api/studio/projects/${id}/gsap-mutations/index.html`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(gsap.status).toBe(501);
+
+      const waveform = await request(app)
+        .get(`/api/studio/projects/${id}/waveform/assets/audio.mp3`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(waveform.status).toBe(501);
+
+      const install = await request(app)
+        .post(`/api/studio/projects/${id}/registry/install`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(install.status).toBe(501);
+    });
+
+    it("renders/file 404s for a filename no ready job advertises", async () => {
+      const { sid, id } = await makeOwnedProject();
+      const res = await request(app)
+        .get(`/api/studio/projects/${id}/renders/file/output.mp4`)
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(404);
+    });
+  },
+);
