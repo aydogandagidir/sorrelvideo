@@ -97,9 +97,10 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `lib/ai`                   | Provider-agnostic LLM adapter (Anthropic / OpenAI) for AI suggest      |
 | `artifacts/api-server`     | Express server, routes, services, render pipeline, Stripe webhooks     |
 | `artifacts/sorrel`         | Main React frontend (the Sorrel app)                                   |
+| `artifacts/studio-editor`  | Repointed `@hyperframes/studio` build (vite repoints `/api/*` → `/api/studio/*` + rebrands), served same-origin under `/editor` (M9). See "Embedded studio editor" / `routes/studio.ts` |
 | `artifacts/mockup-sandbox` | Hyperframes development sandbox                                        |
 | `scripts`                  | Standalone helpers (e.g. `seed-products`)                              |
-| `infra`                    | `@workspace/infra` — AWS CDK scaffold for the Lambda render backend (M11, deployed out-of-band; not yet in the workspace install — see Future work) |
+| `infra`                    | `@workspace/infra` — AWS CDK scaffold for the Lambda render backend (M11, deployed out-of-band; CDK pin aligned to 0.6.91; not in the workspace install on Windows — see Future work #9) |
 
 ## Architecture decisions
 
@@ -121,8 +122,10 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 - **Template library (registry-vendored, Apache-2.0)**: the hand-authored
   compositions are joined by templates vendored from the open-source
   [Hyperframes registry](https://github.com/heygen-com/hyperframes/tree/main/registry)
-  (Apache-2.0). `scripts/import-registry-templates.mjs` fetches curated blocks →
-  writes `<slug>.html` (attribution header) + the
+  (Apache-2.0). `artifacts/api-server/scripts/import-registry-templates.mjs` (the
+  registry scripts all live there, NOT repo-root `scripts/`; `REF` is pinned to
+  an audited commit for reproducibility) fetches curated blocks → writes
+  `<slug>.html` (attribution header) + the
   `compositions/registry-templates.generated.json` manifest + `REGISTRY-NOTICE.md`.
   **Multi-file blocks are supported**: a block whose extra files are all static
   `hyperframes:asset`s (images/audio, allow-listed extensions) is vendored — the
@@ -627,7 +630,11 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   + `ALPHA_FORMATS` sets in `renderSettingsService`, replacing the old inline
   `format !== "mp4"` checks). Everything else (high quality, 60fps, any `-4k`
   resolution, webm/mov/png-sequence export, transparent background, watermark removal,
-  >1 transition) is Pro. `assertRenderSettingsAllowed` enforces this, reusing the
+  >1 transition, **background audio**, **captions** — incl. the caption `style`
+  preset) is Pro. **`voiceover` is deliberately NOT gated** (the talking-host flow
+  that sets it already charges an AI unit at creation + the render quota; gating it
+  here would 403 the auto-render AFTER the spend and strand a paid draft).
+  `assertRenderSettingsAllowed` enforces this, reusing the
   existing `getUserPlan` + `403 { reason: "upgrade_required" }` pattern (byte-identical
   to the premium-template / quota rejections, so the same `UpgradeModal` fires). The
   gate runs at PATCH time AND again at render time (defense in depth — a user who
@@ -715,6 +722,19 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   `false` — its `studio`/`video-spotlight` modules are single-scene). Verified by
   the RENDER_SMOKE-gated `transitionsRenderSmoke.test.ts` (real Chrome+FFmpeg
   render + boundary frame extraction). Free keeps ≤1 transition (unchanged gate).
+- **Caption style presets (Pro)**: `RenderCaptions.style?` ∈
+  `classic|pill-karaoke|neon-accent|kinetic-slam` (Whisper word-timing →
+  `RenderCaptions.words`). The overlay builder lives in its own pure module
+  `lib/captionStyles.ts` (`buildCaptionOverlay(words, style?)`, testable apart from
+  the ~1k-line renderService): `classic` is the byte-identical legacy overlay
+  (pinned by a regression test) and the three presets are ported from upstream
+  caption components — each renders under `[data-sorrel-captions]`, tweens on the
+  ROOT `window.__timelines` timeline, emits the words via `<`-escaped
+  `JSON.stringify` (user script is untrusted — no raw interpolation), and sizes in
+  viewport units so portrait/landscape/square stay in sync. `sanitizeCaptions`
+  keeps only the 3 non-`classic` values (`classic`/invalid/absent → the key is
+  dropped, so legacy projects stay byte-identical); the caption Pro-gate is
+  unchanged (the `style` preset rides the existing captions gate).
 - **Cancel now genuinely aborts** an in-flight render (it was documented-but-false):
   `executeRender` creates an `AbortController`, passes `ac.signal` to `executeRenderJob`,
   and the progress callback polls `isCancelRequested(renderJobId)` → `ac.abort()`. The
