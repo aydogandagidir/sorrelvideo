@@ -238,8 +238,19 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 **DB schema change**
 
 1. Edit a file under `lib/db/src/schema/`
-2. `pnpm --filter @workspace/db run push` (dev only — never auto-run on prod)
-3. Restart the API server
+2. Dev loop: `pnpm --filter @workspace/db run push` (dev only — never auto-run on
+   prod). Tests apply the schema via `push-force` (testcontainers, throwaway).
+3. Record it in versioned history: `pnpm --filter @workspace/db run generate` —
+   writes a reviewed `lib/db/drizzle/<n>_*.sql` + updates `meta/`. Commit the
+   WHOLE `drizzle/` dir (the `.sql` AND `meta/_journal.json` + `*_snapshot.json`).
+4. Restart the API server (the boot `apply*Migration()` idempotent self-heals
+   still run, unchanged — they're the belt-and-suspenders layer, complementary
+   to the migration history, not replaced by it).
+5. Apply to prod MANUALLY (never on boot/CI — same caution as `db push`):
+   `railway run --service api pnpm --filter @workspace/db run migrate`. The FIRST
+   migrate on an existing DB needs one-time baseline-stamping (prod's schema
+   already exists, so the `0000` baseline must be marked applied, NOT run, or its
+   bare `CREATE TABLE`s throw `already exists`) — see DEPLOYMENT.md §9.
 
 **API contract change**
 
