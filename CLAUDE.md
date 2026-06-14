@@ -1003,11 +1003,17 @@ Tracked here so it does not get rediscovered each time:
    endpoints (`api-server/src/test/e2e.integration.test.ts`); plus a hermetic
    Playwright browser smoke (`artifacts/sorrel/e2e`, `/api` mocked) for the shipped
    SPA booting + the signup UX in real Chromium (`pnpm --filter @workspace/sorrel
-   run e2e`). **Still pending**: a FULL-STACK browser smoke that renders an MP4
-   (signup → Studio → render → video served) — needs the backend + Postgres + the
-   render toolchain (chrome-headless-shell + ffmpeg) orchestrated, best in CI
-   (Linux Docker; local Windows Docker Desktop's named pipe isn't detected by
-   testcontainers outside the vitest runner).
+   run e2e`); plus a FULL-STACK render smoke
+   (`api-server/src/test/e2eRenderSmoke.integration.test.ts`): signup → create →
+   POST /render → the REAL inline pipeline (Chrome BeginFrame + FFmpeg) →
+   poll-to-ready → the video route serves an ffprobe-valid MP4 (incl. a Range
+   request, exercising `lib/httpRange`). RENDER_SMOKE=1-gated (a real render is
+   1–3 min + needs the toolchain); it self-resolves chrome-headless-shell from the
+   puppeteer cache + materializes `core/dist`, so `RENDER_SMOKE=1 pnpm exec vitest
+   run artifacts/api-server/src/test/e2eRenderSmoke.integration.test.ts` is
+   self-contained where deps + Docker + ffmpeg are present (validated locally:
+   ~92s render → served MP4). **Still pending**: wiring it into CI (install the
+   render toolchain on the Linux runner + run the gated job) so it gates `main`.
 4. **Module completion**: Bulk, Analytics, Collab — each needs a spec
    before implementation. Studio MVP (Tur 6) and AI MVP (Tur 7) landed.
 5. **AI v2**: streaming responses, per-field regen, prompt history,
