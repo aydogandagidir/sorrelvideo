@@ -76,7 +76,7 @@ export const FORMAT_OPTIONS: ReadonlyArray<Option<RenderFormat>> = [
 /**
  * The six resolution presets. Each encodes BOTH aspect ratio and tier; pixel
  * dimensions mirror the engine's CANVAS_DIMENSIONS (verified @hyperframes/core
- * 0.6.6 and the server's `resolveDimensions`).
+ * 0.6.91 and the server's `resolveDimensions`).
  */
 export const RESOLUTION_OPTIONS: ReadonlyArray<Option<RenderResolution>> = [
   {

@@ -30,12 +30,25 @@ tags:
     description: Object storage upload and serving endpoints.
   - name: ai
     description: LLM-backed content suggestion.
+  - name: avatar
+    description: Script-to-talking-host video and live avatar sessions.
+  - name: compositions
+    description: Live composition preview and linting.
+
+# Default security: every operation requires a session (cookie `sid` or an
+# `Authorization: Bearer <sid>` token) unless it overrides this with
+# `security: []` — the genuinely-public auth / health / pricing / public-object
+# endpoints do so below.
+security:
+  - cookieAuth: []
+  - bearerAuth: []
 
 paths:
   /auth/user:
     get:
       tags: [Auth]
       operationId: getCurrentAuthUser
+      security: []
       summary: Get the currently authenticated user
       parameters:
         - $ref: "#/components/parameters/AuthorizationSessionHeader"
@@ -51,6 +64,7 @@ paths:
     post:
       tags: [Auth]
       operationId: signupWithPassword
+      security: []
       summary: Create a new account with email and password
       requestBody:
         required: true
@@ -81,6 +95,7 @@ paths:
     post:
       tags: [Auth]
       operationId: loginWithPassword
+      security: []
       summary: Authenticate with email and password
       requestBody:
         required: true
@@ -111,6 +126,7 @@ paths:
     post:
       tags: [Auth]
       operationId: logoutSession
+      security: []
       summary: Clear the current session
       parameters:
         - $ref: "#/components/parameters/AuthorizationSessionHeader"
@@ -126,6 +142,7 @@ paths:
     post:
       tags: [Auth]
       operationId: requestPasswordReset
+      security: []
       summary: Request a password reset email
       requestBody:
         required: true
@@ -144,6 +161,7 @@ paths:
     post:
       tags: [Auth]
       operationId: resetPassword
+      security: []
       summary: Consume a password-reset token and set a new password
       requestBody:
         required: true
@@ -168,6 +186,7 @@ paths:
     get:
       tags: [Auth]
       operationId: consumeEmailVerification
+      security: []
       summary: Verify an email address via a token from the verification email
       parameters:
         - name: token
@@ -182,6 +201,7 @@ paths:
     post:
       tags: [Auth]
       operationId: resendEmailVerification
+      security: []
       summary: Resend the email verification link
       requestBody:
         required: true
@@ -205,6 +225,7 @@ paths:
     get:
       tags: [Auth]
       operationId: beginBrowserLogin
+      security: []
       summary: Redirect helper that sends the browser to the frontend login page
       parameters:
         - name: returnTo
@@ -219,6 +240,7 @@ paths:
     get:
       tags: [Auth]
       operationId: logoutBrowserSession
+      security: []
       summary: Clear the session and redirect to the home page
       parameters:
         - $ref: "#/components/parameters/AuthorizationSessionHeader"
@@ -229,6 +251,7 @@ paths:
   /healthz:
     get:
       operationId: healthCheck
+      security: []
       tags: [health]
       summary: Health check
       description: Returns server health status
@@ -816,6 +839,7 @@ paths:
   /modules:
     get:
       operationId: listModules
+      security: []
       tags: [modules]
       summary: List available platform modules
       responses:
@@ -1260,6 +1284,7 @@ paths:
     get:
       tags: [Storage]
       operationId: getPublicObject
+      security: []
       summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
       parameters:
         - name: filePath
@@ -1451,6 +1476,18 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Session cookie issued by login/signup (7-day TTL).
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        Opaque session token sent as `Authorization: Bearer <sid>` — the
+        cookie's equivalent for non-browser clients.
   parameters:
     AuthorizationSessionHeader:
       name: Authorization

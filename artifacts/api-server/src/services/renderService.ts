@@ -343,7 +343,7 @@ function audioExtForContentType(contentType: string | undefined): string {
  * Resolve a project's background-audio track into an `<audio>` tag for the
  * engine to mux. The user-uploaded object is DOWNLOADED into the render dir as a
  * sibling file — the proven, ffmpeg-readable form (a `data:` URI is NOT muxed,
- * verified against 0.6.6) — then referenced relatively so the engine's serve
+ * verified against 0.6.91) — then referenced relatively so the engine's serve
  * stage hosts it for the audio mix. Ownership is re-checked here (defense in
  * depth); ANY failure (missing/!owned object, GCS unconfigured, download error)
  * logs and returns null so the render proceeds SILENTLY instead of failing.
@@ -462,7 +462,7 @@ export async function resolveVoiceoverTag(
  * Download a project's spotlight clip (the "/objects/..." path pinned in
  * `compositionVars["capture.videoObject"]`) into the render dir as the fixed
  * sibling `spotlight-video.mp4` the video-spotlight template references (the
- * engine composites it — verified on 0.6.6). Ownership is re-checked; ANY
+ * engine composites it — verified on 0.6.91). Ownership is re-checked; ANY
  * failure logs and returns so the composition still renders its branded frame
  * WITHOUT the clip rather than failing the render.
  */

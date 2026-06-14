@@ -12,7 +12,7 @@
  * `RenderConfig` (fps `{num,den}`, `CanvasResolution`, etc.).
  *
  * `resolution` names mirror the engine's `CANVAS_DIMENSIONS` keys (verified
- * against @hyperframes/core@0.6.6): the three aspects (landscape 1920×1080,
+ * against @hyperframes/core@0.6.91): the three aspects (landscape 1920×1080,
  * portrait 1080×1920, square 1080×1080) and their 4K variants. This single
  * field encodes BOTH aspect ratio and resolution tier.
  */

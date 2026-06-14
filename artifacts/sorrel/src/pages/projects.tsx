@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useSearch } from "wouter";
 import { cn } from "@/lib/utils";
 import { Layout } from "@/components/layout";
@@ -298,6 +298,23 @@ function ProjectCard({
   );
 }
 
+/**
+ * The project's already-saved values for a template's typed variables, keyed by
+ * variable id. Used to seed the params form so a reopened draft shows what was
+ * persisted (not the template defaults).
+ */
+function seedSavedParams(
+  compositionVars: unknown,
+  variables: readonly { id: string }[],
+): Record<string, string> {
+  const vars = (compositionVars ?? {}) as Record<string, string>;
+  const out: Record<string, string> = {};
+  for (const variable of variables) {
+    if (vars[variable.id] !== undefined) out[variable.id] = vars[variable.id];
+  }
+  return out;
+}
+
 function ProjectDetail({
   project,
   brand,
@@ -323,16 +340,27 @@ function ProjectDetail({
   // we match by module. A draft project with a parametric template gets an
   // editable form; values persist into compositionVars keyed by variable id.
   const { data: templates } = useListTemplates();
-  const templateVariables =
-    templates?.find((t) => t.module === project.module)?.variables ?? [];
-  const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
-    const vars = (project.compositionVars ?? {}) as Record<string, string>;
-    const out: Record<string, string> = {};
-    for (const variable of templateVariables) {
-      if (vars[variable.id] !== undefined) out[variable.id] = vars[variable.id];
-    }
-    return out;
-  });
+  const templateVariables = useMemo(
+    () => templates?.find((t) => t.module === project.module)?.variables ?? [],
+    [templates, project.module],
+  );
+  const [paramValues, setParamValues] = useState<Record<string, string>>(() =>
+    seedSavedParams(project.compositionVars, templateVariables),
+  );
+
+  // `useListTemplates` (which carries each template's typed `variables`) can
+  // resolve AFTER this dialog mounts. When it does, the lazy initializer above
+  // already ran with an EMPTY `templateVariables` and produced {}, so the form
+  // would show template DEFAULTS instead of the project's SAVED params. Re-seed
+  // once the variables arrive — guarded by a ref so a later re-render never
+  // clobbers the user's in-progress edits. (ProjectDetail is keyed by project id,
+  // so this ref starts fresh per project.)
+  const paramsSeededRef = useRef(templateVariables.length > 0);
+  useEffect(() => {
+    if (paramsSeededRef.current || templateVariables.length === 0) return;
+    paramsSeededRef.current = true;
+    setParamValues(seedSavedParams(project.compositionVars, templateVariables));
+  }, [templateVariables, project.compositionVars]);
 
   const isReady = project.status === "ready";
   const isRendering = project.status === "rendering";
@@ -1030,6 +1058,7 @@ export default function Projects() {
 
         {detail && (
           <ProjectDetail
+            key={detail.id}
             project={detail}
             brand={brand}
             onClose={() => setDetailId(null)}
