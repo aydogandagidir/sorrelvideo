@@ -56,6 +56,14 @@ export const verifyEmailLimiter = createLimiter({
   max: 10,
 });
 
+// Password-reset consumption. The token is 256-bit so guessing is infeasible,
+// but cap volume per IP as defence-in-depth against token-guessing floods and DB
+// pressure (mirrors verifyEmailLimiter: 10 / hour per IP).
+export const resetPasswordLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+});
+
 // Authenticated AI suggest endpoint. Quota (FREE_AI_LIMIT) is enforced
 // separately in billingService — this limiter is just to keep a single
 // authenticated user from hammering the LLM provider faster than is sane.

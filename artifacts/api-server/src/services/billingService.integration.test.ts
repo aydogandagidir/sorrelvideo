@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import {
+  DISTRIBUTED_RENDER_LIMIT,
   FREE_AI_LIMIT,
   FREE_RENDER_LIMIT,
   checkAndIncrementAiCount,
+  checkAndIncrementDistributedRenderCount,
   checkAndIncrementRenderCount,
   decrementRenderCount,
   getBillingInfo,
@@ -240,3 +242,74 @@ describe.runIf(INTEGRATION_AVAILABLE)("decrementRenderCount — refund", () => {
     expect(updated.renderCount).toBe(0);
   });
 });
+
+describe.runIf(INTEGRATION_AVAILABLE)(
+  "checkAndIncrementDistributedRenderCount — atomic cost ceiling",
+  () => {
+    const future = (): Date => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    async function seedDistributed(
+      userId: string,
+      count: number,
+      resetAt: Date | null,
+    ): Promise<void> {
+      await db
+        .update(usersTable)
+        .set({
+          distributedRenderCount: count,
+          distributedRenderResetAt: resetAt,
+        })
+        .where(eq(usersTable.id, userId));
+    }
+
+    it("enforces the cap atomically at the boundary — no overrun under concurrency", async () => {
+      // The distributed cap is a cost ceiling that applies even to Pro. Seed two
+      // below the cap in the current window, then fire 5 concurrent dispatches:
+      // exactly two may pass, three are rejected, and the counter lands ON the cap.
+      // (The old unlocked ledger-count let all five through → overrun.)
+      const userId = await createProUser();
+      await seedDistributed(userId, DISTRIBUTED_RENDER_LIMIT - 2, future());
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 5 }, () =>
+          checkAndIncrementDistributedRenderCount(userId),
+        ),
+      );
+      const fulfilled = results.filter((r) => r.status === "fulfilled").length;
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === "rejected",
+      );
+
+      expect(fulfilled).toBe(2);
+      expect(rejected).toHaveLength(3);
+      for (const r of rejected) {
+        expect((r.reason as { reason?: string }).reason).toBe(
+          "upgrade_required",
+        );
+      }
+
+      const [updated] = await db
+        .select({ count: usersTable.distributedRenderCount })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+      expect(updated.count).toBe(DISTRIBUTED_RENDER_LIMIT);
+    });
+
+    it("resets the counter when the monthly window has rolled over", async () => {
+      // At the cap, but the window expired (reset date in the past) → the next
+      // call resets to 0 and increments to 1 instead of rejecting.
+      const userId = await createProUser();
+      await seedDistributed(userId, DISTRIBUTED_RENDER_LIMIT, new Date(0));
+
+      await expect(
+        checkAndIncrementDistributedRenderCount(userId),
+      ).resolves.toBeUndefined();
+
+      const [updated] = await db
+        .select({ count: usersTable.distributedRenderCount })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+      expect(updated.count).toBe(1);
+    });
+  },
+);

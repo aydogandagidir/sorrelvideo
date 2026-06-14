@@ -34,6 +34,7 @@ import {
   loginLimiter,
   signupLimiter,
   verifyEmailLimiter,
+  resetPasswordLimiter,
 } from "../middlewares/rateLimit";
 
 const router: IRouter = Router();
@@ -246,51 +247,55 @@ router.post(
   },
 );
 
-router.post("/auth/reset-password", async (req: Request, res: Response) => {
-  const parsed = ResetPasswordBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid reset payload" });
-    return;
-  }
+router.post(
+  "/auth/reset-password",
+  resetPasswordLimiter,
+  async (req: Request, res: Response) => {
+    const parsed = ResetPasswordBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid reset payload" });
+      return;
+    }
 
-  const { token, password } = parsed.data;
-  const tokenHash = hashToken(token);
+    const { token, password } = parsed.data;
+    const tokenHash = hashToken(token);
+    const passwordHash = await hashPassword(password);
 
-  const [row] = await db
-    .select()
-    .from(passwordResetsTable)
-    .where(
-      and(
-        eq(passwordResetsTable.tokenHash, tokenHash),
-        isNull(passwordResetsTable.usedAt),
-        gt(passwordResetsTable.expiresAt, new Date()),
-      ),
-    );
+    // Atomically CONSUME the token: flip used_at only if it is still unused and
+    // unexpired, in a single conditional UPDATE ... RETURNING. This closes the
+    // select-then-update TOCTOU where two concurrent requests carrying the same
+    // token could both pass the read and both reset the password. 0 rows returned
+    // → the token is invalid, expired, or already used.
+    const [consumed] = await db
+      .update(passwordResetsTable)
+      .set({ usedAt: new Date() })
+      .where(
+        and(
+          eq(passwordResetsTable.tokenHash, tokenHash),
+          isNull(passwordResetsTable.usedAt),
+          gt(passwordResetsTable.expiresAt, new Date()),
+        ),
+      )
+      .returning();
 
-  if (!row) {
-    res.status(400).json({ error: "Reset link is invalid or has expired" });
-    return;
-  }
+    if (!consumed) {
+      res.status(400).json({ error: "Reset link is invalid or has expired" });
+      return;
+    }
 
-  const passwordHash = await hashPassword(password);
+    await db
+      .update(usersTable)
+      .set({ passwordHash })
+      .where(eq(usersTable.id, consumed.userId));
 
-  await db
-    .update(usersTable)
-    .set({ passwordHash })
-    .where(eq(usersTable.id, row.userId));
+    // Invalidate every existing session for this user. A reset is the response to
+    // a (suspected) compromise, so any pre-existing attacker session must die now
+    // rather than survive up to the 7-day TTL.
+    await deleteSessionsForUser(consumed.userId);
 
-  await db
-    .update(passwordResetsTable)
-    .set({ usedAt: new Date() })
-    .where(eq(passwordResetsTable.id, row.id));
-
-  // Invalidate every existing session for this user. A reset is the response to
-  // a (suspected) compromise, so any pre-existing attacker session must die now
-  // rather than survive up to the 7-day TTL.
-  await deleteSessionsForUser(row.userId);
-
-  res.status(200).json({ success: true });
-});
+    res.status(200).json({ success: true });
+  },
+);
 
 router.get(
   "/auth/verify-email",

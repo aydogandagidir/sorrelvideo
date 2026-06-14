@@ -54,6 +54,17 @@ export const usersTable = pgTable("users", {
   // (services/billingService.ts) takes a row lock and bumps these atomically.
   aiCount: integer("ai_count").notNull().default(0),
   aiResetAt: timestamp("ai_reset_at", { withTimezone: true }),
+  // Distributed (Lambda) render usage — a per-account monthly cost ceiling that
+  // applies to EVERY plan (Pro included), because Lambda renders cost real AWS
+  // money per run. checkAndIncrementDistributedRenderCount takes a row lock and
+  // bumps these atomically (same pattern as render/AI counts) so concurrent
+  // dispatches across projects can't overrun the cap.
+  distributedRenderCount: integer("distributed_render_count")
+    .notNull()
+    .default(0),
+  distributedRenderResetAt: timestamp("distributed_render_reset_at", {
+    withTimezone: true,
+  }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
