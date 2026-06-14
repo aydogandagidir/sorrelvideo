@@ -220,14 +220,6 @@ export const renderJobsTable = pgTable(
   },
   (table) => [
     index("IDX_render_jobs_project").on(table.projectId),
-    // Backs the per-user distributed-spend scan `countLambdaJobsSince`
-    // (`WHERE user_id = ? AND backend = ? AND created_at >= ?`). Column order
-    // matches the predicate: the two equalities first, the range last.
-    index("IDX_render_jobs_user_backend_created").on(
-      table.userId,
-      table.backend,
-      table.createdAt,
-    ),
     // Backs the in-flight-lambda scan `getActiveLambdaJobs` and boot recovery
     // (`WHERE backend = ? AND status = ?`).
     index("IDX_render_jobs_backend_status").on(table.backend, table.status),

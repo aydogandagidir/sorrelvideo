@@ -50,17 +50,28 @@ export function bboxToCrop(
 }
 
 /**
- * A CropRegion → safe composition vars. Each is `String(a 0–1 number)` — digits +
- * a dot only — so it's injection-proof even though it lands in
+ * Format a 0–1 crop fraction as a NUMERIC-gate-safe string: clamp to [0,1] and
+ * render WITHOUT exponential notation. A value in (0, 1e-6) would stringify as
+ * "1e-7" (via `String`) and then fail `findUnsafeCompositionVar`'s numeric gate,
+ * 400-ing the render; `toFixed(6)` keeps a plain decimal and we trim trailing
+ * zeros to a clean "0" / "0.5" / "1".
+ */
+function cropToken(n: number): string {
+  return clamp01(n).toFixed(6).replace(/\.?0+$/, "") || "0";
+}
+
+/**
+ * A CropRegion → safe composition vars. Each value is a bare 0–1 number (digits +
+ * a dot only, never exponential) so it's injection-proof even though it lands in
  * `parseFloat("{{capture.cropX}}")` literals (renderCompositionTemplate doesn't
  * escape quotes). Returns `{}` for no crop (whole-page render, unchanged).
  */
 export function buildCropVars(crop: CropRegion | undefined): Record<string, string> {
   if (!crop) return {};
   return {
-    "capture.cropX": String(clamp01(crop.x)),
-    "capture.cropY": String(clamp01(crop.y)),
-    "capture.cropW": String(Math.max(MIN_CROP_SIZE, clamp01(crop.w))),
-    "capture.cropH": String(Math.max(MIN_CROP_SIZE, clamp01(crop.h))),
+    "capture.cropX": cropToken(crop.x),
+    "capture.cropY": cropToken(crop.y),
+    "capture.cropW": cropToken(Math.max(MIN_CROP_SIZE, crop.w)),
+    "capture.cropH": cropToken(Math.max(MIN_CROP_SIZE, crop.h)),
   };
 }

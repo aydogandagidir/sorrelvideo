@@ -140,8 +140,11 @@ describe("UpgradeModal — pricing + chrome", () => {
     );
 
     expect(
-      screen.getByText("Unlimited renders every month"),
+      screen.getByText("Unlimited renders & AI drafts"),
     ).toBeInTheDocument();
     expect(screen.getByText("All premium templates")).toBeInTheDocument();
+    // The render_quality description also mentions 4K/60fps; the Pro bullet is
+    // worded distinctly ("4K resolution & 60 fps") so neither getByText collides.
+    expect(screen.getByText("4K resolution & 60 fps")).toBeInTheDocument();
   });
 });

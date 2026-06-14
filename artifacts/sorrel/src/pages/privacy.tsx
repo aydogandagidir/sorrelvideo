@@ -67,7 +67,7 @@ export default function Privacy() {
             about any privacy matter at{" "}
             <a href="mailto:privacy@sorrel.video">privacy@sorrel.video</a>. Our
             full legal entity name and registered address are set out in{" "}
-            <a href="#contact">Section 14 (Contact)</a> below.
+            <a href="#contact">Section 16 (Contact)</a> below.
           </p>
 
           <h2>2. Information we collect</h2>
