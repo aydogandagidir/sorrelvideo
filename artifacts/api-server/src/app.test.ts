@@ -90,4 +90,19 @@ describe("production CORS origin policy", () => {
     expect(res.status).not.toBe(500);
     expect(res.headers["access-control-allow-origin"]).toBeUndefined();
   });
+
+  it("ships CSP in Report-Only mode (never the enforcing header) with the composition CDN allow-list", async () => {
+    const res = await request(app).get("/api/healthz");
+    const reportOnly = res.headers["content-security-policy-report-only"];
+    // Report-Only must be present…
+    expect(reportOnly).toBeDefined();
+    // …and the ENFORCING header must be ABSENT — flipping to enforce is a
+    // deliberate, separate change; guard against an accidental early flip that
+    // could white-screen the SPA / break renders.
+    expect(res.headers["content-security-policy"]).toBeUndefined();
+    // Spot-check the load-bearing allow-list entries the SPA + compositions need.
+    expect(reportOnly).toContain("https://cdn.jsdelivr.net");
+    expect(reportOnly).toContain("fonts.googleapis.com");
+    expect(reportOnly).toContain("frame-ancestors 'self'");
+  });
 });

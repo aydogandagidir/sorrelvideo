@@ -27,13 +27,58 @@ app.set("trust proxy", 1);
 // (API, SPA shell, static assets, error pages) carries them.
 app.use(
   helmet({
-    // CSP is DISABLED deliberately. helmet's default policy is strict
-    // (`default-src 'self'`, no inline) and would white-screen the app: the
-    // Vite SPA emits inline styles, and the vendored HTML compositions load
-    // CDN scripts (GSAP/D3) plus inline <script> tags — a strict CSP would
-    // block both, breaking the UI and every render. A tailored CSP (allow-list
-    // the specific CDNs + hashed inline) is a deliberate follow-up.
-    contentSecurityPolicy: false,
+    // CSP ships in REPORT-ONLY mode (Content-Security-Policy-Report-Only): the
+    // browser EVALUATES this policy and logs violations to the console / any
+    // configured report endpoint, but NEVER blocks a resource — so it cannot
+    // white-screen the SPA or break a render. That is why a strict ENFORCING
+    // default CSP was previously disabled entirely (it blocks the SPA's inline
+    // styles + the compositions' CDN/inline scripts).
+    //
+    // The directives are a tailored allow-list of every origin the SPA + the
+    // vendored HTML compositions actually load: GSAP/d3/topojson via jsdelivr
+    // (script AND connect — the map compositions fetch topojson), three.js /
+    // lottie via cdnjs, Google Fonts, and user brand-logo / screenshot images
+    // (img-src https: + data:). `'unsafe-inline'` (+ `'unsafe-eval'`) are
+    // RETAINED for script/style — the compositions contain many inline <script>
+    // blocks and both the SPA (Vite/Tailwind) and compositions use inline styles,
+    // and GSAP/three.js use eval-family paths. So this is an origin allow-list +
+    // clickjacking/base-URI hardening, NOT an inline-XSS defense (that is what
+    // the compositionVars gate is for).
+    //
+    // TO FLIP TO ENFORCING (a SEPARATE future change): wire a report collector,
+    // observe real production violation reports first, and ONLY THEN drop
+    // `reportOnly`. The composition-preview routes (routes/compositions.ts +
+    // routes/projects.ts `/composition`) serve composition HTML needing the CDN
+    // allow-list above; under report-only they're unaffected, but an enforcing
+    // flip must re-verify them (or carve them out per-route).
+    contentSecurityPolicy: {
+      useDefaults: false,
+      reportOnly: true,
+      directives: {
+        "default-src": ["'self'"],
+        "base-uri": ["'self'"],
+        "object-src": ["'none'"],
+        "frame-ancestors": ["'self'"],
+        "script-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          "https://cdn.jsdelivr.net",
+          "https://cdnjs.cloudflare.com",
+        ],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "https://fonts.googleapis.com",
+        ],
+        "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
+        "img-src": ["'self'", "data:", "https:"],
+        "connect-src": ["'self'", "https://cdn.jsdelivr.net"],
+        "media-src": ["'self'", "data:", "blob:"],
+        "frame-src": ["'self'"],
+        "worker-src": ["'self'", "blob:"],
+      },
+    },
     // Keep X-Content-Type-Options: nosniff (helmet default) — no override.
     // SAMEORIGIN, not DENY: the embedded same-origin <hyperframes-player>
     // iframe (and the /editor mount) must still be framable by the app itself.
