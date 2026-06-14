@@ -2,8 +2,8 @@ import React from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Video, Zap, Layers, Sparkles, MonitorPlay, Check as CheckIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useBillingPrices } from "@/hooks/useBilling";
+import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/lib/plans";
 
 function HeroSection() {
   return (
@@ -18,7 +18,7 @@ function HeroSection() {
       >
         <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
           <Sparkles className="mr-2 h-3.5 w-3.5" />
-          Hyperframes Engine 2.0 Now Available
+          Now in private alpha
         </div>
         
         <h1 className="font-sans text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
@@ -37,23 +37,6 @@ function HeroSection() {
           <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
             Enter Workspace
           </Link>
-          {/*
-            No public documentation site exists yet. Keep the button visible
-            (it sets the expectation) but disabled with a "coming soon" cue,
-            rather than linking to a dead URL.
-          */}
-          <Button
-            variant="outline"
-            size="lg"
-            className="h-12 px-8"
-            disabled
-            title="Documentation is coming soon"
-          >
-            View Documentation
-            <span className="ml-2 text-xs text-muted-foreground">
-              (coming soon)
-            </span>
-          </Button>
         </div>
       </motion.div>
     </section>
@@ -133,7 +116,7 @@ export default function Home() {
               delay={0.2}
               icon={Layers}
               title="Modular Architecture"
-              description="Pick and choose the modules you need. Studio, Bulk, AI, and more."
+              description="Pick and choose the modules you need. Studio, Website → Video, AI, Avatar, and more."
             />
             <FeatureCard 
               delay={0.3}
@@ -159,7 +142,7 @@ export default function Home() {
                   <div className="text-4xl font-extrabold">$0</div>
                 </div>
                 <ul className="space-y-2 flex-1 text-sm text-muted-foreground">
-                  {["3 renders per month", "Standard templates", "720p output", "Community support"].map(f => (
+                  {FREE_PLAN_FEATURES.map(f => (
                     <li key={f} className="flex items-center gap-2"><CheckIcon className="h-4 w-4 text-primary shrink-0" />{f}</li>
                   ))}
                 </ul>
@@ -179,7 +162,7 @@ export default function Home() {
                   <ProPrice />
                 </div>
                 <ul className="space-y-2 flex-1 text-sm">
-                  {["Unlimited renders", "All premium templates", "1080p output", "Priority queue", "Advanced analytics", "Priority support"].map(f => (
+                  {PRO_PLAN_FEATURES.map(f => (
                     <li key={f} className="flex items-center gap-2"><CheckIcon className="h-4 w-4 text-primary shrink-0" />{f}</li>
                   ))}
                 </ul>

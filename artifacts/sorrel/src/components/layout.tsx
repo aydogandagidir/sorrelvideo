@@ -8,9 +8,7 @@ import {
   LogOut,
   Wand2,
   Zap,
-  Layers,
   BarChart3,
-  Users,
   Globe,
   Film,
   Clapperboard,
@@ -64,13 +62,14 @@ const NAV: NavEntry[] = [
   { href: "/brand", label: "Brand DNA", icon: Palette },
 ];
 
-// Website → Video is shipped (no "soon"); the rest are partial/planned modules.
+// Shipped modules only. Website → Video, Live Avatar, and Analytics are live;
+// Bulk (batch render) and Collab (sharing/members) are built but not finished, so
+// they are hidden from the nav until they ship — their routes still resolve for
+// deep links. Re-add them here (with a `soon` badge or as live) when complete.
 const MODULES: NavEntry[] = [
   { href: "/website-to-video", label: "Website → Video", icon: Globe },
   { href: "/avatar", label: "Live Avatar", icon: Bot },
-  { href: "/bulk", label: "Bulk", icon: Layers, soon: true },
-  { href: "/analytics", label: "Analytics", icon: BarChart3, soon: true },
-  { href: "/collab", label: "Collab", icon: Users, soon: true },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 const ROUTE_TITLES: Record<string, string> = {

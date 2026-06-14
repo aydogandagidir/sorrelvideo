@@ -40,7 +40,7 @@ const PRO_ROUTES: ApiFetchRoute[] = [
 ];
 
 describe("Layout shell", () => {
-  it("renders the brand, grouped nav with SOON modules, plan card, and topbar", async () => {
+  it("renders the brand, grouped nav with shipped modules, plan card, and topbar", async () => {
     fetchMock = installApiFetchMock(PRO_ROUTES);
     renderWithProviders(
       <Layout>
@@ -52,7 +52,7 @@ describe("Layout shell", () => {
     expect(screen.getAllByText("Sorrel").length).toBeGreaterThan(0);
     expect(screen.getByText("v1.0")).toBeInTheDocument();
 
-    // Main nav + the MODULES group with SOON badges.
+    // Main nav + the MODULES group (shipped modules only).
     expect(
       screen.getByRole("link", { name: /dashboard/i }),
     ).toBeInTheDocument();
@@ -60,7 +60,18 @@ describe("Layout shell", () => {
       screen.getByRole("link", { name: /brand dna/i }),
     ).toBeInTheDocument();
     expect(screen.getByText("Modules")).toBeInTheDocument();
-    expect(screen.getAllByText(/^soon$/i).length).toBeGreaterThan(0);
+    // Analytics ships as a real module — present, and with no "Soon" badge.
+    expect(
+      screen.getByRole("link", { name: /analytics/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^soon$/i)).not.toBeInTheDocument();
+    // Unfinished modules (Bulk, Collab) are hidden from the nav until they ship.
+    expect(
+      screen.queryByRole("link", { name: /^bulk$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /^collab$/i }),
+    ).not.toBeInTheDocument();
 
     // Pro plan card (async billing) + topbar search affordance.
     await waitFor(() =>

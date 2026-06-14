@@ -5,23 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBillingPrices, useBillingCheckout } from "@/hooks/useBilling";
 import { useAuth } from "@workspace/auth-web";
-
-const FREE_FEATURES = [
-  "3 renders per month",
-  "Standard templates",
-  "720p output",
-  "Community support",
-];
-
-const PRO_FEATURES = [
-  "Unlimited renders",
-  "All premium templates",
-  "1080p output",
-  "Priority render queue",
-  "Advanced analytics",
-  "Priority support",
-  "Custom brand kit",
-];
+import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/lib/plans";
 
 function PricingCard({
   plan,
@@ -33,7 +17,7 @@ function PricingCard({
   plan: string;
   price: string;
   priceId?: string;
-  features: string[];
+  features: readonly string[];
   highlighted?: boolean;
 }) {
   const { isAuthenticated, login } = useAuth();
@@ -175,13 +159,13 @@ export default function Pricing() {
               <PricingCard
                 plan="Free"
                 price="Free"
-                features={FREE_FEATURES}
+                features={FREE_PLAN_FEATURES}
               />
               <PricingCard
                 plan="Pro"
                 price={priceDisplay}
                 priceId={monthlyPrice?.id}
-                features={PRO_FEATURES}
+                features={PRO_PLAN_FEATURES}
                 highlighted
               />
             </div>
