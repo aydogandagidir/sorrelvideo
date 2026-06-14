@@ -104,6 +104,23 @@ export interface HealthStatus {
   status: string;
 }
 
+export type HealthUnhealthyStatus = typeof HealthUnhealthyStatus[keyof typeof HealthUnhealthyStatus];
+
+
+export const HealthUnhealthyStatus = {
+  error: 'error',
+} as const;
+
+export type HealthUnhealthyChecks = {[key: string]: 'ok' | 'error'};
+
+/**
+ * 503 body from /healthz when a dependency probe fails. `status` is always "error"; `checks` maps each probed dependency to "ok"/"error" (redis is present only when REDIS_URL is configured).
+ */
+export interface HealthUnhealthy {
+  status: HealthUnhealthyStatus;
+  checks: HealthUnhealthyChecks;
+}
+
 export type CompositionVariableType = typeof CompositionVariableType[keyof typeof CompositionVariableType];
 
 

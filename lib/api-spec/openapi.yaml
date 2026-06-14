@@ -262,6 +262,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: >-
+            Unhealthy — one or more dependency probes (Postgres, and Redis when
+            REDIS_URL is set) failed. The body names the failing dependency so the
+            platform healthcheck/dashboards show why the instance was pulled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthUnhealthy"
 
   /templates:
     get:
@@ -463,6 +472,12 @@ paths:
           description: Not found
         "409":
           description: Render already in progress
+        "503":
+          description: Render could not be started (queue/ledger unavailable).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /projects/{id}/render/cancel:
     post:
@@ -958,6 +973,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Unexpected error generating captions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "502":
           description: Transcription failed.
           content:
@@ -1124,6 +1145,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Unexpected error creating the video.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "502":
           description: Speech synthesis or transcription failed.
           content:
@@ -1165,6 +1192,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Billing is not configured (APP_URL unset in production).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /billing/portal:
     post:
@@ -1182,6 +1215,24 @@ paths:
           description: No billing account found
         "401":
           description: Unauthorized
+        "500":
+          description: Billing is not configured (APP_URL unset in production).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  # Public/iframe asset-serving routes are intentionally omitted from the typed
+  # spec — the SPA loads them as plain <img src>/iframe URLs, never through the
+  # generated React Query hooks (declaring them would emit unused Blob hooks),
+  # exactly like the /composition preview + project video/thumbnail streams.
+  # Behaviour, for reference (see routes/templates.ts + routes/projects.ts):
+  #   GET /templates/thumbnails/{slug}  -> image/png; PUBLIC (no auth); slug
+  #       allow-listed against the vendored manifest; 404 on unknown/missing.
+  #   GET /templates/{id}/assets/{name} -> image/* or audio/*; AUTH; name
+  #       allow-listed against the manifest (no traversal); 401/404.
+  #   GET /projects/{id}/assets/{name}  -> image/* or audio/* (same MIME set);
+  #       AUTH + owner-scoped; name allow-listed; 401/403/404.
 
   /billing/prices:
     get:
@@ -1616,6 +1667,28 @@ components:
           type: string
       required:
         - status
+
+    HealthUnhealthy:
+      type: object
+      description: >-
+        503 body from /healthz when a dependency probe fails. `status` is always
+        "error"; `checks` maps each probed dependency to "ok"/"error" (redis is
+        present only when REDIS_URL is configured).
+      required:
+        - status
+        - checks
+      properties:
+        status:
+          type: string
+          enum:
+            - error
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - ok
+              - error
 
     Template:
       type: object
