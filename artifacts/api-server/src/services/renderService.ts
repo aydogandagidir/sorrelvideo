@@ -39,7 +39,11 @@ import {
   markRendering,
 } from "./renderJobsService";
 import { generateThumbnail } from "./thumbnailService";
-import { REGISTRY_COMPOSITION_MAP, assetsForModule } from "./registryTemplates";
+import {
+  REGISTRY_COMPOSITION_MAP,
+  assetsForModule,
+  variablesForModule,
+} from "./registryTemplates";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
@@ -177,6 +181,41 @@ export function resolveEntryFile(module: string): string {
  */
 export function isKnownModule(module: string): boolean {
   return module in COMPOSITION_MAP;
+}
+
+/** Memoized per module — the composition file is scanned at most once. */
+const contentCustomizableCache = new Map<string, boolean>();
+/** A placeholder that pipes the user's brand / copy / capture / narration in. */
+const CONTENT_PLACEHOLDER = /\{\{(brand|user|capture|host)\./;
+
+/**
+ * True when a template can be tailored to the user IN-APP: it either declares
+ * typed parametric `variables` (editable via the project's params form) OR its
+ * composition substitutes the user's brand / copy / website capture / talking-host
+ * content through `{{brand.|user.|capture.|host.}}` placeholders. FALSE for the
+ * pure-demo registry compositions that carry NO such placeholder — they render
+ * their canned sample regardless of brand or content. Surfaced on the Template API
+ * (`Template.customizable`, read-time enrichment, never persisted) so the gallery
+ * can foreground the templates that actually produce a tailored video and label
+ * the demos honestly. Scan is memoized; an unreadable file fails closed to false.
+ */
+export function isContentCustomizable(module: string): boolean {
+  const cached = contentCustomizableCache.get(module);
+  if (cached !== undefined) return cached;
+  let result = (variablesForModule(module)?.length ?? 0) > 0;
+  if (!result) {
+    try {
+      const html = fs.readFileSync(
+        path.join(COMPOSITIONS_DIR, resolveEntryFile(module)),
+        "utf-8",
+      );
+      result = CONTENT_PLACEHOLDER.test(html);
+    } catch {
+      result = false;
+    }
+  }
+  contentCustomizableCache.set(module, result);
+  return result;
 }
 
 /**

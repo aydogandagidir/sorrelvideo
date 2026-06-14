@@ -40,6 +40,9 @@ function TemplateCard({
   const [activated, setActivated] = useState(false);
   const [playing, setPlaying] = useState(false);
   const locked = template.isPremium && !isPro;
+  // A "demo" template carries no brand/content placeholders (customizable === false)
+  // — it renders a fixed sample regardless of brand/content; label it honestly.
+  const isDemo = template.customizable === false;
 
   function startPreview(): void {
     setActivated(true);
@@ -108,6 +111,11 @@ function TemplateCard({
           <span className="rounded-full border border-border bg-black/45 px-2 py-0.5 text-[11px] font-semibold capitalize text-white/90 backdrop-blur">
             {template.category}
           </span>
+          {isDemo && (
+            <span className="rounded-full border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 backdrop-blur">
+              Demo
+            </span>
+          )}
           {template.isPremium && (
             <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary backdrop-blur">
               <Zap className="h-3 w-3" /> Premium
@@ -135,6 +143,11 @@ function TemplateCard({
         <p className="line-clamp-2 min-h-[2.4em] text-[12px] leading-snug text-muted-foreground">
           {template.description || "No description provided."}
         </p>
+        {isDemo && (
+          <p className="text-[11px] leading-snug text-amber-500/90">
+            Renders a fixed sample — open in Studio to edit its code/content.
+          </p>
+        )}
         <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
           <Clock className="h-3 w-3" />
           {template.duration}s
@@ -166,6 +179,7 @@ export default function Templates() {
   const { data: billing } = useBillingInfo();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [category, setCategory] = useState("All");
+  const [showDemos, setShowDemos] = useState(false);
   const isPro = billing?.plan === "pro";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -186,10 +200,18 @@ export default function Templates() {
     "All",
     ...Array.from(new Set((templates ?? []).map((t) => t.category))),
   ];
-  const list =
+  const inCategory =
     category === "All"
       ? (templates ?? [])
       : (templates ?? []).filter((t) => t.category === category);
+  // "Demo" templates carry no brand/content placeholders, so they render a fixed
+  // sample regardless of brand/content. Hide them by default — "Use Template"
+  // then surfaces only templates that produce a TAILORED video; a toggle reveals
+  // the demos (labeled) for use as code starting points in Studio.
+  const demoCount = inCategory.filter((t) => t.customizable === false).length;
+  const list = showDemos
+    ? inCategory
+    : inCategory.filter((t) => t.customizable !== false);
 
   if (isError) {
     return (
@@ -211,8 +233,9 @@ export default function Templates() {
         <div className="mb-6">
           <h1 className="text-[27px] leading-tight">Templates</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Motion templates rendered by the Hyperframes engine. Pick one — your
-            Brand DNA flows in automatically.
+            Motion templates rendered by the Hyperframes engine. Customizable
+            templates flow your Brand DNA + copy in automatically; “Demo”
+            templates render a fixed sample you can then edit in Studio.
           </p>
         </div>
 
@@ -233,6 +256,20 @@ export default function Templates() {
                 {c}
               </button>
             ))}
+          </div>
+        ) : null}
+
+        {!isLoading && demoCount > 0 ? (
+          <div className="mb-5 -mt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowDemos((v) => !v)}
+              className="text-[12.5px] font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              {showDemos
+                ? "Hide demo templates"
+                : `Show ${demoCount} demo template${demoCount === 1 ? "" : "s"} (fixed sample — edit in Studio)`}
+            </button>
           </div>
         ) : null}
 

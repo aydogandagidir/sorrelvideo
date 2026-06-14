@@ -194,6 +194,7 @@ export const ListTemplatesResponseItem = zod.object({
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
   "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
+  "customizable": zod.boolean().optional().describe('True when the template can be tailored to the user IN-APP — it declares typed `variables`, or its composition substitutes the user\'s brand\/copy\/website-capture\/talking-host content via `{{brand.|user.|capture.|host.}}` placeholders. False for pure-demo registry compositions that render a fixed sample regardless of brand\/content. Derived server-side at read time (not persisted); the gallery foregrounds customizable templates and labels the demos.'),
   "variables": zod.array(zod.object({
   "id": zod.string(),
   "type": zod.enum(['string', 'number', 'color', 'boolean', 'enum']),
@@ -249,6 +250,7 @@ export const GetTemplateResponse = zod.object({
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
   "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
+  "customizable": zod.boolean().optional().describe('True when the template can be tailored to the user IN-APP — it declares typed `variables`, or its composition substitutes the user\'s brand\/copy\/website-capture\/talking-host content via `{{brand.|user.|capture.|host.}}` placeholders. False for pure-demo registry compositions that render a fixed sample regardless of brand\/content. Derived server-side at read time (not persisted); the gallery foregrounds customizable templates and labels the demos.'),
   "variables": zod.array(zod.object({
   "id": zod.string(),
   "type": zod.enum(['string', 'number', 'color', 'boolean', 'enum']),

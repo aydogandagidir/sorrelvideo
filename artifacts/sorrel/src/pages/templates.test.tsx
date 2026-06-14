@@ -96,6 +96,38 @@ describe("Templates — gallery + error/empty", () => {
     ).toHaveLength(2);
   });
 
+  it("hides demo templates by default, then a toggle reveals them with a Demo badge", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      AUTH_ROUTE,
+      billingRoute("free"),
+      {
+        url: "/api/templates",
+        method: "GET",
+        json: [
+          template({ id: 1, name: "Studio Intro", customizable: true }),
+          template({ id: 2, name: "Map Demo", customizable: false }),
+        ],
+      },
+    ]);
+
+    renderWithProviders(<Templates />);
+
+    // The customizable template shows by default; the demo is hidden (no badge).
+    await waitFor(() =>
+      expect(screen.getByText("Studio Intro")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Map Demo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Demo")).not.toBeInTheDocument();
+
+    // The toggle reveals the demo, now carrying a "Demo" badge.
+    await user.click(
+      screen.getByRole("button", { name: /show 1 demo template/i }),
+    );
+    expect(screen.getByText("Map Demo")).toBeInTheDocument();
+    expect(screen.getByText("Demo")).toBeInTheDocument();
+  });
+
   it("shows the empty-state copy when there are no templates", async () => {
     fetchMock = installApiFetchMock([
       AUTH_ROUTE,
