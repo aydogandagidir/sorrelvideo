@@ -245,6 +245,7 @@ export default function Templates() {
               <button
                 key={c}
                 type="button"
+                aria-pressed={category === c}
                 onClick={() => setCategory(c)}
                 className={cn(
                   "rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold capitalize transition-colors",

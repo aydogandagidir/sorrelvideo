@@ -77,7 +77,11 @@ describe("Layout shell", () => {
     await waitFor(() =>
       expect(screen.getByText(/pro · unlimited/i)).toBeInTheDocument(),
     );
-    expect(screen.getByRole("button", { name: /search/i })).toBeInTheDocument();
+    // Two search affordances exist (desktop topbar + mobile header); jsdom
+    // ignores the responsive CSS, so both render. At least one is present.
+    expect(
+      screen.getAllByRole("button", { name: /search/i }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("opens the command palette from the search button", async () => {
@@ -89,7 +93,7 @@ describe("Layout shell", () => {
       </Layout>,
     );
 
-    await user.click(screen.getByRole("button", { name: /search/i }));
+    await user.click(screen.getAllByRole("button", { name: /search/i })[0]);
     expect(
       await screen.findByPlaceholderText(/jump to/i),
     ).toBeInTheDocument();

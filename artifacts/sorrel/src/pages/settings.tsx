@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearch } from "wouter";
 import { Layout } from "@/components/layout";
 import {
@@ -22,6 +22,7 @@ import {
   Zap,
   CreditCard,
   Loader2,
+  Keyboard,
 } from "lucide-react";
 import {
   useBillingInfo,
@@ -31,6 +32,48 @@ import {
 } from "@/hooks/useBilling";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+
+/**
+ * Single-key nav shortcuts (S/D/P/T/B) are convenient but a WCAG 2.1.4 risk —
+ * the spec requires a way to switch character-key shortcuts off. The layout's
+ * key handler reads `localStorage["sorrel:navShortcuts"]` at fire time, so this
+ * toggle needs no shared state or context.
+ */
+function NavShortcutsToggle() {
+  const [enabled, setEnabled] = useState(
+    () =>
+      typeof localStorage === "undefined" ||
+      localStorage.getItem("sorrel:navShortcuts") !== "off",
+  );
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <Label htmlFor="nav-shortcuts" className="text-sm font-medium">
+          Single-key navigation shortcuts
+        </Label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Press S, D, P, T, or B to jump between pages. Turn this off if it gets
+          in the way of typing.
+        </p>
+      </div>
+      <Switch
+        id="nav-shortcuts"
+        checked={enabled}
+        aria-label="Single-key navigation shortcuts"
+        onCheckedChange={(on) => {
+          setEnabled(on);
+          try {
+            localStorage.setItem("sorrel:navShortcuts", on ? "on" : "off");
+          } catch {
+            /* localStorage may be unavailable */
+          }
+        }}
+      />
+    </div>
+  );
+}
 
 function BillingCard() {
   const { data: billing, isLoading } = useBillingInfo();
@@ -251,6 +294,19 @@ export default function Settings() {
         </div>
 
         <BillingCard />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Keyboard className="h-4 w-4" />
+              Preferences
+            </CardTitle>
+            <CardDescription>Personalize how Sorrel behaves.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <NavShortcutsToggle />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
