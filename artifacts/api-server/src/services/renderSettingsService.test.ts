@@ -289,10 +289,10 @@ describe("toEngineConfig", () => {
     expect(cfg.outputResolution).toBe(DEFAULT_RENDER_SETTINGS.resolution);
   });
 
-  it("defaults reproduce the legacy 30fps/draft/mp4 config", () => {
+  it("defaults to standard quality (crisp by default, Free-allowed) at 30fps/mp4", () => {
     const cfg = toEngineConfig(DEFAULT_RENDER_SETTINGS, "composition.html");
     expect(cfg.fps).toEqual({ num: 30, den: 1 });
-    expect(cfg.quality).toBe("draft");
+    expect(cfg.quality).toBe("standard");
     expect(cfg.format).toBe("mp4");
   });
 
