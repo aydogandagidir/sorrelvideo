@@ -99,7 +99,7 @@ export default function WebsiteToVideo(): React.JSX.Element {
     <Layout>
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-[27px] leading-tight flex items-center gap-2">
             <Globe className="h-7 w-7 text-primary" />
             Website → Video
           </h1>

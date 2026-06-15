@@ -198,7 +198,7 @@ export default function Bulk() {
       <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-bold tracking-tight">Bulk Render</h1>
+            <h1 className="text-[27px] leading-tight">Bulk Render</h1>
             <ModuleStatusBadge status="beta" />
           </div>
           <p className="text-muted-foreground">

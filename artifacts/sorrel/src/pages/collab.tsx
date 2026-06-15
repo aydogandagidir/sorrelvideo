@@ -83,7 +83,7 @@ export default function Collab() {
       <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-bold tracking-tight">Collaboration</h1>
+            <h1 className="text-[27px] leading-tight">Collaboration</h1>
             <ModuleStatusBadge status="coming_soon" />
           </div>
           <p className="text-muted-foreground">
