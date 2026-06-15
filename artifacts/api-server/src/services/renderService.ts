@@ -428,6 +428,36 @@ export function inlineVendorScripts(html: string): string {
   );
 }
 
+/**
+ * A deterministic, emit-time "fit" script. After layout settles (`fonts.ready`),
+ * any text element whose SUBSTITUTED copy overflows its own box is shrunk just
+ * enough to fit. It acts ONLY on actual overflow (i.e. a user's long headline /
+ * body / CTA) — a no-op on the authored layout — so it is safe to inject into
+ * every composition. It sets an inline `font-size` that persists across the
+ * paused timeline's frames, so both the render and the live preview show copy
+ * that fits instead of clipping/overflowing. Marked `data-sorrel-fit` so its
+ * presence is trivially assertable.
+ */
+const FIT_SCRIPT =
+  '<script data-sorrel-fit>(function(){' +
+  'var S=".headline,.subhead,.subtitle,.title,.body,.body-text,.cta";' +
+  'function fits(e){return e.scrollHeight<=e.clientHeight+1&&e.scrollWidth<=e.clientWidth+1}' +
+  'function fit(e){var s=parseFloat(getComputedStyle(e).fontSize);if(!s||fits(e))return;' +
+  'var m=Math.max(10,s*0.4),g=0;while(!fits(e)&&s>m&&g++<48){s*=0.94;e.style.fontSize=s+"px"}}' +
+  'function run(){try{Array.prototype.forEach.call(document.querySelectorAll(S),fit)}catch(_){}}' +
+  'function go(){run();(window.requestAnimationFrame||function(f){setTimeout(f,16)})(run);' +
+  'if(document.fonts&&document.fonts.ready)document.fonts.ready.then(run)}' +
+  'if(document.readyState!=="loading")go();else document.addEventListener("DOMContentLoaded",go)' +
+  '})();</script>';
+
+/**
+ * Inject the auto-fit script before the last `</body>` (mirrors injectWatermark)
+ * so it runs after the composition's elements exist. Pure.
+ */
+export function injectFitScript(html: string): string {
+  return injectBeforeBodyEnd(html, FIT_SCRIPT);
+}
+
 /** Map an uploaded audio object's content-type to a file extension. */
 function audioExtForContentType(contentType: string | undefined): string {
   switch ((contentType ?? "").toLowerCase()) {
@@ -807,7 +837,7 @@ export async function buildCompositionHtml(project: {
     typeof project.compositionHtml === "string" &&
     project.compositionHtml.length > 0
   ) {
-    return inlineVendorScripts(project.compositionHtml);
+    return injectFitScript(inlineVendorScripts(project.compositionHtml));
   }
 
   const baseEntryFile = resolveEntryFile(project.module);
@@ -836,7 +866,7 @@ export async function buildCompositionHtml(project: {
   vars["layout.aspect"] =
     width > height ? "landscape" : width < height ? "portrait" : "square";
 
-  return inlineVendorScripts(renderCompositionTemplate(source, vars));
+  return injectFitScript(inlineVendorScripts(renderCompositionTemplate(source, vars)));
 }
 
 /**

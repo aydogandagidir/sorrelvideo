@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTransitionsInjection,
   copyTemplateAssets,
+  injectFitScript,
   injectWatermark,
   inlineVendorScripts,
   isContentCustomizable,
@@ -66,6 +67,30 @@ describe("inlineVendorScripts", () => {
     expect(inlineVendorScripts("<div>no scripts</div>")).toBe(
       "<div>no scripts</div>",
     );
+  });
+});
+
+describe("injectFitScript", () => {
+  it("injects the auto-fit script just before </body> (after the elements exist)", () => {
+    const out = injectFitScript(
+      '<html><body><h1 class="headline">x</h1></body></html>',
+    );
+    expect(out).toContain("data-sorrel-fit");
+    expect(out.indexOf("data-sorrel-fit")).toBeLessThan(out.indexOf("</body>"));
+    // the original composition content is untouched
+    expect(out).toContain('<h1 class="headline">x</h1>');
+  });
+
+  it("targets the conventional copy classes, guards on overflow, waits for fonts", () => {
+    const out = injectFitScript("<body></body>");
+    expect(out).toContain(".headline");
+    expect(out).toContain(".cta");
+    expect(out).toContain("scrollHeight"); // only shrinks on real overflow
+    expect(out).toContain("fonts.ready"); // runs after web fonts settle (deterministic)
+  });
+
+  it("still injects when there is no closing body tag (never silently dropped)", () => {
+    expect(injectFitScript("<div>no body</div>")).toContain("data-sorrel-fit");
   });
 });
 
