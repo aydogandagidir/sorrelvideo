@@ -1,11 +1,12 @@
 import React from "react";
 import { Link } from "wouter";
-import { Check, Zap, Video, Loader2, ArrowRight } from "lucide-react";
+import { Check, Zap, Video, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBillingPrices, useBillingCheckout } from "@/hooks/useBilling";
 import { useAuth } from "@workspace/auth-web";
 import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/lib/plans";
+import { MarketingHeader } from "@/components/marketing-header";
 
 function PricingCard({
   plan,
@@ -97,7 +98,7 @@ function PricingCard({
         </Button>
       ) : (
         <Link
-          href="/dashboard"
+          href="/signup"
           className="inline-flex w-full h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted transition-colors"
         >
           Get Started Free
@@ -116,28 +117,7 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="fixed top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight">
-            <Video className="h-5 w-5 text-primary" />
-            <span>Sorrel</span>
-          </Link>
-          <nav className="hidden md:flex gap-6 text-sm font-medium">
-            <Link href="/#features" className="text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link href="/pricing" className="text-foreground font-semibold">
-              Pricing
-            </Link>
-          </nav>
-          <Link
-            href="/dashboard"
-            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Open App <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </div>
-      </header>
+      <MarketingHeader active="pricing" />
 
       <main className="pt-32 pb-24 px-4">
         <div className="container mx-auto max-w-5xl">

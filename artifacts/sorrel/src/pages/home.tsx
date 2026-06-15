@@ -1,9 +1,10 @@
 import React from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, Video, Zap, Layers, Sparkles, MonitorPlay, Check as CheckIcon } from "lucide-react";
+import { ArrowRight, Video, Zap, Sparkles, Check as CheckIcon, Film, Globe, Clapperboard } from "lucide-react";
 import { useBillingPrices } from "@/hooks/useBilling";
 import { FREE_PLAN_FEATURES, PRO_PLAN_FEATURES } from "@/lib/plans";
+import { MarketingHeader } from "@/components/marketing-header";
 
 function HeroSection() {
   return (
@@ -29,14 +30,17 @@ function HeroSection() {
         </h1>
         
         <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
-          Sorrel is the creative workspace built on top of the Hyperframes engine. 
-          Wrap your programmatic video primitives into a polished SaaS platform for your marketing team.
+          Turn a template, your website, or a script into branded short-form
+          video in minutes — no editor, no render farm, no waiting.
         </p>
-        
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
-            Enter Workspace
+
+        <div className="flex flex-col items-center gap-3">
+          <Link href="/signup" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
+            Start free — no card required
           </Link>
+          <span className="text-xs text-muted-foreground">
+            Free plan included · upgrade anytime · secured by Stripe
+          </span>
         </div>
       </motion.div>
     </section>
@@ -78,51 +82,37 @@ function FeatureCard({ icon: Icon, title, description, delay }: { icon: React.El
 export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="fixed top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight">
-            <Video className="h-5 w-5 text-primary" />
-            <span>Sorrel</span>
-          </Link>
-          <nav className="hidden md:flex gap-6 text-sm font-medium">
-            <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-          </nav>
-          <Link href="/dashboard" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-            Open App <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main>
         <HeroSection />
 
         <section id="features" className="py-24 px-4 container mx-auto max-w-6xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">The Production Studio</h2>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Three ways to make a video</h2>
             <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
-              Built for speed, precision, and scale. Bring your technical primitives to the creative team.
+              Start from a template, your own website, or a script. Sorrel renders a branded MP4 you can download and share.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FeatureCard 
+            <FeatureCard
               delay={0.1}
-              icon={Zap}
-              title="Lightning Fast"
-              description="Render videos in seconds, not hours. Hyperframes engine optimized for speed."
+              icon={Film}
+              title="Start from a template"
+              description="Pick from a library of branded templates and customize the copy, colors, and logo — render to MP4 in seconds."
             />
-            <FeatureCard 
+            <FeatureCard
               delay={0.2}
-              icon={Layers}
-              title="Modular Architecture"
-              description="Pick and choose the modules you need. Studio, Website → Video, AI, Avatar, and more."
+              icon={Globe}
+              title="Turn your website into video"
+              description="Paste a URL and Sorrel captures your site, then produces a branded showcase video automatically."
             />
-            <FeatureCard 
+            <FeatureCard
               delay={0.3}
-              icon={MonitorPlay}
-              title="Real-time Preview"
-              description="See changes instantly. No waiting for renders just to see a typo fix."
+              icon={Clapperboard}
+              title="Script to talking-host"
+              description="Write a script and get a branded, lip-synced host video with karaoke captions — no camera, no studio."
             />
           </div>
         </section>
@@ -146,7 +136,7 @@ export default function Home() {
                     <li key={f} className="flex items-center gap-2"><CheckIcon className="h-4 w-4 text-primary shrink-0" />{f}</li>
                   ))}
                 </ul>
-                <Link href="/dashboard" className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted transition-colors">
+                <Link href="/signup" className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted transition-colors">
                   Get Started Free
                 </Link>
               </div>
@@ -167,7 +157,7 @@ export default function Home() {
                   ))}
                 </ul>
                 <Link href="/pricing" className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-                  <Zap className="mr-2 h-4 w-4" />Get Started
+                  <Zap className="mr-2 h-4 w-4" />See Pro plan
                 </Link>
               </div>
             </div>
@@ -176,9 +166,9 @@ export default function Home() {
 
         <section className="py-24 px-4 bg-background">
           <div className="container mx-auto max-w-4xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-8">Ready to scale your video production?</h2>
-            <Link href="/dashboard" className="inline-flex h-14 items-center justify-center rounded-md bg-primary px-8 text-base font-bold text-primary-foreground transition-colors hover:bg-primary/90">
-              Go to Workspace <ArrowRight className="ml-2 h-5 w-5" />
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-8">Ready to make your first video?</h2>
+            <Link href="/signup" className="inline-flex h-14 items-center justify-center rounded-md bg-primary px-8 text-base font-bold text-primary-foreground transition-colors hover:bg-primary/90">
+              Create your first video free <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
           </div>
         </section>
