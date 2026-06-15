@@ -44,6 +44,7 @@ import { findInvalidTypedVar } from "../lib/typedVars";
 import { variablesForModule } from "../services/registryTemplates";
 import { logger } from "../lib/logger";
 import { serveTemplateAsset } from "../lib/templateAssets";
+import { resolveByteRange } from "../lib/httpRange";
 
 /**
  * Validate a project's compositionVars against the typed variables its module
@@ -603,14 +604,16 @@ router.get("/projects/:id/video", async (req, res): Promise<void> => {
   );
 
   if (range) {
-    const match = /bytes=(\d*)-(\d*)/.exec(range);
-    const start = match && match[1] ? parseInt(match[1], 10) : 0;
-    const end = match && match[2] ? parseInt(match[2], 10) : total - 1;
-    if (start >= total || end >= total) {
+    // Single-range parsing extracted to lib/httpRange (unit-tested): handles
+    // suffix ranges (last N bytes), open-ended ranges, past-EOF clamping, and
+    // returns null for inverted / unsatisfiable ranges → a clean 416.
+    const resolved = resolveByteRange(range, total);
+    if (!resolved) {
       res.status(416).setHeader("Content-Range", `bytes */${total}`);
       res.end();
       return;
     }
+    const { start, end } = resolved;
     res.status(206);
     res.setHeader("Content-Range", `bytes ${start}-${end}/${total}`);
     res.setHeader("Content-Length", end - start + 1);

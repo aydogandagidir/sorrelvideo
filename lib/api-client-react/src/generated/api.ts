@@ -48,6 +48,7 @@ import type {
   GenerateCaptionsResult,
   GenericSuccess,
   HealthStatus,
+  HealthUnhealthy,
   LintRequest,
   LintResponse,
   ListTemplatesParams,
@@ -867,7 +868,7 @@ export const getHealthCheckQueryKey = () => {
     }
 
 
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<HealthUnhealthy>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -886,14 +887,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
-export type HealthCheckQueryError = ErrorType<unknown>
+export type HealthCheckQueryError = ErrorType<HealthUnhealthy>
 
 
 /**
  * @summary Health check
  */
 
-export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<HealthUnhealthy>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -1605,7 +1606,7 @@ export const startProjectRender = async (id: number, options?: RequestInit): Pro
 
 
 
-export const getStartProjectRenderMutationOptions = <TError = ErrorType<void>,
+export const getStartProjectRenderMutationOptions = <TError = ErrorType<void | ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof startProjectRender>>, TError,{id: number}, TContext> => {
 
@@ -1634,12 +1635,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type StartProjectRenderMutationResult = NonNullable<Awaited<ReturnType<typeof startProjectRender>>>
 
-    export type StartProjectRenderMutationError = ErrorType<void>
+    export type StartProjectRenderMutationError = ErrorType<void | ErrorEnvelope>
 
     /**
  * @summary Start a render job for a project
  */
-export const useStartProjectRender = <TError = ErrorType<void>,
+export const useStartProjectRender = <TError = ErrorType<void | ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startProjectRender>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof startProjectRender>>,
@@ -3365,7 +3366,7 @@ export const createPortalSession = async ( options?: RequestInit): Promise<Porta
 
 
 
-export const getCreatePortalSessionMutationOptions = <TError = ErrorType<void>,
+export const getCreatePortalSessionMutationOptions = <TError = ErrorType<void | ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPortalSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createPortalSession>>, TError,void, TContext> => {
 
@@ -3394,12 +3395,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreatePortalSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createPortalSession>>>
 
-    export type CreatePortalSessionMutationError = ErrorType<void>
+    export type CreatePortalSessionMutationError = ErrorType<void | ErrorEnvelope>
 
     /**
  * @summary Create a Stripe Customer Portal session for managing subscriptions
  */
-export const useCreatePortalSession = <TError = ErrorType<void>,
+export const useCreatePortalSession = <TError = ErrorType<void | ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPortalSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createPortalSession>>,

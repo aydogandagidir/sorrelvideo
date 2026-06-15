@@ -104,6 +104,23 @@ export interface HealthStatus {
   status: string;
 }
 
+export type HealthUnhealthyStatus = typeof HealthUnhealthyStatus[keyof typeof HealthUnhealthyStatus];
+
+
+export const HealthUnhealthyStatus = {
+  error: 'error',
+} as const;
+
+export type HealthUnhealthyChecks = {[key: string]: 'ok' | 'error'};
+
+/**
+ * 503 body from /healthz when a dependency probe fails. `status` is always "error"; `checks` maps each probed dependency to "ok"/"error" (redis is present only when REDIS_URL is configured).
+ */
+export interface HealthUnhealthy {
+  status: HealthUnhealthyStatus;
+  checks: HealthUnhealthyChecks;
+}
+
 export type CompositionVariableType = typeof CompositionVariableType[keyof typeof CompositionVariableType];
 
 
@@ -152,6 +169,8 @@ export interface Template {
   tags?: string[];
   /** True when the template's composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services/transitionCapableTemplates.ts) — the editor disables the transitions picker when false. */
   supportsTransitions?: boolean;
+  /** True when the template can be tailored to the user IN-APP — it declares typed `variables`, or its composition substitutes the user's brand/copy/website-capture/talking-host content via `{{brand.|user.|capture.|host.}}` placeholders. False for pure-demo registry compositions that render a fixed sample regardless of brand/content. Derived server-side at read time (not persisted); the gallery foregrounds customizable templates and labels the demos. */
+  customizable?: boolean;
   /** Typed editable parameters the composition declares via the engine's native data-composition-variables. Present only for parametric templates (e.g. data-chart); the Studio form renders one control per entry's type. Derived from the manifest at read time (not persisted). */
   variables?: CompositionVariable[];
   createdAt?: string;

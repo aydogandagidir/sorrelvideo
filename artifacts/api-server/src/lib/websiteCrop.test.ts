@@ -90,4 +90,16 @@ describe("buildCropVars", () => {
     expect(vars["capture.cropW"]).toBe(String(MIN_CROP_SIZE));
     expect(vars["capture.cropH"]).toBe(String(MIN_CROP_SIZE));
   });
+
+  it("never emits exponential notation for a sub-1e-6 fraction (the numeric gate would 400 it)", () => {
+    // String(1e-7) === "1e-7" — which fails findUnsafeCompositionVar's NUMERIC
+    // gate. cropToken must snap such tiny fractions to a plain "0".
+    const vars = buildCropVars({ x: 0.0000001, y: 5e-7, w: 0.5, h: 0.5 });
+    expect(vars["capture.cropX"]).toBe("0");
+    expect(vars["capture.cropY"]).toBe("0");
+    for (const v of Object.values(vars)) {
+      expect(v).toMatch(/^\d+(\.\d+)?$/); // bare number, never exponential
+      expect(v).not.toContain("e");
+    }
+  });
 });

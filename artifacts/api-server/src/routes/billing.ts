@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import {
   getBillingInfo,
   ensureStripeCustomer,
@@ -7,6 +7,22 @@ import {
 import { getUncachableStripeClient } from "../stripeClient";
 
 const router: IRouter = Router();
+
+/**
+ * The absolute origin used to build Stripe redirect URLs. Prefer APP_URL; in
+ * PRODUCTION we must NOT fall back to the request's Host header — an attacker can
+ * spoof it to redirect the post-checkout flow to an arbitrary site — so an unset
+ * APP_URL is a hard misconfiguration there (returns null → 500). In dev we fall
+ * back to the request host for convenience. Returns null when no safe origin
+ * can be resolved.
+ */
+function resolveBillingOrigin(req: Request): string | null {
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "");
+  if (appUrl) return appUrl;
+  if (process.env.NODE_ENV === "production") return null;
+  const host = req.get("host");
+  return host ? `${req.protocol}://${host}` : null;
+}
 
 /**
  * Fetches Pro Plan prices from Stripe, filtered to only the "Sorrel Pro" product.
@@ -81,18 +97,31 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     return;
   }
 
-  // Server-side allowlist: only allow Sorrel Pro prices
-  let allowedPrices: string[];
-  try {
-    const prices = await getProPrices();
-    allowedPrices = prices.map((p) => p.id);
-  } catch (err) {
-    req.log.error({ err }, "Could not verify Pro prices for allowlist");
-    res.status(500).json({ error: "Billing service unavailable" });
-    return;
-  }
+  const stripe = await getUncachableStripeClient();
 
-  if (!allowedPrices.includes(priceId)) {
+  // Validate the submitted price DIRECTLY against Stripe (strongly consistent).
+  // The old approach built an allowlist from products.search, which is backed by
+  // an eventually-consistent index — during a lag it could omit a valid price and
+  // fail-closed on a legitimate purchase. retrieve() reads through, removing that
+  // failure mode while keeping the same fail-closed guarantee: only an active,
+  // recurring price on the active "Sorrel Pro" product is accepted.
+  try {
+    const price = await stripe.prices.retrieve(priceId, {
+      expand: ["product"],
+    });
+    const product = price.product;
+    const isProProduct =
+      typeof product === "object" &&
+      product !== null &&
+      !("deleted" in product && product.deleted === true) &&
+      product.active === true &&
+      (product.metadata?.["plan"] === "pro" || product.name === "Sorrel Pro");
+    if (!price.active || price.type !== "recurring" || !isProProduct) {
+      res.status(400).json({ error: "Invalid or unauthorized price" });
+      return;
+    }
+  } catch (err) {
+    req.log.warn({ err, priceId }, "Stripe price validation failed");
     res.status(400).json({ error: "Invalid or unauthorized price" });
     return;
   }
@@ -115,9 +144,15 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     return;
   }
 
-  const origin = process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
+  const origin = resolveBillingOrigin(req);
+  if (!origin) {
+    req.log.error(
+      "APP_URL is not set; refusing to build a checkout redirect from the Host header in production",
+    );
+    res.status(500).json({ error: "Billing is not configured" });
+    return;
+  }
 
-  const stripe = await getUncachableStripeClient();
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     payment_method_types: ["card"],
@@ -144,7 +179,14 @@ router.post("/billing/portal", async (req, res): Promise<void> => {
     return;
   }
 
-  const origin = process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`;
+  const origin = resolveBillingOrigin(req);
+  if (!origin) {
+    req.log.error(
+      "APP_URL is not set; refusing to build a portal return URL from the Host header in production",
+    );
+    res.status(500).json({ error: "Billing is not configured" });
+    return;
+  }
 
   const stripe = await getUncachableStripeClient();
   const portalSession = await stripe.billingPortal.sessions.create({

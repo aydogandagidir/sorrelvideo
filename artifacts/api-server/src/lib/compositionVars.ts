@@ -19,6 +19,20 @@
  *     and SVG `fill`/`stroke` (data-chart, product-launch, website-showcase, …).
  *     A crafted value can inject a CSS `url(…)` (exfiltration) or extra
  *     declarations.
+ *   - numeric keys (`duration`, `capture.height`, `capture.crop{X,Y,W,H}`,
+ *     `layout.{width,height}`, `sorrel.transitionsActive`) → substituted into JS
+ *     `parseInt("{{…}}")` / `parseFloat("{{…}}")` (website-showcase.html) and
+ *     double-quoted attributes (`data-duration="{{…}}"` in talking-host,
+ *     video-spotlight, website-showcase). A `"` breaks out of the JS string
+ *     literal / attribute → arbitrary script in the app origin, with NO angle
+ *     brackets needed (so `escapeMarkup`'s `< > &` escaping is irrelevant).
+ *   - `layout.aspect` → a bare enum token (`portrait|landscape|square`) in the
+ *     same JS-string / attribute contexts.
+ *   - `brand.fontFamily` → injected UNQUOTED into a CSS `font-family:` declaration
+ *     (`font-family: {{brand.fontFamily}}, "Segoe UI"`). The brand-WRITE path
+ *     validates it (brandKitService `SAFE_FONT`), but a `compositionVars` override
+ *     replaces the brand-snapshot value in `buildVarMap`, bypassing that gate —
+ *     so the same shape is enforced here.
  *
  * This is owner-scoped today, but it voids the escaping contract and becomes a
  * stored-XSS the moment any shared/public preview lands. So we validate at the
@@ -59,6 +73,55 @@ const COLOR_KEYS: readonly string[] = [
   "brand.secondaryColor",
   "brand.accentColor",
 ];
+
+/**
+ * compositionVars keys whose value is substituted into a JS NUMERIC context
+ * (`parseInt("{{key}}")` / `parseFloat("{{key}}")`) or a double-quoted HTML
+ * attribute (`data-duration="{{key}}"`). Because `escapeMarkup` leaves quotes
+ * intact, a `"` here breaks out of the JS string literal / attribute and injects
+ * script. Every legitimate producer (website→video capture, `buildCropVars`,
+ * talkingHost, render dimensions) emits a plain number, so a bare numeric token
+ * is required. `layout.{width,height}` and `sorrel.transitionsActive` are
+ * server-managed on the RENDER path (overwritten after the merge) but remain
+ * user-overridable on the `?vars=` PREVIEW path, so they are gated here too.
+ */
+const NUMERIC_KEYS: readonly string[] = [
+  "duration",
+  "capture.height",
+  "capture.cropX",
+  "capture.cropY",
+  "capture.cropW",
+  "capture.cropH",
+  "layout.width",
+  "layout.height",
+  "sorrel.transitionsActive",
+];
+
+/**
+ * compositionVars keys substituted into a JS string / attribute as a bare ENUM
+ * token (`data-aspect="{{layout.aspect}}"`, `"{{layout.aspect}}" === "1"`-style
+ * comparisons). Allow only a leading-letter identifier so a quote can't break
+ * out. Legit values: `portrait | landscape | square`.
+ */
+const TOKEN_KEYS: readonly string[] = ["layout.aspect"];
+
+/**
+ * compositionVars keys substituted UNQUOTED into a CSS declaration
+ * (`font-family: {{brand.fontFamily}}, "Segoe UI"`). A `;` / `}` / `(` / quote
+ * would inject a second declaration or an exfiltrating `url(…)`. Mirrors
+ * `brandKitService`'s `SAFE_FONT` so a compositionVars override is held to the
+ * same shape the brand-write path enforces.
+ */
+const FONT_KEYS: readonly string[] = ["brand.fontFamily"];
+
+/** A bare number: integer or decimal — no sign, exponent, quote, or whitespace. */
+const NUMERIC_TOKEN = /^\d+(\.\d+)?$/;
+
+/** A bare identifier: leading letter, then letters / digits / `_` / `-`. */
+const IDENTIFIER_TOKEN = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
+/** A safe bare font-family name (mirrors brandKitService `SAFE_FONT`). */
+const SAFE_FONT_TOKEN = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,79}$/;
 
 /**
  * Characters that would break out of a double-quoted HTML attribute or inject
@@ -145,6 +208,29 @@ export function findUnsafeCompositionVar(
       return {
         key,
         reason: `${key} must be a hex (#rgb/#rrggbb), rgb()/rgba(), or hsl()/hsla() color`,
+      };
+    }
+
+    // Empty is "unset" (the composition falls back to a default), matching the
+    // URL/color checks; `buildVarMap` also skips empty values at merge time.
+    if (NUMERIC_KEYS.includes(key) && value !== "" && !NUMERIC_TOKEN.test(value)) {
+      return {
+        key,
+        reason: `${key} must be a plain number (no quotes or other characters)`,
+      };
+    }
+
+    if (TOKEN_KEYS.includes(key) && value !== "" && !IDENTIFIER_TOKEN.test(value)) {
+      return {
+        key,
+        reason: `${key} must be a bare token (letters, digits, "-", "_")`,
+      };
+    }
+
+    if (FONT_KEYS.includes(key) && value !== "" && !SAFE_FONT_TOKEN.test(value)) {
+      return {
+        key,
+        reason: `${key} must be a plain font name (letters, digits, spaces, "-", "_")`,
       };
     }
   }

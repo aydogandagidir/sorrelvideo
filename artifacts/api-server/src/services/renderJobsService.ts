@@ -9,7 +9,7 @@
  * called by the executor that already holds the job id it just created, so they
  * key on the job id alone.
  */
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   db,
   renderJobsTable,
@@ -60,8 +60,8 @@ export async function markRendering(id: string): Promise<void> {
  *  - `backend` re-tags the executor. The render endpoint opens the ledger row
  *    BEFORE backend selection runs, so it stamps `inline`/`bullmq`; once a
  *    render is actually dispatched to Lambda we correct the row to `lambda` so
- *    the progress poller (`getActiveLambdaJobs`) and the distributed quota
- *    (`countLambdaJobsSince`) — both keyed on `backend='lambda'` — see it.
+ *    the progress poller (`getActiveLambdaJobs`), keyed on `backend='lambda'`,
+ *    sees it.
  */
 export async function markExternalId(
   id: string,
@@ -201,29 +201,6 @@ export async function getActiveLambdaJobs(): Promise<RenderJobRow[]> {
       ),
     )
     .orderBy(desc(renderJobsTable.createdAt));
-}
-
-/**
- * Count distributed (lambda) render jobs created on/after `since` — the basis
- * for the monthly distributed-render cap (see billingService). Counting the
- * ledger avoids adding a dedicated users column: one row per dispatch is already
- * written, so a COUNT over the current billing window is the usage number.
- */
-export async function countLambdaJobsSince(
-  userId: string,
-  since: Date,
-): Promise<number> {
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(renderJobsTable)
-    .where(
-      and(
-        eq(renderJobsTable.userId, userId),
-        eq(renderJobsTable.backend, "lambda"),
-        gte(renderJobsTable.createdAt, since),
-      ),
-    );
-  return row?.count ?? 0;
 }
 
 /** Newest render job for a project, or undefined if none exist. */

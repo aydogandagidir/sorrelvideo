@@ -39,7 +39,11 @@ import {
   markRendering,
 } from "./renderJobsService";
 import { generateThumbnail } from "./thumbnailService";
-import { REGISTRY_COMPOSITION_MAP, assetsForModule } from "./registryTemplates";
+import {
+  REGISTRY_COMPOSITION_MAP,
+  assetsForModule,
+  variablesForModule,
+} from "./registryTemplates";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
@@ -177,6 +181,41 @@ export function resolveEntryFile(module: string): string {
  */
 export function isKnownModule(module: string): boolean {
   return module in COMPOSITION_MAP;
+}
+
+/** Memoized per module — the composition file is scanned at most once. */
+const contentCustomizableCache = new Map<string, boolean>();
+/** A placeholder that pipes the user's brand / copy / capture / narration in. */
+const CONTENT_PLACEHOLDER = /\{\{(brand|user|capture|host)\./;
+
+/**
+ * True when a template can be tailored to the user IN-APP: it either declares
+ * typed parametric `variables` (editable via the project's params form) OR its
+ * composition substitutes the user's brand / copy / website capture / talking-host
+ * content through `{{brand.|user.|capture.|host.}}` placeholders. FALSE for the
+ * pure-demo registry compositions that carry NO such placeholder — they render
+ * their canned sample regardless of brand or content. Surfaced on the Template API
+ * (`Template.customizable`, read-time enrichment, never persisted) so the gallery
+ * can foreground the templates that actually produce a tailored video and label
+ * the demos honestly. Scan is memoized; an unreadable file fails closed to false.
+ */
+export function isContentCustomizable(module: string): boolean {
+  const cached = contentCustomizableCache.get(module);
+  if (cached !== undefined) return cached;
+  let result = (variablesForModule(module)?.length ?? 0) > 0;
+  if (!result) {
+    try {
+      const html = fs.readFileSync(
+        path.join(COMPOSITIONS_DIR, resolveEntryFile(module)),
+        "utf-8",
+      );
+      result = CONTENT_PLACEHOLDER.test(html);
+    } catch {
+      result = false;
+    }
+  }
+  contentCustomizableCache.set(module, result);
+  return result;
 }
 
 /**
@@ -343,7 +382,7 @@ function audioExtForContentType(contentType: string | undefined): string {
  * Resolve a project's background-audio track into an `<audio>` tag for the
  * engine to mux. The user-uploaded object is DOWNLOADED into the render dir as a
  * sibling file — the proven, ffmpeg-readable form (a `data:` URI is NOT muxed,
- * verified against 0.6.6) — then referenced relatively so the engine's serve
+ * verified against 0.6.91) — then referenced relatively so the engine's serve
  * stage hosts it for the audio mix. Ownership is re-checked here (defense in
  * depth); ANY failure (missing/!owned object, GCS unconfigured, download error)
  * logs and returns null so the render proceeds SILENTLY instead of failing.
@@ -462,7 +501,7 @@ export async function resolveVoiceoverTag(
  * Download a project's spotlight clip (the "/objects/..." path pinned in
  * `compositionVars["capture.videoObject"]`) into the render dir as the fixed
  * sibling `spotlight-video.mp4` the video-spotlight template references (the
- * engine composites it — verified on 0.6.6). Ownership is re-checked; ANY
+ * engine composites it — verified on 0.6.91). Ownership is re-checked; ANY
  * failure logs and returns so the composition still renders its branded frame
  * WITHOUT the clip rather than failing the render.
  */

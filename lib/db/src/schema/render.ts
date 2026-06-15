@@ -12,7 +12,7 @@
  * `RenderConfig` (fps `{num,den}`, `CanvasResolution`, etc.).
  *
  * `resolution` names mirror the engine's `CANVAS_DIMENSIONS` keys (verified
- * against @hyperframes/core@0.6.6): the three aspects (landscape 1920×1080,
+ * against @hyperframes/core@0.6.91): the three aspects (landscape 1920×1080,
  * portrait 1080×1920, square 1080×1080) and their 4K variants. This single
  * field encodes BOTH aspect ratio and resolution tier.
  */
@@ -220,14 +220,6 @@ export const renderJobsTable = pgTable(
   },
   (table) => [
     index("IDX_render_jobs_project").on(table.projectId),
-    // Backs the per-user distributed-spend scan `countLambdaJobsSince`
-    // (`WHERE user_id = ? AND backend = ? AND created_at >= ?`). Column order
-    // matches the predicate: the two equalities first, the range last.
-    index("IDX_render_jobs_user_backend_created").on(
-      table.userId,
-      table.backend,
-      table.createdAt,
-    ),
     // Backs the in-flight-lambda scan `getActiveLambdaJobs` and boot recovery
     // (`WHERE backend = ? AND status = ?`).
     index("IDX_render_jobs_backend_status").on(table.backend, table.status),

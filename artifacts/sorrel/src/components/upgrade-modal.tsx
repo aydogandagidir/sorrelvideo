@@ -52,11 +52,12 @@ const REASON_MESSAGES: Record<string, { title: string; description: string }> =
   };
 
 const PRO_FEATURES = [
-  "Unlimited renders every month",
-  "Unlimited AI suggestions",
+  "Unlimited renders & AI drafts",
+  "4K resolution & 60 fps",
+  "No watermark",
+  "Transparent, WebM & ProRes exports",
+  "Captions & background audio",
   "All premium templates",
-  "Priority render queue",
-  "Priority support",
 ];
 
 export function UpgradeModal({

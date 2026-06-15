@@ -30,12 +30,25 @@ tags:
     description: Object storage upload and serving endpoints.
   - name: ai
     description: LLM-backed content suggestion.
+  - name: avatar
+    description: Script-to-talking-host video and live avatar sessions.
+  - name: compositions
+    description: Live composition preview and linting.
+
+# Default security: every operation requires a session (cookie `sid` or an
+# `Authorization: Bearer <sid>` token) unless it overrides this with
+# `security: []` — the genuinely-public auth / health / pricing / public-object
+# endpoints do so below.
+security:
+  - cookieAuth: []
+  - bearerAuth: []
 
 paths:
   /auth/user:
     get:
       tags: [Auth]
       operationId: getCurrentAuthUser
+      security: []
       summary: Get the currently authenticated user
       parameters:
         - $ref: "#/components/parameters/AuthorizationSessionHeader"
@@ -51,6 +64,7 @@ paths:
     post:
       tags: [Auth]
       operationId: signupWithPassword
+      security: []
       summary: Create a new account with email and password
       requestBody:
         required: true
@@ -81,6 +95,7 @@ paths:
     post:
       tags: [Auth]
       operationId: loginWithPassword
+      security: []
       summary: Authenticate with email and password
       requestBody:
         required: true
@@ -111,6 +126,7 @@ paths:
     post:
       tags: [Auth]
       operationId: logoutSession
+      security: []
       summary: Clear the current session
       parameters:
         - $ref: "#/components/parameters/AuthorizationSessionHeader"
@@ -126,6 +142,7 @@ paths:
     post:
       tags: [Auth]
       operationId: requestPasswordReset
+      security: []
       summary: Request a password reset email
       requestBody:
         required: true
@@ -144,6 +161,7 @@ paths:
     post:
       tags: [Auth]
       operationId: resetPassword
+      security: []
       summary: Consume a password-reset token and set a new password
       requestBody:
         required: true
@@ -168,6 +186,7 @@ paths:
     get:
       tags: [Auth]
       operationId: consumeEmailVerification
+      security: []
       summary: Verify an email address via a token from the verification email
       parameters:
         - name: token
@@ -182,6 +201,7 @@ paths:
     post:
       tags: [Auth]
       operationId: resendEmailVerification
+      security: []
       summary: Resend the email verification link
       requestBody:
         required: true
@@ -205,6 +225,7 @@ paths:
     get:
       tags: [Auth]
       operationId: beginBrowserLogin
+      security: []
       summary: Redirect helper that sends the browser to the frontend login page
       parameters:
         - name: returnTo
@@ -219,6 +240,7 @@ paths:
     get:
       tags: [Auth]
       operationId: logoutBrowserSession
+      security: []
       summary: Clear the session and redirect to the home page
       parameters:
         - $ref: "#/components/parameters/AuthorizationSessionHeader"
@@ -229,6 +251,7 @@ paths:
   /healthz:
     get:
       operationId: healthCheck
+      security: []
       tags: [health]
       summary: Health check
       description: Returns server health status
@@ -239,6 +262,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: >-
+            Unhealthy — one or more dependency probes (Postgres, and Redis when
+            REDIS_URL is set) failed. The body names the failing dependency so the
+            platform healthcheck/dashboards show why the instance was pulled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthUnhealthy"
 
   /templates:
     get:
@@ -440,6 +472,12 @@ paths:
           description: Not found
         "409":
           description: Render already in progress
+        "503":
+          description: Render could not be started (queue/ledger unavailable).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /projects/{id}/render/cancel:
     post:
@@ -816,6 +854,7 @@ paths:
   /modules:
     get:
       operationId: listModules
+      security: []
       tags: [modules]
       summary: List available platform modules
       responses:
@@ -930,6 +969,12 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "413":
           description: Audio exceeds the transcription size limit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Unexpected error generating captions.
           content:
             application/json:
               schema:
@@ -1100,6 +1145,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Unexpected error creating the video.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "502":
           description: Speech synthesis or transcription failed.
           content:
@@ -1141,6 +1192,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Billing is not configured (APP_URL unset in production).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /billing/portal:
     post:
@@ -1158,6 +1215,24 @@ paths:
           description: No billing account found
         "401":
           description: Unauthorized
+        "500":
+          description: Billing is not configured (APP_URL unset in production).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  # Public/iframe asset-serving routes are intentionally omitted from the typed
+  # spec — the SPA loads them as plain <img src>/iframe URLs, never through the
+  # generated React Query hooks (declaring them would emit unused Blob hooks),
+  # exactly like the /composition preview + project video/thumbnail streams.
+  # Behaviour, for reference (see routes/templates.ts + routes/projects.ts):
+  #   GET /templates/thumbnails/{slug}  -> image/png; PUBLIC (no auth); slug
+  #       allow-listed against the vendored manifest; 404 on unknown/missing.
+  #   GET /templates/{id}/assets/{name} -> image/* or audio/*; AUTH; name
+  #       allow-listed against the manifest (no traversal); 401/404.
+  #   GET /projects/{id}/assets/{name}  -> image/* or audio/* (same MIME set);
+  #       AUTH + owner-scoped; name allow-listed; 401/403/404.
 
   /billing/prices:
     get:
@@ -1260,6 +1335,7 @@ paths:
     get:
       tags: [Storage]
       operationId: getPublicObject
+      security: []
       summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
       parameters:
         - name: filePath
@@ -1451,6 +1527,18 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Session cookie issued by login/signup (7-day TTL).
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        Opaque session token sent as `Authorization: Bearer <sid>` — the
+        cookie's equivalent for non-browser clients.
   parameters:
     AuthorizationSessionHeader:
       name: Authorization
@@ -1580,6 +1668,28 @@ components:
       required:
         - status
 
+    HealthUnhealthy:
+      type: object
+      description: >-
+        503 body from /healthz when a dependency probe fails. `status` is always
+        "error"; `checks` maps each probed dependency to "ok"/"error" (redis is
+        present only when REDIS_URL is configured).
+      required:
+        - status
+        - checks
+      properties:
+        status:
+          type: string
+          enum:
+            - error
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - ok
+              - error
+
     Template:
       type: object
       required: [id, name, category, module, thumbnailUrl, duration, isPremium]
@@ -1613,6 +1723,16 @@ components:
             data-scene-boundary). Derived server-side from the shipped
             composition (services/transitionCapableTemplates.ts) — the editor
             disables the transitions picker when false.
+        customizable:
+          type: boolean
+          description: >-
+            True when the template can be tailored to the user IN-APP — it declares
+            typed `variables`, or its composition substitutes the user's
+            brand/copy/website-capture/talking-host content via
+            `{{brand.|user.|capture.|host.}}` placeholders. False for pure-demo
+            registry compositions that render a fixed sample regardless of
+            brand/content. Derived server-side at read time (not persisted); the
+            gallery foregrounds customizable templates and labels the demos.
         variables:
           type: array
           description: >-

@@ -168,6 +168,39 @@ railway run --service api pnpm --filter @workspace/db run push
 Re-run only after you've reviewed schema changes locally. Never wire this
 into a deploy hook — accidental destructive migrations are real.
 
+### Versioned migrations (forward path after the first push)
+
+Schema history is tracked as committed SQL under `lib/db/drizzle/`:
+`pnpm --filter @workspace/db run generate` writes a reviewed migration per
+schema change; `... run migrate` applies them in order. `push`/`push-force`
+ignore that dir (they diff the live DB directly), so the dev loop + tests are
+unaffected. Migrations are MANUAL only (never on boot/CI — same caution as
+`push`); the boot `apply*Migration()` idempotent self-heals are unchanged.
+
+**ONE-TIME baseline stamping — required before the first `migrate`.** Prod's
+schema already exists (built via the `push` above), so the baseline
+`drizzle/0000_*.sql` must NOT be run — every bare `CREATE TABLE` would throw
+`already exists`. Mark it applied instead:
+
+1. Confirm prod matches the schema: run `drizzle-kit push` against prod and
+   verify it proposes **no changes** (abort without confirming). If it proposes
+   changes, prod has drifted — reconcile the schema first, then regenerate.
+2. Stamp `0000` into the migrations ledger so `migrate` skips it:
+   ```bash
+   railway run --service api psql "$DATABASE_URL" -c \
+     "CREATE SCHEMA IF NOT EXISTS drizzle;
+      CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
+        id SERIAL PRIMARY KEY, hash text NOT NULL, created_at bigint);
+      INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+      VALUES ('<sha256 of drizzle/0000_*.sql>', <created_at from meta/_journal.json>);"
+   ```
+3. `railway run --service api pnpm --filter @workspace/db run migrate` → reports
+   nothing to apply (0000 stamped). From now on `migrate` runs only `0001+`.
+
+A long-lived LOCAL dev DB built via `push` is in the same boat — keep using
+`push` (recommended; never run `migrate` locally) or drop+recreate it empty so
+`migrate` applies `0000` cleanly from scratch.
+
 ## 10. Custom domain
 
 1. Railway api service → **Settings → Domains → Custom domain**. Add

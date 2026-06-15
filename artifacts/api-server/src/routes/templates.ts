@@ -23,6 +23,7 @@ import { supportsTransitions } from "../services/transitionCapableTemplates";
 import {
   resolveEntryFile,
   renderCompositionTemplate,
+  isContentCustomizable,
 } from "../services/renderService";
 import { serveTemplateAsset } from "../lib/templateAssets";
 import {
@@ -116,17 +117,23 @@ function userTemplatesFilter(userId: string) {
 }
 
 /**
- * Read-time enrichment: `supportsTransitions` + the typed `variables` are
- * properties of the SHIPPED composition / the manifest, derived code-side and
- * never persisted, so already-seeded environments can't go stale. Applied
- * before the zod parse so the fields survive it. `variables` is omitted (not
- * `undefined`-set) for templates that declare none, keeping the payload lean.
+ * Read-time enrichment: `supportsTransitions`, `customizable`, and the typed
+ * `variables` are properties of the SHIPPED composition / the manifest, derived
+ * code-side and never persisted, so already-seeded environments can't go stale.
+ * Applied before the zod parse so the fields survive it. `variables` is omitted
+ * (not `undefined`-set) for templates that declare none, keeping the payload lean.
+ *
+ * `customizable` tells the gallery whether a template actually consumes the user's
+ * brand/copy/content (placeholders or typed variables) vs. being a pure-demo
+ * registry composition that renders a fixed sample — so the UI can foreground the
+ * ones that produce a tailored video and label the demos honestly.
  */
 function withTransitionCapability<T extends { module: string }>(row: T): T {
   const variables = variablesForModule(row.module);
   return {
     ...row,
     supportsTransitions: supportsTransitions(row.module),
+    customizable: isContentCustomizable(row.module),
     ...(variables ? { variables } : {}),
   };
 }

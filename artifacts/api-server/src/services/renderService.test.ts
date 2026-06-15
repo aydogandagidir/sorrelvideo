@@ -6,6 +6,7 @@ import {
   buildTransitionsInjection,
   copyTemplateAssets,
   injectWatermark,
+  isContentCustomizable,
   outputPathFor,
   renderCompositionTemplate,
   renderDirFor,
@@ -17,6 +18,32 @@ import {
 } from "./renderService";
 import { assetsForModule } from "./registryTemplates";
 import { TRANSITION_SHADERS } from "./renderSettingsService";
+
+describe("isContentCustomizable", () => {
+  it("is true for templates that consume brand/user content or declare variables", () => {
+    // Hand-authored content templates carry {{brand.*}}/{{user.*}} placeholders…
+    expect(isContentCustomizable("studio")).toBe(true);
+    expect(isContentCustomizable("brand-story")).toBe(true);
+    expect(isContentCustomizable("video-spotlight")).toBe(true);
+    expect(isContentCustomizable("website-showcase")).toBe(true);
+    // …and data-chart is customizable via its typed parametric variables.
+    expect(isContentCustomizable("data-chart")).toBe(true);
+  });
+
+  it("is false for pure-demo registry compositions (no placeholders, no variables)", () => {
+    expect(isContentCustomizable("app-showcase")).toBe(false);
+    expect(isContentCustomizable("us-map")).toBe(false);
+  });
+
+  it("memoizes — a repeat call returns the same verdict", () => {
+    expect(isContentCustomizable("studio")).toBe(
+      isContentCustomizable("studio"),
+    );
+    expect(isContentCustomizable("app-showcase")).toBe(
+      isContentCustomizable("app-showcase"),
+    );
+  });
+});
 
 describe("renderCompositionTemplate", () => {
   it("substitutes simple {{key}} placeholders", () => {

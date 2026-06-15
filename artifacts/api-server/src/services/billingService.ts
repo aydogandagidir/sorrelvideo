@@ -2,7 +2,6 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, pool, stripeSubscriptionsTable, usersTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
-import { countLambdaJobsSince } from "./renderJobsService";
 
 const FREE_RENDER_LIMIT = 3;
 const FREE_AI_LIMIT = 10;
@@ -31,12 +30,6 @@ export interface BillingInfo {
 function startOfNextMonth(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-}
-
-/** Returns the first instant of the current month in UTC. */
-function startOfThisMonth(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
 /** Returns true if the monthly reset date has passed. */
@@ -435,16 +428,21 @@ export async function checkAndIncrementAiCount(userId: string): Promise<void> {
 
 /**
  * Enforce the monthly DISTRIBUTED (Lambda) render cap — applied to EVERY plan,
- * including Pro. Unlike `checkAndIncrementRenderCount` (which is the Free monthly
- * quota that Pro bypasses), this bounds the per-run-cost Lambda backend for all
- * users so a single account can't run up an unbounded AWS bill.
+ * including Pro. Unlike `checkAndIncrementRenderCount` (the Free quota that Pro
+ * bypasses), this bounds the per-run-cost Lambda backend for all users so a single
+ * account can't run up an unbounded AWS bill.
  *
- * Usage is COUNTED from the `render_jobs` ledger (backend='lambda', createdAt in
- * the current UTC month) rather than tracked on a dedicated users column: one row
- * per dispatch is already written, so the count IS the usage. Because the caller
- * inserts the ledger row immediately AFTER this check passes (mirroring the
- * existing render flow), the count reflects prior dispatches this month and the
- * Nth dispatch is admitted while < limit.
+ * ATOMIC check-and-increment under a pg `FOR UPDATE` row lock (the same proven
+ * shape as `checkAndIncrementRenderCount`), with a monthly reset. This closes the
+ * prior check-then-act race: the old version counted the `render_jobs` ledger with
+ * an UNLOCKED read and the ledger INSERT happened later, so N concurrent dispatches
+ * across different projects of one user could each observe `used < limit` and all
+ * proceed, overrunning the cap. The counter now lives on a locked users row, so
+ * concurrent dispatches serialize and the Nth-over-limit one is rejected.
+ *
+ * No refund on a later pre-dispatch failure: the cap is a coarse COST CEILING, so
+ * consuming one of N slots on a failed attempt errs on the safe (spend-bounding)
+ * side and avoids threading a decrement through the pinned render-start flow.
  *
  * Throws `{ reason: "upgrade_required", status: 403 }` when the cap is hit — the
  * SAME shape as the Free-quota / premium rejections, so the existing 403 handler
@@ -453,12 +451,55 @@ export async function checkAndIncrementAiCount(userId: string): Promise<void> {
 export async function checkAndIncrementDistributedRenderCount(
   userId: string,
 ): Promise<void> {
-  const used = await countLambdaJobsSince(userId, startOfThisMonth());
-  if (used >= DISTRIBUTED_RENDER_LIMIT) {
-    throw Object.assign(
-      new Error("Monthly distributed render limit reached — upgrade to Pro"),
-      { reason: "upgrade_required", status: 403 },
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const lockResult = await client.query<{
+      distributed_render_count: number;
+      distributed_render_reset_at: Date | null;
+    }>(
+      `SELECT distributed_render_count, distributed_render_reset_at
+         FROM users
+        WHERE id = $1
+          FOR UPDATE`,
+      [userId],
     );
+
+    const row = lockResult.rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      throw new Error("User not found");
+    }
+
+    let count = row.distributed_render_count;
+    let resetAt: Date | null = row.distributed_render_reset_at;
+    if (isNewMonth(resetAt)) {
+      count = 0;
+      resetAt = startOfNextMonth();
+    }
+
+    if (count >= DISTRIBUTED_RENDER_LIMIT) {
+      await client.query("ROLLBACK");
+      throw Object.assign(
+        new Error("Monthly distributed render limit reached — upgrade to Pro"),
+        { reason: "upgrade_required", status: 403 },
+      );
+    }
+
+    await client.query(
+      `UPDATE users
+          SET distributed_render_count = $1, distributed_render_reset_at = $2
+        WHERE id = $3`,
+      [count + 1, resetAt, userId],
+    );
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
