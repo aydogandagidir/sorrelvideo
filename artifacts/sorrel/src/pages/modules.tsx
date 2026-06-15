@@ -5,8 +5,41 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { AlertCircle, CheckCircle2, Blocks } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Blocks,
+  Wand2,
+  Globe,
+  Bot,
+  BarChart3,
+  Palette,
+  Layers,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
+/**
+ * Map a module's `icon` (a lucide-react component NAME persisted on the row by
+ * the server-side catalog seeder) to its glyph; an unknown name falls back to a
+ * generic block so a newly-seeded module never renders icon-less.
+ */
+const MODULE_ICONS: Record<string, LucideIcon> = {
+  Wand2,
+  Globe,
+  Bot,
+  BarChart3,
+  Palette,
+  Layers,
+  Users,
+  Blocks,
+};
+
+function ModuleIcon({ name }: { name: string }) {
+  const Icon = MODULE_ICONS[name] ?? Blocks;
+  return <Icon className="h-6 w-6" />;
+}
 
 function ModuleStatusBadge({ status }: { status: string }) {
   switch (status) {
@@ -82,7 +115,7 @@ export default function Modules() {
               <CardHeader>
                 <div className="flex justify-between items-start mb-4">
                   <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Blocks className="h-6 w-6" />
+                    <ModuleIcon name={module.icon} />
                   </div>
                   <ModuleStatusBadge status={module.status} />
                 </div>
