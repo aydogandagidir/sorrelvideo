@@ -510,7 +510,7 @@ function ProjectDetail({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-[1040px] gap-0 overflow-hidden p-0">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-[1040px] gap-0 overflow-y-auto p-0 md:overflow-hidden">
         <DialogTitle className="sr-only">{project.name}</DialogTitle>
         <div className="grid md:h-[80vh] md:grid-cols-[1fr_360px]">
           {/* Cinematic stage: one large, height-driven player on a dark
