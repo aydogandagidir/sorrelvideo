@@ -172,7 +172,7 @@ describe("Analytics — AI quota visibility (the fix)", () => {
     const aiCard = await waitFor(() => cardByTitle(/ai drafts used/i));
     const value = within(aiCard).getByText("9 / 10");
     expect(value).toBeInTheDocument();
-    expect(value).toHaveClass("text-amber-500");
+    expect(value).toHaveClass("text-warning");
     expect(
       within(aiCard).getByText(/1 ai draft left this month/i),
     ).toBeInTheDocument();

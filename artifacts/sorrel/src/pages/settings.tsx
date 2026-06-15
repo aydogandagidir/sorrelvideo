@@ -328,7 +328,7 @@ export default function Settings() {
               </div>
               <Badge
                 variant="secondary"
-                className="text-green-600 bg-green-50"
+                className="border-success/25 bg-success/15 text-success"
               >
                 Active
               </Badge>

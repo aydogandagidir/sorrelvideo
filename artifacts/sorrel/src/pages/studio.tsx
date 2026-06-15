@@ -350,7 +350,7 @@ export default function StudioPage() {
                 </div>
                 {aiRemaining != null && (
                   <p
-                    className={`mt-2 text-xs ${aiNearCap ? "text-amber-500" : "text-muted-foreground"}`}
+                    className={`mt-2 text-xs ${aiNearCap ? "text-warning" : "text-muted-foreground"}`}
                   >
                     {aiRemaining > 0
                       ? `${aiRemaining} AI ${aiRemaining === 1 ? "draft" : "drafts"} left this month`

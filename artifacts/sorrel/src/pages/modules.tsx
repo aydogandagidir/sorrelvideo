@@ -13,7 +13,7 @@ function ModuleStatusBadge({ status }: { status: string }) {
     case "active":
       return <Badge className="bg-primary text-primary-foreground">Active</Badge>;
     case "beta":
-      return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">Beta</Badge>;
+      return <Badge className="border-warning/25 bg-warning/15 text-warning">Beta</Badge>;
     case "coming_soon":
       return <Badge variant="outline" className="text-muted-foreground">Coming Soon</Badge>;
     default:

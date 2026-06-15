@@ -112,7 +112,7 @@ function TemplateCard({
             {template.category}
           </span>
           {isDemo && (
-            <span className="rounded-full border border-amber-400/30 bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 backdrop-blur">
+            <span className="rounded-full border border-warning/30 bg-warning/15 px-2 py-0.5 text-[11px] font-semibold text-warning backdrop-blur">
               Demo
             </span>
           )}
@@ -144,7 +144,7 @@ function TemplateCard({
           {template.description || "No description provided."}
         </p>
         {isDemo && (
-          <p className="text-[11px] leading-snug text-amber-500/90">
+          <p className="text-[11px] leading-snug text-warning/90">
             Renders a fixed sample — open in Studio to edit its code/content.
           </p>
         )}

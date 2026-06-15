@@ -52,7 +52,7 @@ function ModuleStatusBadge({ status }: { status: string }) {
       );
     case "beta":
       return (
-        <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+        <Badge className="border-warning/25 bg-warning/15 text-warning">
           Beta
         </Badge>
       );
@@ -106,7 +106,7 @@ function RenderStatusBadge({ status }: { status: string }) {
       return <Badge variant="destructive">Failed</Badge>;
     case "rendering":
       return (
-        <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+        <Badge className="border-spark/20 bg-spark/10 text-spark">
           Rendering
         </Badge>
       );
@@ -472,7 +472,7 @@ export default function Analytics() {
             <SummaryCard
               title="AI drafts used"
               value={
-                <span className={aiNearCap ? "text-amber-500" : undefined}>
+                <span className={aiNearCap ? "text-warning" : undefined}>
                   {aiUsageLabel}
                 </span>
               }
