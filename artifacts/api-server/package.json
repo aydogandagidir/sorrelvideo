@@ -37,7 +37,7 @@
     "puppeteer": "^24.43.1",
     "rate-limit-redis": "^4.2.0",
     "resend": "^6.12.4",
-    "stripe": "^22.2.0",
+    "stripe": "^22.2.1",
     "zod": "catalog:"
   },
   "devDependencies": {
