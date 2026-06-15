@@ -247,7 +247,7 @@ function UserRow() {
         type="button"
         onClick={logout}
         aria-label="Log out"
-        className="text-muted-foreground transition-colors hover:text-foreground"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
       >
         <LogOut className="h-[15px] w-[15px]" />
       </button>
@@ -421,6 +421,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      // Respect the user's preference (Settings → Preferences). WCAG 2.1.4:
+      // single-character shortcuts must be switchable off.
+      if (
+        typeof localStorage !== "undefined" &&
+        localStorage.getItem("sorrel:navShortcuts") === "off"
+      )
+        return;
       const dest = JUMP[e.key.toLowerCase()];
       if (dest) {
         e.preventDefault();
@@ -460,18 +467,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
               Sorrel
             </span>
           </Link>
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="flex w-[248px] flex-col bg-sidebar p-0">
-              <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <SidebarBody active={active} onNavigate={() => setMobileOpen(false)} />
-            </SheetContent>
-          </Sheet>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Search"
+              className="grid h-10 w-10 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Search className="h-5 w-5" />
+            </button>
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle navigation</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="flex w-[248px] flex-col bg-sidebar p-0">
+                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <SidebarBody active={active} onNavigate={() => setMobileOpen(false)} />
+              </SheetContent>
+            </Sheet>
+          </div>
         </header>
 
         {/* Desktop topbar */}
