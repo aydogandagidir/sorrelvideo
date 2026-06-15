@@ -26,7 +26,7 @@ export default function EmailVerifiedPage() {
             Sorrel
           </Link>
           {ok ? (
-            <CheckCircle2 className="h-12 w-12 mx-auto text-green-500" />
+            <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
           ) : (
             <XCircle className="h-12 w-12 mx-auto text-destructive" />
           )}

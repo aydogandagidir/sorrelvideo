@@ -116,7 +116,7 @@ export function RenderTray() {
           {renderingCount > 0 ? (
             <Loader2 className="h-4 w-4 animate-spin text-spark" />
           ) : (
-            <Check className="h-4 w-4 text-green-500" />
+            <Check className="h-4 w-4 text-success" />
           )}
         </span>
         <span className="flex-1 text-[13px] font-semibold">
@@ -154,7 +154,7 @@ export function RenderTray() {
                   <CompositionThumb {...thumbProps(p, brand)} frame={0.62} />
                   {done && (
                     <div className="absolute inset-0 grid place-items-center bg-black/45 duration-300 animate-in fade-in">
-                      <span className="grid h-5 w-5 place-items-center rounded-full bg-green-500 text-black duration-300 animate-in zoom-in">
+                      <span className="grid h-5 w-5 place-items-center rounded-full bg-success text-success-foreground duration-300 animate-in zoom-in">
                         <Check className="h-3 w-3" strokeWidth={3} />
                       </span>
                     </div>
@@ -165,7 +165,7 @@ export function RenderTray() {
                     {p.name}
                   </div>
                   {done ? (
-                    <div className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-green-500">
+                    <div className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-success">
                       Ready to ship <ArrowRight className="h-2.5 w-2.5" />
                     </div>
                   ) : (

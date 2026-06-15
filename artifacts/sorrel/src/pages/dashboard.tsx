@@ -63,7 +63,7 @@ function thumbProps(project: Project, brand?: BrandKit) {
 function StatusDot({ status }: { status: string }) {
   const map: Record<string, { cls: string; label: string; live?: boolean }> = {
     ready: {
-      cls: "bg-green-500/15 text-green-400 border-green-500/25",
+      cls: "bg-success/15 text-success border-success/25",
       label: "Ready",
     },
     rendering: {
@@ -71,7 +71,7 @@ function StatusDot({ status }: { status: string }) {
       label: "Rendering",
       live: true,
     },
-    failed: { cls: "bg-red-500/15 text-red-400 border-red-500/25", label: "Failed" },
+    failed: { cls: "bg-destructive/15 text-destructive border-destructive/30", label: "Failed" },
     draft: {
       cls: "bg-secondary text-muted-foreground border-border",
       label: "Draft",

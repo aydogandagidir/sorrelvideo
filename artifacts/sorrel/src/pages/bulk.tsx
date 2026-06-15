@@ -35,7 +35,7 @@ function ModuleStatusBadge({ status }: { status: string }) {
       );
     case "beta":
       return (
-        <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+        <Badge className="border-warning/25 bg-warning/15 text-warning">
           Beta
         </Badge>
       );
