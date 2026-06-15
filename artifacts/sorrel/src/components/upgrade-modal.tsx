@@ -19,6 +19,7 @@ interface UpgradeModalProps {
     | "premium_template"
     | "ai_limit"
     | "render_quality"
+    | "avatar"
     | "general";
 }
 
@@ -43,6 +44,11 @@ const REASON_MESSAGES: Record<string, { title: string; description: string }> =
       title: "High-quality exports need Pro",
       description:
         "Free renders are capped at 1080p, 30fps, MP4 with a watermark and a single transition. Upgrade to Pro for 4K, 60fps, transparent backgrounds, ProRes/MOV and WebM exports, watermark removal, and multiple transitions.",
+    },
+    avatar: {
+      title: "The Live Avatar is a Pro feature",
+      description:
+        "The real-time conversational avatar is included with Sorrel Pro. Upgrade to talk to your brand's AI host live.",
     },
     general: {
       title: "Upgrade to Sorrel Pro",

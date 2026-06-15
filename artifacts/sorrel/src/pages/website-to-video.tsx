@@ -37,13 +37,26 @@ export default function WebsiteToVideo(): React.JSX.Element {
   const createVideo = useWebsiteToVideo({
     mutation: {
       onSuccess: (project) => setLocation(`/projects?focus=${project.id}`),
-      onError: () =>
+      // Branch on the backend status so the message matches the real failure
+      // (rate-limit, SSRF/invalid-URL reject, capture failure) instead of one
+      // misleading "make sure the URL is reachable" for every case.
+      onError: (err) => {
+        const e = err as { status?: number; data?: { error?: string } };
+        const description =
+          e.status === 429
+            ? "You're capturing sites too quickly — wait a minute and try again."
+            : e.status === 400
+              ? (e.data?.error ??
+                "That URL can't be captured. Use a public site and try again.")
+              : e.status === 502
+                ? "We couldn't load that site. Make sure it's public and reachable, then try again."
+                : "Something went wrong creating the video. Please try again.";
         toast({
           variant: "destructive",
           title: "Couldn't create the video",
-          description:
-            "Make sure the URL is a public, reachable site, then try again.",
-        }),
+          description,
+        });
+      },
     },
   });
 
@@ -53,6 +66,22 @@ export default function WebsiteToVideo(): React.JSX.Element {
     if (!trimmed || createVideo.isPending) return;
     // Be forgiving: accept "example.com" and default it to https://.
     const full = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    // Catch obvious junk before a slow Chrome round-trip: must parse to a URL
+    // with a dotted hostname.
+    let hostname = "";
+    try {
+      hostname = new URL(full).hostname;
+    } catch {
+      hostname = "";
+    }
+    if (!hostname.includes(".")) {
+      toast({
+        variant: "destructive",
+        title: "Enter a valid website URL",
+        description: "For example, yourcompany.com",
+      });
+      return;
+    }
     createVideo.mutate({
       data: {
         url: full,

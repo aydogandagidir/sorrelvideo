@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Bot, Clapperboard, Loader2, Mic, Send, Sparkles } from "lucide-react";
+import { Bot, Clapperboard, Loader2, Mic, Send, Sparkles, Zap } from "lucide-react";
 import {
   useAvatarChat,
   useCreateAvatarVideo,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
+import { useBillingInfo } from "@/hooks/useBilling";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,10 +31,12 @@ type Msg = { role: "user" | "assistant"; content: string };
 type Status = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 /**
- * Live Avatar — the FREE, browser-native conversational avatar (Track F,
- * self-hosted path). The browser does speech-to-text + text-to-speech for free;
- * the server does only the brand-voiced LLM turn (POST /api/avatar/chat). A
- * stylized SVG face lip-syncs while it speaks. No GPU, no SaaS, no credits.
+ * Live Avatar — the browser-native conversational avatar (Track F, self-hosted
+ * path). The browser does speech-to-text + text-to-speech, so there is no GPU
+ * and no per-minute SaaS cost; the only server work is the brand-voiced LLM turn
+ * (POST /api/avatar/chat), which is a PRO feature (the route 403s Free users —
+ * see api-server/src/routes/avatar.ts). A stylized SVG face lip-syncs while it
+ * speaks.
  *
  * Voice in (SpeechRecognition) is Chrome/Edge-only — everywhere else the typed
  * input is the path, so the feature degrades gracefully. Voice OUT
@@ -266,14 +269,16 @@ export default function AvatarPage() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState<
-    "premium_template" | "ai_limit"
-  >("premium_template");
+  const [upgradeReason, setUpgradeReason] = useState<"avatar" | "ai_limit">(
+    "avatar",
+  );
 
   const chat = useAvatarChat();
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sttSupported = speechRecognitionCtor() !== null;
+  const { data: billing } = useBillingInfo();
+  const isPro = billing?.plan === "pro";
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -318,7 +323,7 @@ export default function AvatarPage() {
       } catch (err) {
         const e = err as { status?: number; data?: { error?: string } };
         if (e.status === 403) {
-          setUpgradeReason("premium_template");
+          setUpgradeReason("avatar");
           setShowUpgrade(true);
           setStatus("idle");
           return;
@@ -384,7 +389,7 @@ export default function AvatarPage() {
             </p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11.5px] font-semibold text-primary">
-            <Sparkles className="h-3.5 w-3.5" /> Beta
+            <Zap className="h-3.5 w-3.5" /> Pro
           </span>
         </div>
 
@@ -394,12 +399,26 @@ export default function AvatarPage() {
 
             {!started ? (
               <>
-                <Button type="button" size="lg" onClick={start}>
-                  <Bot className="h-4 w-4" /> Start conversation
-                </Button>
+                {isPro ? (
+                  <Button type="button" size="lg" onClick={start}>
+                    <Bot className="h-4 w-4" /> Start conversation
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={() => {
+                      setUpgradeReason("avatar");
+                      setShowUpgrade(true);
+                    }}
+                  >
+                    <Zap className="h-4 w-4" /> Unlock with Pro
+                  </Button>
+                )}
                 <p className="text-center text-[11.5px] text-muted-foreground">
-                  Free and unlimited. Voiced by your browser, answered in your
-                  brand voice.
+                  {isPro
+                    ? "Answered in your brand voice — voiced by your browser, no credits used."
+                    : "The Live Avatar is a Pro feature. Upgrade to talk to your brand's AI host live."}
                 </p>
               </>
             ) : (
