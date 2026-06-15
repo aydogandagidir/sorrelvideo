@@ -1,0 +1,5 @@
+# Vendored third-party libraries (minified) — self-hosted GSAP / D3 / Three.js /
+# topojson / lottie copies that the compositions inline at render + preview time
+# (see renderService.inlineVendorScripts). Never reformat these; they're upstream
+# build artifacts, not our source. ESLint already ignores compositions/** too.
+artifacts/api-server/src/compositions/vendor/

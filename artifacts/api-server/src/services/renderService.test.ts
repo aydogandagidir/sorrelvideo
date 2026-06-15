@@ -6,6 +6,7 @@ import {
   buildTransitionsInjection,
   copyTemplateAssets,
   injectWatermark,
+  inlineVendorScripts,
   isContentCustomizable,
   outputPathFor,
   renderCompositionTemplate,
@@ -18,6 +19,55 @@ import {
 } from "./renderService";
 import { assetsForModule } from "./registryTemplates";
 import { TRANSITION_SHADERS } from "./renderSettingsService";
+
+describe("inlineVendorScripts", () => {
+  const VENDORED = [
+    "https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js",
+    "https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js",
+    "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js",
+    "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js",
+  ];
+
+  it("inlines each vendored CDN lib and drops the external src (no CDN dependency left)", () => {
+    for (const url of VENDORED) {
+      const out = inlineVendorScripts(`<head><script src="${url}"></script></head>`);
+      expect(out).not.toContain(url);
+      expect(out).toContain("<script>");
+      // The real minified lib (>1KB) is now inline, not an empty stub.
+      expect(out.length).toBeGreaterThan(1000);
+    }
+  });
+
+  it("inlines the GSAP lib used by 69/74 compositions (the timeline dependency)", () => {
+    const out = inlineVendorScripts(
+      '<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>',
+    );
+    expect(out).toMatch(/GSAP 3\.14\.2/);
+    expect(out).not.toContain("src=");
+  });
+
+  it("leaves an unknown external script untouched (graceful CDN fallback)", () => {
+    const html = '<script src="https://example.com/whatever.js"></script>';
+    expect(inlineVendorScripts(html)).toBe(html);
+  });
+
+  it("leaves non-script externals (e.g. Google Fonts CSS) alone", () => {
+    const html =
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter">';
+    expect(inlineVendorScripts(html)).toBe(html);
+  });
+
+  it("inlines repeated occurrences and is a no-op on script-less HTML", () => {
+    const tag =
+      '<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>';
+    expect(inlineVendorScripts(tag + tag)).not.toContain("jsdelivr");
+    expect(inlineVendorScripts("<div>no scripts</div>")).toBe(
+      "<div>no scripts</div>",
+    );
+  });
+});
 
 describe("isContentCustomizable", () => {
   it("is true for templates that consume brand/user content or declare variables", () => {

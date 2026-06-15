@@ -359,6 +359,75 @@ function injectBeforeBodyEnd(html: string, snippet: string): string {
   return html.slice(0, idx) + snippet + html.slice(idx);
 }
 
+/**
+ * Self-hosted copies of the animation libraries the compositions reference. 69
+ * of the 74 compositions load GSAP (plus a few D3 / Three.js / topojson /
+ * lottie) from cdn.jsdelivr.net / cdnjs at RUNTIME. Because the live preview
+ * runs in the USER's browser iframe and the render runs in the server's Chrome,
+ * BOTH depend on that CDN being reachable — an unreachable/slow/blocked CDN is
+ * exactly the "Composition timeline not found after 8s" preview failure (the
+ * composition's inline script throws `gsap is not defined`, so no timeline ever
+ * registers on `window.__timelines`/`window.__hf`) and a matching render
+ * timeout. Inlining the vendored copy at emit time removes that dependency.
+ *
+ * Keyed by the EXACT CDN URL → the file under compositions/vendor/. Versions are
+ * load-bearing (three r128 vs 0.147 expose different APIs), so the map is exact;
+ * an unrecognised URL is left as-is (graceful CDN fallback).
+ */
+const VENDOR_LIBS: Readonly<Record<string, string>> = {
+  "https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js": "gsap-3.14.2.min.js",
+  "https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js": "d3-7.min.js",
+  "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js":
+    "topojson-client-3.1.0.min.js",
+  "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js":
+    "three-0.147.0.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js":
+    "three-r128.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js":
+    "lottie-5.12.2.min.js",
+};
+
+const VENDOR_DIR = path.join(COMPOSITIONS_DIR, "vendor");
+const vendorCache = new Map<string, string | null>();
+
+/** Read a vendored lib's bytes (memoized). `null` → not on disk → keep the CDN tag. */
+function readVendorLib(url: string): string | null {
+  const cached = vendorCache.get(url);
+  if (cached !== undefined) return cached;
+  const file = VENDOR_LIBS[url];
+  let body: string | null = null;
+  if (file) {
+    try {
+      // Neutralize any literal </script in the lib so the inline <script> can't
+      // be closed early (minified libs don't contain it, but be defensive).
+      body = fs
+        .readFileSync(path.join(VENDOR_DIR, file), "utf-8")
+        .replace(/<\/script/gi, "<\\/script");
+    } catch {
+      body = null;
+    }
+  }
+  vendorCache.set(url, body);
+  return body;
+}
+
+/**
+ * Replace each `<script src="<known CDN lib>"></script>` with an INLINE copy of
+ * the vendored library, so neither the live preview (user's browser iframe) nor
+ * the render (server Chrome) depends on a live CDN. Unknown script URLs and
+ * non-script externals (e.g. Google Fonts CSS — a missing font degrades
+ * gracefully, a missing animation lib breaks the timeline) are left untouched.
+ */
+export function inlineVendorScripts(html: string): string {
+  return html.replace(
+    /<script\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["'][^>]*>\s*<\/script>/gi,
+    (match, url: string) => {
+      const lib = readVendorLib(url);
+      return lib === null ? match : `<script>${lib}</script>`;
+    },
+  );
+}
+
 /** Map an uploaded audio object's content-type to a file extension. */
 function audioExtForContentType(contentType: string | undefined): string {
   switch ((contentType ?? "").toLowerCase()) {
@@ -738,7 +807,7 @@ export async function buildCompositionHtml(project: {
     typeof project.compositionHtml === "string" &&
     project.compositionHtml.length > 0
   ) {
-    return project.compositionHtml;
+    return inlineVendorScripts(project.compositionHtml);
   }
 
   const baseEntryFile = resolveEntryFile(project.module);
@@ -767,7 +836,7 @@ export async function buildCompositionHtml(project: {
   vars["layout.aspect"] =
     width > height ? "landscape" : width < height ? "portrait" : "square";
 
-  return renderCompositionTemplate(source, vars);
+  return inlineVendorScripts(renderCompositionTemplate(source, vars));
 }
 
 /**
