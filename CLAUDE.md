@@ -682,8 +682,9 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   (`$type<RenderSettings>`) holds the user-editable render config —
   `{ fps: 24|30|60, quality: draft|standard|high, format: mp4|webm|mov|png-sequence,
   resolution: landscape|portrait|square (+ each `-4k` variant), transparent, watermark,
-  transitions? }`. Null → `DEFAULT_RENDER_SETTINGS` (draft / 30fps / mp4 / portrait /
-  opaque / watermarked) so legacy projects render byte-for-byte as before. Edited via the
+  transitions? }`. Null → `DEFAULT_RENDER_SETTINGS` (standard / 30fps / mp4 / portrait /
+  opaque / watermarked — `standard` is the crisp, Free-allowed default quality floor; was
+  `draft`, bumped so default output is sale-quality without changing the Free/Pro gate). Edited via the
   dedicated, Pro-gated `PATCH /api/projects/:id/render-settings` (NOT the generic project
   PATCH — that would let Pro-only knobs be set un-gated). The settings service lives in
   `services/renderSettingsService.ts`: `resolveSettings` (coerce a partial/null blob into a

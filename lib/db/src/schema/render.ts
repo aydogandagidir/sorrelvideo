@@ -148,13 +148,16 @@ export interface RenderSettings {
 }
 
 /**
- * Defaults applied when `render_settings` is null. Chosen to reproduce the
- * pre-settings render output byte-for-byte: draft quality, 30fps, mp4, the
+ * Defaults applied when `render_settings` is null. `standard` is the crisp-by-
+ * default quality floor — Free is allowed draft|standard (only `high` is Pro),
+ * so a Free user's render is not visibly soft out of the box. 30fps, mp4, the
  * portrait 9:16 the Studio compositions are authored at, opaque, watermarked.
+ * (Historically `draft`; bumped to `standard` so the default output is
+ * sale-quality without touching the Free/Pro gate.)
  */
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   fps: 30,
-  quality: "draft",
+  quality: "standard",
   format: "mp4",
   resolution: "portrait",
   transparent: false,
