@@ -439,7 +439,16 @@ function ProjectDetail({
                 : "render_limit",
             );
             setUpgradeOpen(true);
+            return;
           }
+          toast({
+            variant: "destructive",
+            title: "Couldn't start the render",
+            description:
+              e.status === 409
+                ? "A render is already in progress for this project."
+                : (e.data?.error ?? "Please try again."),
+          });
         },
       },
     );
@@ -831,6 +840,12 @@ function ProjectDetail({
                               invalidate();
                               onClose();
                             },
+                            onError: () =>
+                              toast({
+                                variant: "destructive",
+                                title: "Couldn't delete the project",
+                                description: "Please try again.",
+                              }),
                           },
                         )
                       }
@@ -871,6 +886,7 @@ export default function Projects() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectModule, setNewProjectModule] = useState("studio");
+  const [search, setSearch] = useState("");
 
   const hasRendering = projects?.some((p) => p.status === "rendering") ?? false;
   useProjectPolling(hasRendering);
@@ -878,10 +894,14 @@ export default function Projects() {
   const readyCount = projects?.filter((p) => p.status === "ready").length ?? 0;
   const renderingCount =
     projects?.filter((p) => p.status === "rendering").length ?? 0;
-  const filtered =
+  const byStatus =
     filter === "All"
       ? (projects ?? [])
       : (projects ?? []).filter((p) => p.status === filter.toLowerCase());
+  const query = search.trim().toLowerCase();
+  const filtered = query
+    ? byStatus.filter((p) => (p.name ?? "").toLowerCase().includes(query))
+    : byStatus;
   const detail = projects?.find((p) => p.id === detailId) ?? null;
 
   const handleCreate = (e: React.FormEvent) => {
@@ -999,9 +1019,16 @@ export default function Projects() {
               {f}
             </button>
           ))}
-          <div className="ml-auto hidden h-[34px] w-[180px] items-center gap-2 rounded-md border bg-secondary px-2.5 text-muted-foreground sm:flex">
-            <Search className="h-3.5 w-3.5" />
-            <span className="text-[12.5px]">Filter projects…</span>
+          <div className="ml-auto hidden h-[34px] w-[180px] items-center gap-2 rounded-md border bg-secondary px-2.5 text-muted-foreground focus-within:border-muted-foreground/40 sm:flex">
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter projects…"
+              aria-label="Filter projects by name"
+              className="w-full bg-transparent text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+            />
           </div>
         </div>
 

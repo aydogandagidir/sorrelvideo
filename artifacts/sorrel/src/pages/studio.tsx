@@ -71,6 +71,11 @@ export default function StudioPage() {
     "render_limit" | "premium_template" | "ai_limit" | "render_quality"
   >("ai_limit");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiUndo, setAiUndo] = useState<{
+    headline: string;
+    bodyText: string;
+    ctaText: string;
+  } | null>(null);
 
   // Optional spotlight clip (Track D): when attached, the project is created
   // from the video-spotlight template with the clip pinned as
@@ -136,6 +141,14 @@ export default function StudioPage() {
   );
   const previewSrc = `/api/compositions/${previewModule}/preview?resolution=${selectedAspect}&vars=${b64UrlVars(previewVars)}`;
 
+  function undoAiFill() {
+    if (!aiUndo) return;
+    setHeadline(aiUndo.headline);
+    setBodyText(aiUndo.bodyText);
+    setCtaText(aiUndo.ctaText);
+    setAiUndo(null);
+  }
+
   async function handleAiSuggest() {
     setAiError(null);
     const trimmed = aiPrompt.trim();
@@ -145,6 +158,8 @@ export default function StudioPage() {
     }
     try {
       const result = await aiSuggest.mutateAsync({ data: { prompt: trimmed } });
+      // Stash the pre-fill copy so a one-click overwrite is undoable.
+      setAiUndo({ headline, bodyText, ctaText });
       setHeadline(result.headline);
       setBodyText(result.bodyText);
       setCtaText(result.ctaText);
@@ -316,6 +331,16 @@ export default function StudioPage() {
                       </>
                     )}
                   </Button>
+                  {aiUndo && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={undoAiFill}
+                    >
+                      Undo AI fill
+                    </Button>
+                  )}
                   <span className="text-[11.5px] text-muted-foreground">
                     Brand voice:{" "}
                     <span className="capitalize text-foreground/80">

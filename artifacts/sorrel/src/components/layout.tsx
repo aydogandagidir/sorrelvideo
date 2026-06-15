@@ -328,7 +328,6 @@ function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
         className="relative grid h-[34px] w-[34px] place-items-center rounded-md border bg-secondary text-muted-foreground transition-colors hover:text-foreground"
       >
         <Bell className="h-4 w-4" />
-        <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-spark" />
       </button>
     </header>
   );
