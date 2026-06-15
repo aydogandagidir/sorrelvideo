@@ -134,11 +134,11 @@ function NavItem({
       <item.icon className="h-[17px] w-[17px]" />
       <span className="flex-1">{item.label}</span>
       {item.soon ? (
-        <span className="rounded border border-border px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground/60">
+        <span className="rounded border border-border px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground/80">
           Soon
         </span>
       ) : item.kbd ? (
-        <span className="font-mono text-[10px] text-muted-foreground/50">
+        <span className="font-mono text-[10px] text-muted-foreground/80">
           {item.kbd}
         </span>
       ) : null}
@@ -148,13 +148,23 @@ function NavItem({
   // so the browser navigates instead of wouter client-routing into NotFound.
   if (item.external) {
     return (
-      <a href={item.href} onClick={onNavigate} className={className}>
+      <a
+        href={item.href}
+        onClick={onNavigate}
+        className={className}
+        aria-current={active ? "page" : undefined}
+      >
         {inner}
       </a>
     );
   }
   return (
-    <Link href={item.href} onClick={onNavigate} className={className}>
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={className}
+      aria-current={active ? "page" : undefined}
+    >
       {inner}
     </Link>
   );
@@ -263,11 +273,15 @@ function SidebarBody({
         >
           Sorrel
         </span>
-        <span className="ml-auto font-mono text-[9.5px] font-bold text-muted-foreground/50">
+        <span className="ml-auto font-mono text-[9.5px] font-bold text-muted-foreground/80">
           v1.0
         </span>
       </div>
-      <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3.5">
+      <div
+        role="navigation"
+        aria-label="Primary"
+        className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-3.5"
+      >
         {NAV.map((item) => (
           <NavItem
             key={item.href}
@@ -276,7 +290,7 @@ function SidebarBody({
             onNavigate={onNavigate}
           />
         ))}
-        <div className="px-2 pb-1.5 pt-4 text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground/50">
+        <div className="px-2 pb-1.5 pt-4 text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
           Modules
         </div>
         {MODULES.map((item) => (
@@ -366,7 +380,7 @@ function CommandPalette({
               <item.icon className="mr-2 h-4 w-4" />
               {item.label}
               {item.soon && (
-                <span className="ml-auto text-[10px] uppercase text-muted-foreground/60">
+                <span className="ml-auto text-[10px] uppercase text-muted-foreground/80">
                   Soon
                 </span>
               )}
@@ -419,8 +433,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+      >
+        Skip to content
+      </a>
       {/* Desktop sidebar */}
-      <aside className="hidden w-[248px] shrink-0 flex-col border-r bg-sidebar md:flex">
+      <aside
+        aria-label="Sidebar"
+        className="hidden w-[248px] shrink-0 flex-col border-r bg-sidebar md:flex"
+      >
         <SidebarBody active={active} />
       </aside>
 
@@ -456,7 +479,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Topbar onOpenPalette={() => setPaletteOpen(true)} />
         </div>
 
-        <main className="flex-1 overflow-y-auto px-6 pb-16 pt-6 lg:px-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto px-6 pb-16 pt-6 focus:outline-none lg:px-8"
+        >
           {children}
         </main>
       </div>

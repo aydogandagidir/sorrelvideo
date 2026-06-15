@@ -103,7 +103,7 @@ export function RenderTray() {
   if (items.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 w-80 overflow-hidden rounded-xl border bg-card shadow-2xl duration-300 animate-in slide-in-from-bottom-2 fade-in">
+    <div className="fixed bottom-3 right-3 z-50 w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border bg-card shadow-2xl duration-300 animate-in slide-in-from-bottom-2 fade-in sm:bottom-5 sm:right-5 sm:w-80">
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
