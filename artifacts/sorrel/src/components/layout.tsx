@@ -41,6 +41,8 @@ interface NavEntry {
   icon: LucideIcon;
   kbd?: string;
   soon?: boolean;
+  /** Shipped but incomplete — renders a subtle "Beta" badge next to the label. */
+  beta?: boolean;
   /**
    * The target lives OUTSIDE the SPA (e.g. the same-origin `/editor/` mount,
    * a separately-built @hyperframes/studio app served by express.static). Such
@@ -54,9 +56,18 @@ interface NavEntry {
 const NAV: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/studio", label: "Studio", icon: Wand2, kbd: "S" },
-  // The full timeline editor (@hyperframes/studio) is a separate same-origin
-  // build mounted at /editor/ — open it with a real navigation, not a route.
-  { href: "/editor/", label: "Editor", icon: Clapperboard, external: true },
+  // The timeline editor (@hyperframes/studio) is a separate same-origin build
+  // mounted at /editor/ — open it with a real navigation, not a route. Labeled
+  // "Timeline Editor" + Beta because it does real timeline scrub / text edit /
+  // render, but several editing ops (keyframe, asset upload, block install) are
+  // still stubbed upstream — don't oversell it as a full composition builder.
+  {
+    href: "/editor/",
+    label: "Timeline Editor",
+    icon: Clapperboard,
+    external: true,
+    beta: true,
+  },
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/templates", label: "Templates", icon: Film },
   { href: "/brand", label: "Brand DNA", icon: Palette },
@@ -136,6 +147,10 @@ function NavItem({
       {item.soon ? (
         <span className="rounded border border-border px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground/80">
           Soon
+        </span>
+      ) : item.beta ? (
+        <span className="rounded border border-primary/30 bg-primary/5 px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-primary/80">
+          Beta
         </span>
       ) : item.kbd ? (
         <span className="font-mono text-[10px] text-muted-foreground/80">
