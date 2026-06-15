@@ -73,7 +73,7 @@ export default function Modules() {
     <Layout>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Platform Modules</h1>
+          <h1 className="text-[27px] leading-tight">Platform Modules</h1>
           <p className="text-muted-foreground">Extend your Sorrel workspace with additional capabilities.</p>
         </div>
       </div>
