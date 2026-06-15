@@ -59,7 +59,11 @@ import {
   resolveSettings,
   assertRenderSettingsAllowed,
 } from "../services/renderSettingsService";
-import { buildCompositionHtml } from "../services/renderService";
+import {
+  buildCompositionHtml,
+  inlineVendorScripts,
+  injectFitScript,
+} from "../services/renderService";
 import {
   enqueueRender,
   isQueueEnabled,
@@ -621,7 +625,13 @@ router.get(
       }
       res.setHeader("Cache-Control", "no-store");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.send(html);
+      // Inline the vendored animation libs + auto-fit, exactly like the main-app
+      // preview (buildCompositionHtml): the editor preview iframe serves the RAW
+      // workspace entry, which (for a CDN-authored composition, or a workspace
+      // seeded before the self-host fix) still references cdn.jsdelivr.net — so
+      // without this the editor preview re-introduces the "Composition timeline
+      // not found after 8s" CDN dependency these routes otherwise bypass.
+      res.send(injectFitScript(inlineVendorScripts(html)));
     } catch (err) {
       if (err instanceof WorkspacePathError) {
         res.status(err.status).json({ error: err.message });
@@ -714,7 +724,13 @@ router.get(
       }
       res.setHeader("Cache-Control", "no-store");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.send(html);
+      // Inline the vendored animation libs + auto-fit, exactly like the main-app
+      // preview (buildCompositionHtml): the editor preview iframe serves the RAW
+      // workspace entry, which (for a CDN-authored composition, or a workspace
+      // seeded before the self-host fix) still references cdn.jsdelivr.net — so
+      // without this the editor preview re-introduces the "Composition timeline
+      // not found after 8s" CDN dependency these routes otherwise bypass.
+      res.send(injectFitScript(inlineVendorScripts(html)));
     } catch (err) {
       if (err instanceof WorkspacePathError) {
         res.status(err.status).json({ error: err.message });
