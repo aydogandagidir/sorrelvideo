@@ -71,6 +71,22 @@ describe.runIf(INTEGRATION_AVAILABLE)(
         .set("Authorization", `Bearer ${sid}`);
       expect(res.status).toBe(200);
     });
+
+    it("serves CDN-free HTML for a GSAP composition (no live-CDN dependency)", async () => {
+      // brand-story loads GSAP from cdn.jsdelivr.net at runtime; the live preview
+      // runs in the user's browser iframe, so an unreachable CDN was the
+      // "Composition timeline not found after 8s" failure. The route must inline
+      // the vendored lib so the served HTML never depends on the CDN.
+      const sid = await createSession({ userId: await createFreeUser() });
+      const res = await request(app)
+        .get("/api/compositions/brand-story/preview")
+        .set("Authorization", `Bearer ${sid}`);
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain("cdn.jsdelivr.net");
+      expect(res.text).toContain("GSAP 3.14.2"); // the vendored lib is inlined
+      // …and the auto-fit + a registered timeline are present so the player resolves.
+      expect(res.text).toContain("data-sorrel-fit");
+    });
   },
 );
 

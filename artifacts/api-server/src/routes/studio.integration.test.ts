@@ -118,6 +118,38 @@ describe.runIf(INTEGRATION_AVAILABLE)(
       expect(res.text).toContain("__timelines"); // the studio timeline seed
     });
 
+    it("inlines the CDN animation libs when SERVING the editor preview (raw stored file)", async () => {
+      const { sid, project } = await makeStudioProject();
+      // A workspace entry that still references the CDN — a CDN-authored block, or
+      // a workspace seeded before the self-host fix. The preview routes serve the
+      // RAW stored file, so they must inline the vendored lib; otherwise the
+      // editor preview re-introduces the "Composition timeline not found after 8s"
+      // CDN dependency (the bug behind a preview that "still" fails in /editor).
+      const raw =
+        "<!doctype html><html><head>" +
+        '<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>' +
+        '</head><body><div class="headline">x</div></body></html>';
+      await writeWorkspaceFile(
+        project.userId,
+        String(project.id),
+        "index.html",
+        raw,
+      );
+
+      for (const url of [
+        `/api/studio/projects/${project.id}/preview/comp/index.html`,
+        `/api/studio/projects/${project.id}/preview`,
+      ]) {
+        const res = await request(app)
+          .get(url)
+          .set("Authorization", `Bearer ${sid}`);
+        expect(res.status).toBe(200);
+        expect(res.text).not.toContain("cdn.jsdelivr.net");
+        expect(res.text).toContain("GSAP 3.14.2"); // the vendored lib is inlined
+        expect(res.text).toContain("data-sorrel-fit"); // + auto-fit, like the main preview
+      }
+    });
+
     it("GET /preview/<file> serves workspace files (asset wildcard)", async () => {
       const { sid, project } = await makeStudioProject();
       // Seed via the master preview first, then fetch the entry as an asset.
