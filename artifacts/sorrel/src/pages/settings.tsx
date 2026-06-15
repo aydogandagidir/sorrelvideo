@@ -30,6 +30,7 @@ import {
   useBillingPrices,
 } from "@/hooks/useBilling";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 function BillingCard() {
   const { data: billing, isLoading } = useBillingInfo();
@@ -38,6 +39,7 @@ function BillingCard() {
   const portalMutation = useBillingPortal();
   const queryClient = useQueryClient();
   const search = useSearch();
+  const { toast } = useToast();
 
   // After a successful Stripe checkout, the webhook may take a few seconds to
   // arrive and update the subscription record. We poll /billing/me until the
@@ -67,15 +69,31 @@ function BillingCard() {
 
   const handleUpgrade = async () => {
     if (!monthlyPrice) return;
-    const { url } = await checkoutMutation.mutateAsync({
-      priceId: monthlyPrice.id,
-    });
-    if (url) window.location.href = url;
+    try {
+      const { url } = await checkoutMutation.mutateAsync({
+        priceId: monthlyPrice.id,
+      });
+      if (url) window.location.href = url;
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Couldn't start checkout",
+        description: "Please try again in a moment.",
+      });
+    }
   };
 
   const handlePortal = async () => {
-    const { url } = await portalMutation.mutateAsync();
-    if (url) window.location.href = url;
+    try {
+      const { url } = await portalMutation.mutateAsync();
+      if (url) window.location.href = url;
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Couldn't open the billing portal",
+        description: "Please try again in a moment.",
+      });
+    }
   };
 
   if (isLoading) {

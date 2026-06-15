@@ -22,7 +22,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,17 @@ import {
   X,
 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CompositionThumb } from "@/components/composition";
 import { cn } from "@/lib/utils";
@@ -333,6 +344,12 @@ export default function Brand() {
           invalidate();
           toast({ title: `“${kit.name}” is now your default` });
         },
+        onError: () =>
+          toast({
+            variant: "destructive",
+            title: "Couldn't update your default",
+            description: "Please try again.",
+          }),
       },
     );
   }
@@ -346,6 +363,12 @@ export default function Brand() {
           if (selectedId === kit.id) startNew();
           toast({ title: "Brand DNA deleted" });
         },
+        onError: () =>
+          toast({
+            variant: "destructive",
+            title: "Couldn't delete this Brand DNA",
+            description: "Please try again.",
+          }),
       },
     );
   }
@@ -454,17 +477,41 @@ export default function Brand() {
                   <Star className="ml-1.5 h-3 w-3 fill-current opacity-80" />
                 )}
               </Button>
-              <Button
-                variant={selectedId === kit.id ? "default" : "outline"}
-                size="sm"
-                className="rounded-l-none border-l-0 px-2"
-                title="Delete this DNA"
-                disabled={deleteKit.isPending}
-                onClick={() => removeKit(kit)}
-                aria-label={`Delete ${kit.name}`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant={selectedId === kit.id ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-l-none border-l-0 px-2"
+                    title="Delete this DNA"
+                    disabled={deleteKit.isPending}
+                    aria-label={`Delete ${kit.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete “{kit.name}”?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently removes this Brand DNA. This can’t be
+                      undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleteKit.isPending}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className={cn(buttonVariants({ variant: "destructive" }))}
+                      onClick={() => removeKit(kit)}
+                      disabled={deleteKit.isPending}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           ))}
           {selectedId === "new" && (
