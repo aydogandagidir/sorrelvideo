@@ -931,6 +931,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /ai/edit:
+    post:
+      operationId: aiEdit
+      tags: [ai]
+      summary: Revise existing Studio copy per a natural-language instruction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiEditRequest"
+      responses:
+        "200":
+          description: Edited copy produced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSuggestResult"
+        "400":
+          description: Request failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: AI quota exhausted — upgrade required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too many requests; back off.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: Provider call failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /captions/generate:
     post:
       operationId: generateCaptions
@@ -2529,6 +2578,30 @@ components:
           type: string
         ctaText:
           type: string
+
+    AiEditRequest:
+      type: object
+      required: [instruction, current]
+      properties:
+        instruction:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: The natural-language edit to apply to the current copy.
+        current:
+          type: object
+          description: The current Studio copy to revise (fields may be empty).
+          required: [headline, bodyText, ctaText]
+          properties:
+            headline:
+              type: string
+              maxLength: 160
+            bodyText:
+              type: string
+              maxLength: 500
+            ctaText:
+              type: string
+              maxLength: 48
 
     CheckoutRequest:
       type: object

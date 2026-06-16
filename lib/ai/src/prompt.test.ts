@@ -83,6 +83,27 @@ describe("buildUserPrompt", () => {
       "Brief: launch our autumn line",
     );
   });
+
+  it("keeps the plain brief form when no current copy is supplied", () => {
+    expect(buildUserPrompt("hello world")).toBe("Brief: hello world");
+  });
+
+  it("frames an EDIT turn when current copy is supplied", () => {
+    const out = buildUserPrompt("make it punchier", {
+      headline: "Old headline",
+      bodyText: "Old body",
+      ctaText: "Buy now",
+    });
+    // A revise instruction, not a from-scratch brief…
+    expect(out).not.toContain("Brief:");
+    expect(out).toMatch(/Revise the CURRENT video copy/i);
+    expect(out).toContain("Instruction: make it punchier");
+    // …with the current copy JSON-embedded so the model can't confuse it with
+    // the instruction (and a quote/newline inside a field can't break framing).
+    expect(out).toContain('"headline": "Old headline"');
+    expect(out).toContain('"bodyText": "Old body"');
+    expect(out).toContain('"ctaText": "Buy now"');
+  });
 });
 
 describe("SYSTEM_CORE (the cacheable, brand-independent prefix)", () => {

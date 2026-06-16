@@ -59,7 +59,7 @@ export const anthropicProvider: AiProvider = {
 
   async suggest(input: SuggestInput): Promise<SuggestResult> {
     const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
-    const userPrompt = buildUserPrompt(input.prompt);
+    const userPrompt = buildUserPrompt(input.prompt, input.current);
 
     // Structure the system prompt as cache-controlled blocks so the stable
     // context is reused across requests instead of re-billed every call.

@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './aiEditRequest';
+export * from './aiEditRequestCurrent';
 export * from './aiSuggestRequest';
 export * from './aiSuggestResult';
 export * from './analyticsOverview';

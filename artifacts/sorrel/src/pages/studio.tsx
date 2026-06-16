@@ -4,6 +4,7 @@ import { Loader2, Sparkles, Rocket, Film, Trash2 } from "lucide-react";
 import { useUpload } from "@workspace/object-storage-web";
 import {
   useAiSuggest,
+  useAiEdit,
   useCreateProject,
   useGetBrandKit,
   useStartProjectRender,
@@ -48,6 +49,9 @@ export default function StudioPage() {
   const queryClient = useQueryClient();
   const updateRenderSettings = useUpdateProjectRenderSettings();
   const aiSuggest = useAiSuggest();
+  const aiEdit = useAiEdit();
+  // One spinner for both AI actions — they share the card's button + overlay.
+  const isAiPending = aiSuggest.isPending || aiEdit.isPending;
 
   const plan = billing?.plan ?? "free";
 
@@ -57,6 +61,9 @@ export default function StudioPage() {
   const aiNearCap = aiRemaining != null && aiRemaining <= 2;
 
   const [name, setName] = useState("Untitled Studio Project");
+  // "draft" → write copy from a brief (/ai/suggest); "edit" → revise the current
+  // copy per an instruction (/ai/edit). Same card, same quota, same undo.
+  const [aiMode, setAiMode] = useState<"draft" | "edit">("draft");
   const [aiPrompt, setAiPrompt] = useState("");
   const [headline, setHeadline] = useState(DEFAULT_HEADLINE);
   const [bodyText, setBodyText] = useState(DEFAULT_BODY);
@@ -149,16 +156,29 @@ export default function StudioPage() {
     setAiUndo(null);
   }
 
-  async function handleAiSuggest() {
+  async function handleAiAction() {
     setAiError(null);
     const trimmed = aiPrompt.trim();
     if (trimmed.length < 3) {
-      setAiError("Tell the AI what you'd like a video about (min 3 chars).");
+      setAiError(
+        aiMode === "edit"
+          ? "Tell the AI what to change (min 3 chars)."
+          : "Tell the AI what you'd like a video about (min 3 chars).",
+      );
       return;
     }
     try {
-      const result = await aiSuggest.mutateAsync({ data: { prompt: trimmed } });
-      // Stash the pre-fill copy so a one-click overwrite is undoable.
+      // Draft writes from a brief; edit revises the copy that's on screen now.
+      const result =
+        aiMode === "edit"
+          ? await aiEdit.mutateAsync({
+              data: {
+                instruction: trimmed,
+                current: { headline, bodyText, ctaText },
+              },
+            })
+          : await aiSuggest.mutateAsync({ data: { prompt: trimmed } });
+      // Stash the pre-change copy so a one-click overwrite is undoable.
       setAiUndo({ headline, bodyText, ctaText });
       setHeadline(result.headline);
       setBodyText(result.bodyText);
@@ -178,7 +198,11 @@ export default function StudioPage() {
         setAiError("Slow down a bit — try again in a minute.");
         return;
       }
-      setAiError(anyErr.data?.error ?? anyErr.message ?? "AI suggestion failed");
+      setAiError(
+        anyErr.data?.error ??
+          anyErr.message ??
+          (aiMode === "edit" ? "AI edit failed" : "AI suggestion failed"),
+      );
     }
   }
 
@@ -279,7 +303,7 @@ export default function StudioPage() {
           <div className="flex flex-col gap-5">
             {/* AI brief */}
             <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-b from-primary/[0.05] to-transparent">
-              {aiSuggest.isPending && (
+              {isAiPending && (
                 <div
                   className="pointer-events-none absolute inset-0"
                   style={{
@@ -296,10 +320,41 @@ export default function StudioPage() {
                     <Sparkles className="h-4 w-4" />
                   </span>
                   <div>
-                    <div className="text-[13.5px] font-semibold">AI brief</div>
-                    <div className="text-[11.5px] text-muted-foreground">
-                      Describe it — we draft the headline, body &amp; CTA.
+                    <div className="text-[13.5px] font-semibold">
+                      {aiMode === "edit" ? "AI edit" : "AI brief"}
                     </div>
+                    <div className="text-[11.5px] text-muted-foreground">
+                      {aiMode === "edit"
+                        ? "Tell us what to change — we revise your current copy."
+                        : "Describe it — we draft the headline, body & CTA."}
+                    </div>
+                  </div>
+                  {/* Draft (write from a brief) vs Edit (revise current copy) */}
+                  <div
+                    className="ml-auto inline-flex rounded-lg border p-0.5 text-[11.5px] font-semibold"
+                    role="tablist"
+                    aria-label="AI mode"
+                  >
+                    {(["draft", "edit"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        role="tab"
+                        aria-selected={aiMode === m}
+                        onClick={() => {
+                          setAiMode(m);
+                          setAiError(null);
+                        }}
+                        className={cn(
+                          "rounded-md px-2.5 py-1 capitalize transition-colors",
+                          aiMode === m
+                            ? "bg-primary/15 text-primary"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {m}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 <Textarea
@@ -307,8 +362,12 @@ export default function StudioPage() {
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   maxLength={500}
-                  placeholder="e.g. promote our limited spring roast to existing subscribers"
-                  disabled={aiSuggest.isPending}
+                  placeholder={
+                    aiMode === "edit"
+                      ? "e.g. make the headline punchier and mention free shipping"
+                      : "e.g. promote our limited spring roast to existing subscribers"
+                  }
+                  disabled={isAiPending}
                 />
                 {aiError && (
                   <p className="mt-2 text-sm text-destructive" role="alert">
@@ -318,16 +377,18 @@ export default function StudioPage() {
                 <div className="mt-2.5 flex flex-wrap items-center gap-3">
                   <Button
                     type="button"
-                    onClick={handleAiSuggest}
-                    disabled={aiSuggest.isPending}
+                    onClick={handleAiAction}
+                    disabled={isAiPending}
                   >
-                    {aiSuggest.isPending ? (
+                    {isAiPending ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Drafting…
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {aiMode === "edit" ? "Editing…" : "Drafting…"}
                       </>
                     ) : (
                       <>
-                        <Sparkles className="h-4 w-4" /> Fill with AI
+                        <Sparkles className="h-4 w-4" />
+                        {aiMode === "edit" ? "Edit with AI" : "Fill with AI"}
                       </>
                     )}
                   </Button>
@@ -338,7 +399,7 @@ export default function StudioPage() {
                       size="sm"
                       onClick={undoAiFill}
                     >
-                      Undo AI fill
+                      Undo AI change
                     </Button>
                   )}
                   <span className="text-[11.5px] text-muted-foreground">
