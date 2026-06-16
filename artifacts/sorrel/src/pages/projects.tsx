@@ -11,6 +11,7 @@ import {
   useUpdateProject,
   useListTemplates,
   useGetBrandKit,
+  useAiEdit,
   getListProjectsQueryKey,
   type Project,
   type BrandKit,
@@ -43,6 +44,7 @@ import {
   RotateCcw,
   Search,
   PencilRuler,
+  Sparkles,
 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
@@ -56,6 +58,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -329,11 +332,26 @@ function ProjectDetail({
   const renderMutation = useStartProjectRender();
   const updateSettings = useUpdateProjectRenderSettings();
   const updateProject = useUpdateProject();
+  const aiEdit = useAiEdit();
   const { toast } = useToast();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<
-    "render_limit" | "premium_template"
+    "render_limit" | "premium_template" | "ai_limit"
   >("render_limit");
+
+  // Editable headline/body/cta for a draft/failed project — the same copy the
+  // Studio create page writes, but reachable AFTER creation so users can iterate
+  // (manually or with "Edit with AI") instead of recreating the project. Seeded
+  // from the saved compositionVars; ProjectDetail is keyed by id so this lazy
+  // init is correct per project. Persisted via the validated PATCH /projects.
+  const savedCopy = (project.compositionVars ?? {}) as Record<string, string>;
+  const [copyValues, setCopyValues] = useState({
+    headline: savedCopy["user.headline"] ?? "",
+    bodyText: savedCopy["user.bodyText"] ?? "",
+    ctaText: savedCopy["user.ctaText"] ?? "",
+  });
+  const [aiInstruction, setAiInstruction] = useState("");
+  const [aiCopyError, setAiCopyError] = useState<string | null>(null);
 
   // Typed template parameters (the engine's native composition variables). The
   // templates list carries each template's `variables` (read-time enrichment);
@@ -366,6 +384,31 @@ function ProjectDetail({
   const isRendering = project.status === "rendering";
   const videoSrc = project.videoUrl ?? `/api/projects/${project.id}/video`;
   const v = project.compositionVars ?? {};
+
+  // The copy editor (+ live preview override) shows only for templates that
+  // actually use headline/body/cta, and only in draft/failed — the states that
+  // render the live composition preview, so an edit is visible before a render
+  // is spent (ready shows the finished video; rendering is mid-flight).
+  const hasCopy = Boolean(
+    v["user.headline"] || v["user.bodyText"] || v["user.ctaText"],
+  );
+  const canEditCopy =
+    hasCopy &&
+    (project.status === "draft" || project.status === "failed");
+
+  // The live composition preview rides unsaved edits as a ?vars= override so the
+  // picture matches before a render is spent: typed params always, plus the copy
+  // fields while they're editable (draft/failed).
+  const previewVars: Record<string, string> = {
+    ...paramValues,
+    ...(canEditCopy
+      ? {
+          "user.headline": copyValues.headline,
+          "user.bodyText": copyValues.bodyText,
+          "user.ctaText": copyValues.ctaText,
+        }
+      : {}),
+  };
 
   // Aspect ratio / publishing format (the project's render resolution).
   const settings = project.renderSettings ?? DEFAULT_RENDER_SETTINGS;
@@ -421,6 +464,74 @@ function ProjectDetail({
         },
       },
     );
+
+  const handleSaveCopy = () =>
+    updateProject.mutate(
+      {
+        id: project.id,
+        data: {
+          compositionVars: {
+            ...((project.compositionVars ?? {}) as Record<string, string>),
+            "user.headline": copyValues.headline,
+            "user.bodyText": copyValues.bodyText,
+            "user.ctaText": copyValues.ctaText,
+          },
+        },
+      },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: "Copy saved — re-render to apply it" });
+        },
+        onError: (err) => {
+          const e = err as { data?: { error?: string } };
+          toast({
+            title: "Couldn't save copy",
+            description: e.data?.error,
+            variant: "destructive",
+          });
+        },
+      },
+    );
+
+  // "Edit with AI": revise the on-screen copy per an instruction. Updates the
+  // LOCAL fields (so the live preview reflects it via ?vars=); the user then
+  // Saves + re-renders. Same /ai/edit endpoint, quota and gating as Studio.
+  async function handleAiEditCopy() {
+    setAiCopyError(null);
+    const instruction = aiInstruction.trim();
+    if (instruction.length < 3) {
+      setAiCopyError("Tell the AI what to change (min 3 chars).");
+      return;
+    }
+    try {
+      const result = await aiEdit.mutateAsync({
+        data: { instruction, current: copyValues },
+      });
+      setCopyValues({
+        headline: result.headline,
+        bodyText: result.bodyText,
+        ctaText: result.ctaText,
+      });
+      setAiInstruction("");
+    } catch (err) {
+      const anyErr = err as {
+        status?: number;
+        data?: { reason?: string; error?: string };
+        message?: string;
+      };
+      if (anyErr.status === 403 && anyErr.data?.reason === "upgrade_required") {
+        setUpgradeReason("ai_limit");
+        setUpgradeOpen(true);
+        return;
+      }
+      if (anyErr.status === 429) {
+        setAiCopyError("Slow down a bit — try again in a minute.");
+        return;
+      }
+      setAiCopyError(anyErr.data?.error ?? anyErr.message ?? "AI edit failed");
+    }
+  }
 
   const handleRender = () =>
     renderMutation.mutate(
@@ -545,8 +656,8 @@ function ProjectDetail({
               >
                 <HfPlayer
                   src={`/api/projects/${project.id}/composition${
-                    Object.keys(paramValues).length > 0
-                      ? `?vars=${b64UrlVars(paramValues)}`
+                    Object.keys(previewVars).length > 0
+                      ? `?vars=${b64UrlVars(previewVars)}`
                       : ""
                   }`}
                   aspect={ratioLabel}
@@ -693,33 +804,136 @@ function ProjectDetail({
               </div>
             )}
 
-            {(v["user.headline"] || v["user.bodyText"] || v["user.ctaText"]) && (
+            {hasCopy && (
               <div>
                 <div className="mb-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground/70">
                   Copy
                 </div>
-                <div className="flex flex-col gap-2 text-[13.5px]">
-                  {v["user.headline"] && (
-                    <div>
-                      <span className="text-muted-foreground">Headline · </span>
-                      {v["user.headline"].replace(/\n/g, " ")}
+                {canEditCopy ? (
+                  <div className="space-y-2.5">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={`copy-hl-${project.id}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        Headline
+                      </Label>
+                      <Textarea
+                        id={`copy-hl-${project.id}`}
+                        rows={2}
+                        value={copyValues.headline}
+                        onChange={(e) =>
+                          setCopyValues((c) => ({ ...c, headline: e.target.value }))
+                        }
+                        maxLength={140}
+                        disabled={updateProject.isPending || aiEdit.isPending}
+                      />
                     </div>
-                  )}
-                  {v["user.bodyText"] && (
-                    <div>
-                      <span className="text-muted-foreground">Body · </span>
-                      {v["user.bodyText"]}
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={`copy-body-${project.id}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        Body
+                      </Label>
+                      <Textarea
+                        id={`copy-body-${project.id}`}
+                        rows={3}
+                        value={copyValues.bodyText}
+                        onChange={(e) =>
+                          setCopyValues((c) => ({ ...c, bodyText: e.target.value }))
+                        }
+                        maxLength={400}
+                        disabled={updateProject.isPending || aiEdit.isPending}
+                      />
                     </div>
-                  )}
-                  {v["user.ctaText"] && (
-                    <div>
-                      <span className="text-muted-foreground">CTA · </span>
-                      <span className="font-semibold text-primary">
-                        {v["user.ctaText"]}
-                      </span>
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={`copy-cta-${project.id}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        Call to action
+                      </Label>
+                      <Input
+                        id={`copy-cta-${project.id}`}
+                        value={copyValues.ctaText}
+                        onChange={(e) =>
+                          setCopyValues((c) => ({ ...c, ctaText: e.target.value }))
+                        }
+                        maxLength={48}
+                        disabled={updateProject.isPending || aiEdit.isPending}
+                      />
                     </div>
-                  )}
-                </div>
+
+                    {/* Edit with AI — revise the fields above by instruction */}
+                    <div className="space-y-2 rounded-lg border bg-muted/30 p-2.5">
+                      <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-muted-foreground">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" /> Edit with
+                        AI
+                      </div>
+                      <Input
+                        value={aiInstruction}
+                        onChange={(e) => setAiInstruction(e.target.value)}
+                        maxLength={500}
+                        placeholder="e.g. make the headline punchier and mention free shipping"
+                        disabled={aiEdit.isPending}
+                      />
+                      {aiCopyError && (
+                        <p className="text-xs text-destructive" role="alert">
+                          {aiCopyError}
+                        </p>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleAiEditCopy}
+                        disabled={aiEdit.isPending}
+                      >
+                        {aiEdit.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-2 h-4 w-4" />
+                        )}
+                        {aiEdit.isPending ? "Editing…" : "Edit with AI"}
+                      </Button>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveCopy}
+                      disabled={updateProject.isPending}
+                    >
+                      {updateProject.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Save copy
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 text-[13.5px]">
+                    {v["user.headline"] && (
+                      <div>
+                        <span className="text-muted-foreground">Headline · </span>
+                        {v["user.headline"].replace(/\n/g, " ")}
+                      </div>
+                    )}
+                    {v["user.bodyText"] && (
+                      <div>
+                        <span className="text-muted-foreground">Body · </span>
+                        {v["user.bodyText"]}
+                      </div>
+                    )}
+                    {v["user.ctaText"] && (
+                      <div>
+                        <span className="text-muted-foreground">CTA · </span>
+                        <span className="font-semibold text-primary">
+                          {v["user.ctaText"]}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

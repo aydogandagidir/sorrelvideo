@@ -143,10 +143,12 @@ describe("Projects — card → detail controls", () => {
       within(dialog).getByRole("button", { name: /delete project/i }),
     ).toBeEnabled();
     // The draft stage shows the REAL composition preview pointed at this
-    // project's composition route (not the generic mock thumbnail).
+    // project's composition route (not the generic mock thumbnail). Unsaved copy
+    // / param edits ride along as a ?vars= override (the fixture has copy), so
+    // assert the route prefix rather than an exact, override-free URL.
     const preview = within(dialog).getByTestId("hf-player");
-    expect(preview.getAttribute("data-src")).toBe(
-      "/api/projects/1/composition",
+    expect(preview.getAttribute("data-src")).toMatch(
+      /^\/api\/projects\/1\/composition(\?vars=|$)/,
     );
   });
 
@@ -195,6 +197,82 @@ describe("Projects — card → detail controls", () => {
     expect(
       within(dialog).getByRole("button", { name: /delete project/i }),
     ).toBeDisabled();
+  });
+});
+
+describe("Projects — edit copy (draft/failed)", () => {
+  it("a draft detail exposes an editable copy form and saves user.* compositionVars", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([draftProject({ id: 5, name: "Editable" })]),
+      {
+        url: "/api/projects/5",
+        method: "PATCH",
+        status: 200,
+        json: draftProject({ id: 5, name: "Editable" }),
+      },
+      { url: "/api/projects", method: "GET", json: [] },
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const dialog = await openDetail("Editable");
+
+    // The copy is now an editable field seeded with the saved headline — not the
+    // read-only "Headline ·" display.
+    const headline = within(dialog).getByLabelText(/headline/i);
+    expect(headline).toHaveValue("Hi");
+    await user.clear(headline);
+    await user.type(headline, "New headline");
+
+    await user.click(within(dialog).getByRole("button", { name: /save copy/i }));
+
+    await waitFor(() => {
+      const patch = patchCalls().find((c) => /\/api\/projects\/5$/.test(c.url));
+      expect(patch).toBeTruthy();
+    });
+    const patch = patchCalls().find((c) => /\/api\/projects\/5$/.test(c.url));
+    const vars = (patch?.body as { compositionVars?: Record<string, string> })
+      .compositionVars;
+    expect(vars?.["user.headline"]).toBe("New headline");
+    // Untouched fields are preserved from the saved copy.
+    expect(vars?.["user.ctaText"]).toBe("Go");
+  });
+
+  it("‘Edit with AI’ posts the instruction + current copy and applies the result", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([draftProject({ id: 6, name: "AiEdit" })]),
+      {
+        url: "/api/ai/edit",
+        method: "POST",
+        status: 200,
+        json: { headline: "Punchy", bodyText: "Tight.", ctaText: "Go" },
+      },
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const dialog = await openDetail("AiEdit");
+
+    await user.type(
+      within(dialog).getByPlaceholderText(/make the headline punchier/i),
+      "make it punchy",
+    );
+    await user.click(within(dialog).getByRole("button", { name: /edit with ai/i }));
+
+    // The result is applied to the editable fields (so the user can Save + render).
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText(/headline/i)).toHaveValue("Punchy"),
+    );
+    const post = postCalls().find((c) => /\/api\/ai\/edit$/.test(c.url));
+    expect(
+      (post?.body as { instruction?: string; current?: { ctaText?: string } })
+        .instruction,
+    ).toBe("make it punchy");
+    expect(
+      (post?.body as { current?: { ctaText?: string } }).current?.ctaText,
+    ).toBe("Go");
   });
 });
 
@@ -271,3 +349,39 @@ function deleteCalls(): Array<{ url: string }> {
           : (args[0] as Request).url,
     }));
 }
+
+/** All calls for a given method, with the JSON request body parsed (if any). */
+function requestsOf(method: string): Array<{ url: string; body: unknown }> {
+  const calls = fetchMock?.mock.mock.calls ?? [];
+  return calls
+    .filter((args) => {
+      const init = args[1] as RequestInit | undefined;
+      const input = args[0] as RequestInfo | URL;
+      const m = (
+        init?.method ??
+        (typeof input === "object" && "method" in input
+          ? (input as Request).method
+          : "GET")
+      ).toUpperCase();
+      return m === method.toUpperCase();
+    })
+    .map((args) => {
+      const init = args[1] as RequestInit | undefined;
+      const url =
+        typeof args[0] === "string"
+          ? (args[0] as string)
+          : (args[0] as Request).url;
+      let body: unknown;
+      if (typeof init?.body === "string") {
+        try {
+          body = JSON.parse(init.body);
+        } catch {
+          body = undefined;
+        }
+      }
+      return { url, body };
+    });
+}
+
+const patchCalls = () => requestsOf("PATCH");
+const postCalls = () => requestsOf("POST");
