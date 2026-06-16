@@ -1,6 +1,13 @@
 import { useState, useRef, type FormEvent, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
-import { Loader2, Sparkles, Rocket, Film, Trash2 } from "lucide-react";
+import {
+  Loader2,
+  Sparkles,
+  Rocket,
+  Film,
+  Trash2,
+  LayoutTemplate,
+} from "lucide-react";
 import { useUpload } from "@workspace/object-storage-web";
 import {
   useAiSuggest,
@@ -41,6 +48,49 @@ const DEFAULT_BODY =
   "Sorrel turns a template, your brand kit, and a few sentences into branded video — ready to ship.";
 const DEFAULT_CTA = "Try it free";
 
+/**
+ * The copy-compatible templates the Studio page can produce: every one takes the
+ * same headline + body + CTA and the user's brand, so the Compose fields and the
+ * live preview map 1:1 across them (verified against each composition's
+ * `{{user.*}}` keys + the render COMPOSITION_MAP). All are Free; only Brand Story
+ * is multi-scene, so only it exposes the transition picker. A spotlight clip is a
+ * separate path that forces the Video Spotlight template (see below).
+ */
+const STUDIO_TEMPLATES = [
+  {
+    module: "studio",
+    name: "Studio",
+    blurb: "Clean headline, body & CTA",
+    supportsTransitions: false,
+  },
+  {
+    module: "product-launch",
+    name: "Product Launch",
+    blurb: "Bold product reveal",
+    supportsTransitions: false,
+  },
+  {
+    module: "brand-promo",
+    name: "Brand Promo",
+    blurb: "Punchy brand moment",
+    supportsTransitions: false,
+  },
+  {
+    module: "social-teaser",
+    name: "Social Teaser",
+    blurb: "Short scroll-stopping hook",
+    supportsTransitions: false,
+  },
+  {
+    module: "brand-story",
+    name: "Brand Story",
+    blurb: "Two scenes + a transition",
+    supportsTransitions: true,
+  },
+] as const;
+
+type StudioModule = (typeof STUDIO_TEMPLATES)[number]["module"];
+
 export default function StudioPage() {
   const [, setLocation] = useLocation();
   const { data: brandKit } = useGetBrandKit();
@@ -72,6 +122,9 @@ export default function StudioPage() {
   const [renderSettings, setRenderSettings] = useState<RenderSettings>(
     DEFAULT_RENDER_SETTINGS,
   );
+  // Which copy-compatible template to produce (STUDIO_TEMPLATES). A spotlight
+  // clip overrides this with the Video Spotlight template.
+  const [selectedModule, setSelectedModule] = useState<StudioModule>("studio");
   const [error, setError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -137,17 +190,33 @@ export default function StudioPage() {
   const pickAspect = (value: RenderSettings["resolution"]) =>
     setRenderSettings((s) => ({ ...s, resolution: value }));
 
+  // The template actually produced: a spotlight clip forces Video Spotlight,
+  // otherwise the picked copy template. Only multi-scene templates expose the
+  // transition picker, and switching to one that can't use transitions clears a
+  // stale value so it never lingers in settings.
+  const effectiveModule = spotlightClip ? "video-spotlight" : selectedModule;
+  const supportsTransitions =
+    !spotlightClip &&
+    (STUDIO_TEMPLATES.find((t) => t.module === selectedModule)
+      ?.supportsTransitions ??
+      false);
+  function pickTemplate(module: StudioModule) {
+    setSelectedModule(module);
+    const supports =
+      STUDIO_TEMPLATES.find((t) => t.module === module)?.supportsTransitions ??
+      false;
+    if (!supports) setRenderSettings((s) => ({ ...s, transitions: undefined }));
+  }
+
   // Live preview: render the REAL composition module via the module-keyed
-  // preview route (no project id exists until submit). A spotlight clip switches
-  // to the video-spotlight module (without the hero clip — that's materialized
-  // only at render time). Debounce the user.* vars so a burst of keystrokes is
-  // one composition fetch; a changed `src` reloads the player iframe.
-  const previewModule = spotlightClip ? "video-spotlight" : "studio";
+  // preview route (no project id exists until submit; a spotlight clip's hero is
+  // materialized only at render time). Debounce the user.* vars so a burst of
+  // keystrokes is one composition fetch; a changed `src` reloads the iframe.
   const previewVars = useDebouncedValue(
     { "user.headline": headline, "user.bodyText": bodyText, "user.ctaText": ctaText },
     600,
   );
-  const previewSrc = `/api/compositions/${previewModule}/preview?resolution=${selectedAspect}&vars=${b64UrlVars(previewVars)}`;
+  const previewSrc = `/api/compositions/${effectiveModule}/preview?resolution=${selectedAspect}&vars=${b64UrlVars(previewVars)}`;
 
   function undoAiFill() {
     if (!aiUndo) return;
@@ -230,7 +299,7 @@ export default function StudioPage() {
       const project = await createProject.mutateAsync({
         data: {
           name: name.trim() || "Untitled Studio Project",
-          module: spotlightClip ? "video-spotlight" : "studio",
+          module: effectiveModule,
           compositionVars: spotlightClip
             ? {
                 ...compositionVars,
@@ -305,6 +374,61 @@ export default function StudioPage() {
         <div className="grid items-start gap-5 lg:grid-cols-[1.55fr_1fr]">
           {/* Compose column */}
           <div className="flex flex-col gap-5">
+            {/* Template picker — the copy-compatible templates Studio can make */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="mb-2.5 flex items-center gap-2">
+                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary">
+                    <LayoutTemplate className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-[13.5px] font-semibold">Template</div>
+                    <div className="text-[11.5px] text-muted-foreground">
+                      Pick a style — your copy &amp; brand fill it in.
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {STUDIO_TEMPLATES.map((t) => {
+                    const on = !spotlightClip && t.module === selectedModule;
+                    return (
+                      <button
+                        key={t.module}
+                        type="button"
+                        onClick={() => pickTemplate(t.module)}
+                        disabled={!!spotlightClip}
+                        aria-pressed={on}
+                        className={cn(
+                          "rounded-lg border p-2.5 text-left transition-colors disabled:opacity-50",
+                          on
+                            ? "border-primary bg-primary/10"
+                            : "hover:border-primary/40",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "text-[12.5px] font-semibold",
+                            on && "text-primary",
+                          )}
+                        >
+                          {t.name}
+                        </div>
+                        <div className="text-[10.5px] text-muted-foreground">
+                          {t.blurb}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {spotlightClip && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Your spotlight clip uses the Video Spotlight template — remove
+                    it to pick another.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             {/* AI brief */}
             <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-b from-primary/[0.05] to-transparent">
               {isAiPending && (
@@ -567,13 +691,10 @@ export default function StudioPage() {
                     onChange={setRenderSettings}
                     plan={plan}
                     disabled={isSubmitting}
-                    // Studio creates `studio` / `video-spotlight` projects —
-                    // both single-scene compositions, so scene transitions
-                    // can't apply (the picker used to be configurable-but-
-                    // inert here; now it's honestly disabled). Transition-
-                    // capable templates (brand-story) get their settings UI
-                    // on the project page, with the real per-template flag.
-                    supportsTransitions={false}
+                    // Only multi-scene templates can composite a transition. The
+                    // picker enables it for Brand Story and disables it for the
+                    // single-scene templates (and the spotlight-clip path).
+                    supportsTransitions={supportsTransitions}
                     onUpgrade={() => {
                       setUpgradeReason("render_quality");
                       setShowUpgrade(true);
@@ -619,7 +740,7 @@ export default function StudioPage() {
                     </span>
                   </div>
                   <span className="font-mono text-[11px] text-muted-foreground">
-                    studio
+                    {effectiveModule}
                   </span>
                 </div>
                 {/* Format / platform — sets the render aspect AND the preview shape */}
