@@ -17,6 +17,7 @@ import {
   type BrandKit,
 } from "@workspace/api-client-react";
 import { TemplateParamsForm } from "@/components/template-params-form";
+import { AiQuickEdits } from "@/components/ai-quick-edits";
 import { HfPlayer } from "@/components/hf-player";
 import { b64UrlVars } from "@/lib/preview-vars";
 import {
@@ -497,9 +498,11 @@ function ProjectDetail({
   // "Edit with AI": revise the on-screen copy per an instruction. Updates the
   // LOCAL fields (so the live preview reflects it via ?vars=); the user then
   // Saves + re-renders. Same /ai/edit endpoint, quota and gating as Studio.
-  async function handleAiEditCopy() {
+  // A quick-edit chip passes its canned instruction directly; the text field
+  // path uses `aiInstruction` (and clears it on success).
+  async function handleAiEditCopy(instructionOverride?: string) {
     setAiCopyError(null);
-    const instruction = aiInstruction.trim();
+    const instruction = (instructionOverride ?? aiInstruction).trim();
     if (instruction.length < 3) {
       setAiCopyError("Tell the AI what to change (min 3 chars).");
       return;
@@ -513,7 +516,7 @@ function ProjectDetail({
         bodyText: result.bodyText,
         ctaText: result.ctaText,
       });
-      setAiInstruction("");
+      if (instructionOverride === undefined) setAiInstruction("");
     } catch (err) {
       const anyErr = err as {
         status?: number;
@@ -871,6 +874,10 @@ function ProjectDetail({
                         <Sparkles className="h-3.5 w-3.5 text-primary" /> Edit with
                         AI
                       </div>
+                      <AiQuickEdits
+                        onPick={(ins) => void handleAiEditCopy(ins)}
+                        disabled={aiEdit.isPending}
+                      />
                       <Input
                         value={aiInstruction}
                         onChange={(e) => setAiInstruction(e.target.value)}
@@ -886,7 +893,7 @@ function ProjectDetail({
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={handleAiEditCopy}
+                        onClick={() => void handleAiEditCopy()}
                         disabled={aiEdit.isPending}
                       >
                         {aiEdit.isPending ? (

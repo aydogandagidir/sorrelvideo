@@ -274,6 +274,37 @@ describe("Projects — edit copy (draft/failed)", () => {
       (post?.body as { current?: { ctaText?: string } }).current?.ctaText,
     ).toBe("Go");
   });
+
+  it("a quick-edit chip posts its canned instruction + the current copy", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([draftProject({ id: 8, name: "Chips" })]),
+      {
+        url: "/api/ai/edit",
+        method: "POST",
+        status: 200,
+        json: { headline: "Tighter", bodyText: "Short.", ctaText: "Go" },
+      },
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const dialog = await openDetail("Chips");
+
+    // No instruction typed — the chip carries a canned one.
+    await user.click(within(dialog).getByRole("button", { name: /^shorter$/i }));
+
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText(/headline/i)).toHaveValue("Tighter"),
+    );
+    const post = postCalls().find((c) => /\/api\/ai\/edit$/.test(c.url));
+    expect(
+      (post?.body as { instruction?: string }).instruction,
+    ).toMatch(/shorter/i);
+    expect(
+      (post?.body as { current?: { ctaText?: string } }).current?.ctaText,
+    ).toBe("Go");
+  });
 });
 
 describe("Projects — delete confirmation AlertDialog", () => {

@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { RenderSettingsForm } from "@/components/render-settings-form";
+import { AiQuickEdits } from "@/components/ai-quick-edits";
 import { HfPlayer } from "@/components/hf-player";
 import {
   DEFAULT_RENDER_SETTINGS,
@@ -156,12 +157,16 @@ export default function StudioPage() {
     setAiUndo(null);
   }
 
-  async function handleAiAction() {
+  async function handleAiAction(explicitInstruction?: string) {
     setAiError(null);
-    const trimmed = aiPrompt.trim();
+    // A quick-edit chip passes its instruction directly and is always an edit;
+    // the button uses the textarea + the Draft/Edit toggle.
+    const isQuickEdit = explicitInstruction !== undefined;
+    const doEdit = isQuickEdit || aiMode === "edit";
+    const trimmed = (explicitInstruction ?? aiPrompt).trim();
     if (trimmed.length < 3) {
       setAiError(
-        aiMode === "edit"
+        doEdit
           ? "Tell the AI what to change (min 3 chars)."
           : "Tell the AI what you'd like a video about (min 3 chars).",
       );
@@ -169,15 +174,14 @@ export default function StudioPage() {
     }
     try {
       // Draft writes from a brief; edit revises the copy that's on screen now.
-      const result =
-        aiMode === "edit"
-          ? await aiEdit.mutateAsync({
-              data: {
-                instruction: trimmed,
-                current: { headline, bodyText, ctaText },
-              },
-            })
-          : await aiSuggest.mutateAsync({ data: { prompt: trimmed } });
+      const result = doEdit
+        ? await aiEdit.mutateAsync({
+            data: {
+              instruction: trimmed,
+              current: { headline, bodyText, ctaText },
+            },
+          })
+        : await aiSuggest.mutateAsync({ data: { prompt: trimmed } });
       // Stash the pre-change copy so a one-click overwrite is undoable.
       setAiUndo({ headline, bodyText, ctaText });
       setHeadline(result.headline);
@@ -201,7 +205,7 @@ export default function StudioPage() {
       setAiError(
         anyErr.data?.error ??
           anyErr.message ??
-          (aiMode === "edit" ? "AI edit failed" : "AI suggestion failed"),
+          (doEdit ? "AI edit failed" : "AI suggestion failed"),
       );
     }
   }
@@ -369,6 +373,14 @@ export default function StudioPage() {
                   }
                   disabled={isAiPending}
                 />
+                {aiMode === "edit" && (
+                  <div className="mt-2">
+                    <AiQuickEdits
+                      onPick={(ins) => void handleAiAction(ins)}
+                      disabled={isAiPending}
+                    />
+                  </div>
+                )}
                 {aiError && (
                   <p className="mt-2 text-sm text-destructive" role="alert">
                     {aiError}
@@ -377,7 +389,7 @@ export default function StudioPage() {
                 <div className="mt-2.5 flex flex-wrap items-center gap-3">
                   <Button
                     type="button"
-                    onClick={handleAiAction}
+                    onClick={() => void handleAiAction()}
                     disabled={isAiPending}
                   >
                     {isAiPending ? (
