@@ -1101,6 +1101,36 @@ export const AiSuggestResponse = zod.object({
 
 
 /**
+ * @summary Revise existing Studio copy per a natural-language instruction
+ */
+export const aiEditBodyInstructionMin = 3;
+export const aiEditBodyInstructionMax = 500;
+
+export const aiEditBodyCurrentHeadlineMax = 160;
+
+export const aiEditBodyCurrentBodyTextMax = 500;
+
+export const aiEditBodyCurrentCtaTextMax = 48;
+
+
+
+export const AiEditBody = zod.object({
+  "instruction": zod.string().min(aiEditBodyInstructionMin).max(aiEditBodyInstructionMax).describe('The natural-language edit to apply to the current copy.'),
+  "current": zod.object({
+  "headline": zod.string().max(aiEditBodyCurrentHeadlineMax),
+  "bodyText": zod.string().max(aiEditBodyCurrentBodyTextMax),
+  "ctaText": zod.string().max(aiEditBodyCurrentCtaTextMax)
+}).describe('The current Studio copy to revise (fields may be empty).')
+})
+
+export const AiEditResponse = zod.object({
+  "headline": zod.string(),
+  "bodyText": zod.string(),
+  "ctaText": zod.string()
+})
+
+
+/**
  * @summary Generate word-timed captions from an uploaded audio object (Pro)
  */
 

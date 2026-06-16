@@ -118,9 +118,38 @@ export function buildAvatarSystem(brand: BrandDna): string {
   return brandContext ? `${core}\n\n${brandContext}` : core;
 }
 
-/** Wraps the user's brief in a minimal scaffold; the model already has shape rules from the system prompt. */
-export function buildUserPrompt(brief: string): string {
-  return `Brief: ${brief.trim()}`;
+/**
+ * Wraps the user's brief in a minimal scaffold; the model already has shape
+ * rules from the system prompt. When `current` is supplied the brief is treated
+ * as an EDIT instruction ("Edit with AI"): the model is shown the existing copy
+ * and asked to apply the instruction minimally, preserving fields the
+ * instruction doesn't touch, while still returning the full three-field object.
+ * The current copy is JSON-encoded so the model can't confuse it with the
+ * instruction (and a quote/newline inside a field can't break the framing).
+ */
+export function buildUserPrompt(
+  brief: string,
+  current?: { headline: string; bodyText: string; ctaText: string },
+): string {
+  if (!current) return `Brief: ${brief.trim()}`;
+  return [
+    "Revise the CURRENT video copy below according to the instruction.",
+    "Change only what the instruction asks for; keep the other fields as they are.",
+    "Return the full object (all three fields), edited where applicable.",
+    "",
+    "Current copy (JSON):",
+    JSON.stringify(
+      {
+        headline: current.headline,
+        bodyText: current.bodyText,
+        ctaText: current.ctaText,
+      },
+      null,
+      2,
+    ),
+    "",
+    `Instruction: ${brief.trim()}`,
+  ].join("\n");
 }
 
 // ───────────────────────────── Brand extraction ─────────────────────────────

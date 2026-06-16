@@ -24,10 +24,29 @@ export const BrandDnaSchema = z.object({
 });
 export type BrandDna = z.infer<typeof BrandDnaSchema>;
 
+/**
+ * The current Studio copy, supplied when `prompt` is an EDIT instruction (the
+ * "Edit with AI" flow) instead of a from-scratch brief. Fields may be empty —
+ * the user can be refining a partial draft — so unlike `SuggestOutputSchema`
+ * these are not `.min(1)`. Same per-field length caps as the output.
+ */
+export const CurrentCopySchema = z.object({
+  headline: z.string().max(160),
+  bodyText: z.string().max(500),
+  ctaText: z.string().max(48),
+});
+export type CurrentCopy = z.infer<typeof CurrentCopySchema>;
+
 /** What the API route hands to the provider. */
 export const SuggestInputSchema = z.object({
   prompt: z.string().min(3).max(500),
   brand: BrandDnaSchema,
+  /**
+   * When present, `prompt` is an EDIT instruction applied to this current copy
+   * ("Edit with AI") rather than a from-scratch brief. The provider frames the
+   * turn as a minimal revision that keeps fields the instruction doesn't touch.
+   */
+  current: CurrentCopySchema.optional(),
   maxTokens: z.number().int().positive().max(2000).optional(),
 });
 export type SuggestInput = z.infer<typeof SuggestInputSchema>;

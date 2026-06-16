@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AiEditRequest,
   AiSuggestRequest,
   AiSuggestResult,
   AnalyticsOverview,
@@ -2905,6 +2906,77 @@ export const useAiSuggest = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getAiSuggestMutationOptions(options));
+    }
+
+export const getAiEditUrl = () => {
+
+
+
+
+  return `/api/ai/edit`
+}
+
+/**
+ * @summary Revise existing Studio copy per a natural-language instruction
+ */
+export const aiEdit = async (aiEditRequest: AiEditRequest, options?: RequestInit): Promise<AiSuggestResult> => {
+
+  return customFetch<AiSuggestResult>(getAiEditUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      aiEditRequest,)
+  }
+);}
+
+
+
+
+export const getAiEditMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aiEdit>>, TError,{data: BodyType<AiEditRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof aiEdit>>, TError,{data: BodyType<AiEditRequest>}, TContext> => {
+
+const mutationKey = ['aiEdit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof aiEdit>>, {data: BodyType<AiEditRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  aiEdit(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AiEditMutationResult = NonNullable<Awaited<ReturnType<typeof aiEdit>>>
+    export type AiEditMutationBody = BodyType<AiEditRequest>
+    export type AiEditMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Revise existing Studio copy per a natural-language instruction
+ */
+export const useAiEdit = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof aiEdit>>, TError,{data: BodyType<AiEditRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof aiEdit>>,
+        TError,
+        {data: BodyType<AiEditRequest>},
+        TContext
+      > => {
+      return useMutation(getAiEditMutationOptions(options));
     }
 
 export const getGenerateCaptionsUrl = () => {

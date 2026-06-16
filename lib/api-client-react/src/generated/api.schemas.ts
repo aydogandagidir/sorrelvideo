@@ -902,6 +902,29 @@ export interface AiSuggestResult {
   ctaText: string;
 }
 
+/**
+ * The current Studio copy to revise (fields may be empty).
+ */
+export type AiEditRequestCurrent = {
+  /** @maxLength 160 */
+  headline: string;
+  /** @maxLength 500 */
+  bodyText: string;
+  /** @maxLength 48 */
+  ctaText: string;
+};
+
+export interface AiEditRequest {
+  /**
+     * The natural-language edit to apply to the current copy.
+     * @minLength 3
+     * @maxLength 500
+     */
+  instruction: string;
+  /** The current Studio copy to revise (fields may be empty). */
+  current: AiEditRequestCurrent;
+}
+
 export interface CheckoutRequest {
   priceId: string;
 }

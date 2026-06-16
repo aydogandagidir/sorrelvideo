@@ -165,7 +165,7 @@ export const openaiProvider: AiProvider = {
   async suggest(input: SuggestInput): Promise<SuggestResult> {
     const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
     const system = buildSystemPrompt(input.brand);
-    const userPrompt = buildUserPrompt(input.prompt);
+    const userPrompt = buildUserPrompt(input.prompt, input.current);
 
     const response = await getClient().chat.completions.create({
       model,

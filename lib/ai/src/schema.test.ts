@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BrandVoiceSchema,
+  CurrentCopySchema,
   SuggestInputSchema,
   SuggestOutputSchema,
 } from "./schema";
@@ -46,6 +47,41 @@ describe("SuggestInputSchema", () => {
       },
     });
     expect(ok.brand.voice).toBe("playful");
+  });
+
+  it("treats `current` as optional (absent → undefined)", () => {
+    const ok = SuggestInputSchema.parse({
+      prompt: "launch our autumn line",
+      brand: { companyName: null, voice: null, voiceDescription: null },
+    });
+    expect(ok.current).toBeUndefined();
+  });
+
+  it("accepts a `current` copy (the edit flow)", () => {
+    const ok = SuggestInputSchema.parse({
+      prompt: "make it punchier",
+      brand: { companyName: null, voice: null, voiceDescription: null },
+      current: { headline: "H", bodyText: "B", ctaText: "C" },
+    });
+    expect(ok.current?.headline).toBe("H");
+  });
+});
+
+describe("CurrentCopySchema", () => {
+  it("allows empty fields (a partial draft being edited)", () => {
+    expect(() =>
+      CurrentCopySchema.parse({ headline: "", bodyText: "", ctaText: "" }),
+    ).not.toThrow();
+  });
+
+  it("caps each field at its length limit", () => {
+    expect(() =>
+      CurrentCopySchema.parse({
+        headline: "x".repeat(161),
+        bodyText: "y",
+        ctaText: "z",
+      }),
+    ).toThrow();
   });
 });
 
