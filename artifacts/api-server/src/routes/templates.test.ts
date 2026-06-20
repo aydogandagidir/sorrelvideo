@@ -31,6 +31,25 @@ describe("GET /api/templates/thumbnails/:slug", () => {
     expect(res.headers["content-type"]).toBe("image/png");
   });
 
+  it("serves the gallery-surfaced posters (brand-story + the Studio copy templates)", async () => {
+    // brand-story's PNG was committed but its slug was missing from the
+    // allow-list → 404 in the gallery; the three Studio copy templates are now
+    // seeded + given posters. Each must serve a real, non-trivial PNG.
+    for (const slug of [
+      "brand-story",
+      "product-launch",
+      "brand-promo",
+      "social-teaser",
+    ]) {
+      const res = await request(app).get(
+        `/api/templates/thumbnails/${slug}.png`,
+      );
+      expect(res.status, slug).toBe(200);
+      expect(res.headers["content-type"]).toBe("image/png");
+      expect(res.body.length).toBeGreaterThan(3000);
+    }
+  });
+
   it("404s for a slug that is not a vendored template (allow-list)", async () => {
     const res = await request(app).get(
       "/api/templates/thumbnails/not-a-real-template.png",

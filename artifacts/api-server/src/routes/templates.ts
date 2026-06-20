@@ -47,6 +47,13 @@ const THUMBNAIL_SLUGS = new Set([
   "lottie-reveal",
   "video-spotlight",
   "talking-host",
+  // brand-story is a seeded hand-authored template (its PNG is committed) but was
+  // missing here, so GET /templates/thumbnails/brand-story.png 404'd in the
+  // gallery — add it. The three Studio copy templates are now gallery-surfaced too.
+  "brand-story",
+  "product-launch",
+  "brand-promo",
+  "social-teaser",
 ]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

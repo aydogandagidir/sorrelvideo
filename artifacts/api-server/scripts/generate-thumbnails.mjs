@@ -240,6 +240,12 @@ async function main() {
     // (sorrel.transitionsActive defaults to "0" → its own hard cut), so the
     // poster is one of its two static scenes — exactly what the gallery wants.
     { slug: "brand-story", duration: 8 },
+    // The copy templates the Studio picker offers — now surfaced in the gallery
+    // too (single-scene; same headline/body/CTA render path). Keep slug/duration
+    // in sync with HAND_AUTHORED_TEMPLATES in platformTemplatesService.ts.
+    { slug: "product-launch", duration: 6 },
+    { slug: "brand-promo", duration: 5 },
+    { slug: "social-teaser", duration: 4 },
   ];
 
   // Optional CLI filter: `node scripts/generate-thumbnails.mjs <slug> [<slug>…]`
