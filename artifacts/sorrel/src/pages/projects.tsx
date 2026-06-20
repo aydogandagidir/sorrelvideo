@@ -6,6 +6,7 @@ import {
   useListProjects,
   useCreateProject,
   useDeleteProject,
+  useDuplicateProject,
   useStartProjectRender,
   useUpdateProjectRenderSettings,
   useUpdateProject,
@@ -46,6 +47,7 @@ import {
   Search,
   PencilRuler,
   Sparkles,
+  Copy,
 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
@@ -330,6 +332,7 @@ function ProjectDetail({
 }) {
   const queryClient = useQueryClient();
   const deleteProject = useDeleteProject();
+  const duplicateProject = useDuplicateProject();
   const renderMutation = useStartProjectRender();
   const updateSettings = useUpdateProjectRenderSettings();
   const updateProject = useUpdateProject();
@@ -562,6 +565,31 @@ function ProjectDetail({
               e.status === 409
                 ? "A render is already in progress for this project."
                 : (e.data?.error ?? "Please try again."),
+          });
+        },
+      },
+    );
+
+  // Clone this project's content into a fresh draft (copy/brand/settings), then
+  // close the dialog so the new copy shows up in the grid to tweak + re-render.
+  const handleDuplicate = () =>
+    duplicateProject.mutate(
+      { id: project.id },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({
+            title: "Project duplicated",
+            description: "A draft copy is now in your projects.",
+          });
+          onClose();
+        },
+        onError: (err) => {
+          const e = err as { data?: { error?: string } };
+          toast({
+            variant: "destructive",
+            title: "Couldn't duplicate the project",
+            description: e.data?.error ?? "Please try again.",
           });
         },
       },
@@ -1017,6 +1045,18 @@ function ProjectDetail({
                   Rendering… {Math.round(project.renderProgress ?? 0)}%
                 </Button>
               )}
+              <Button
+                variant="outline"
+                onClick={handleDuplicate}
+                disabled={duplicateProject.isPending}
+              >
+                {duplicateProject.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Copy className="mr-2 h-4 w-4" />
+                )}
+                Duplicate
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => {

@@ -307,6 +307,34 @@ describe("Projects — edit copy (draft/failed)", () => {
   });
 });
 
+describe("Projects — duplicate", () => {
+  it("clones the project via POST /projects/:id/duplicate", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([draftProject({ id: 4, name: "Original" })]),
+      {
+        url: /\/projects\/4\/duplicate$/,
+        method: "POST",
+        status: 201,
+        json: draftProject({ id: 5, name: "Original (copy)" }),
+      },
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const dialog = await openDetail("Original");
+
+    await user.click(within(dialog).getByRole("button", { name: /duplicate/i }));
+
+    await waitFor(() => {
+      const post = postCalls().find((c) =>
+        /\/projects\/4\/duplicate$/.test(c.url),
+      );
+      expect(post).toBeTruthy();
+    });
+  });
+});
+
 describe("Projects — delete confirmation AlertDialog", () => {
   it("opens the confirm dialog on trash, and only the Delete confirm fires DELETE", async () => {
     const user = userEvent.setup();

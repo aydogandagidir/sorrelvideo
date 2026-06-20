@@ -506,6 +506,31 @@ paths:
         "409":
           description: No render in progress
 
+  /projects/{id}/duplicate:
+    post:
+      operationId: duplicateProject
+      tags: [projects]
+      summary: Duplicate a project as a fresh draft (copies copy, brand & settings)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: A new draft project copied from the source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
   /projects/{id}/video:
     get:
       operationId: getProjectVideo

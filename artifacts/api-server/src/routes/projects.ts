@@ -189,6 +189,57 @@ router.get("/projects/:id", async (req, res): Promise<void> => {
   res.json(GetProjectResponse.parse(serializeDates(withProgress)));
 });
 
+router.post("/projects/:id/duplicate", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = GetProjectParams.safeParse({ id: parseInt(rawId, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [source] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, params.data.id));
+
+  if (!source) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (source.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  // A duplicate is a fresh DRAFT cloned from the source's CONTENT — copy/brand/
+  // template, render settings, and any editor-persisted compositionHtml — so the
+  // user can iterate on a variation without rebuilding it. Render OUTPUTS and the
+  // status are deliberately NOT copied: the copy renders on its own (status
+  // draft; video/thumbnail/error/progress reset).
+  const [project] = await db
+    .insert(projectsTable)
+    .values({
+      userId: req.user.id,
+      name: `${source.name} (copy)`.slice(0, 120),
+      description: source.description,
+      status: "draft",
+      module: source.module,
+      templateId: source.templateId,
+      brandKitId: source.brandKitId,
+      duration: source.duration,
+      compositionVars: source.compositionVars,
+      compositionHtml: source.compositionHtml,
+      renderSettings: source.renderSettings,
+    })
+    .returning();
+
+  res.status(201).json(GetProjectResponse.parse(serializeDates(project)));
+});
+
 router.patch("/projects/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Unauthorized" });
