@@ -80,6 +80,16 @@ const DEFAULT_ACCENT = "#cdfb45";
 const COMP_BG = "#0d1110";
 const FILTERS = ["All", "Ready", "Rendering", "Draft", "Failed"] as const;
 
+/** Client-side sort of the (already-fetched) project list. Sort key is the
+ *  project's `updatedAt` — the same date the cards display — so the order
+ *  matches what the user reads. */
+const SORTS = ["newest", "oldest", "name"] as const;
+const SORT_LABELS: Record<(typeof SORTS)[number], string> = {
+  newest: "Newest",
+  oldest: "Oldest",
+  name: "Name A–Z",
+};
+
 function thumbProps(project: Project, brand?: BrandKit) {
   const v = project.compositionVars ?? {};
   const company = brand?.companyName || "Sorrel";
@@ -1148,6 +1158,7 @@ export default function Projects() {
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectModule, setNewProjectModule] = useState("studio");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<(typeof SORTS)[number]>("newest");
 
   const hasRendering = projects?.some((p) => p.status === "rendering") ?? false;
   useProjectPolling(hasRendering);
@@ -1163,6 +1174,14 @@ export default function Projects() {
   const filtered = query
     ? byStatus.filter((p) => (p.name ?? "").toLowerCase().includes(query))
     : byStatus;
+  // Sort a COPY so the underlying query data is never mutated. `name` is a
+  // locale-aware A–Z; the date sorts key on `updatedAt` (newest first default).
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === "name") return (a.name ?? "").localeCompare(b.name ?? "");
+    const at = new Date(a.updatedAt).getTime();
+    const bt = new Date(b.updatedAt).getTime();
+    return sort === "oldest" ? at - bt : bt - at;
+  });
   const detail = projects?.find((p) => p.id === detailId) ?? null;
 
   const handleCreate = (e: React.FormEvent) => {
@@ -1280,7 +1299,21 @@ export default function Projects() {
               {f}
             </button>
           ))}
-          <div className="ml-auto hidden h-[34px] w-[180px] items-center gap-2 rounded-md border bg-secondary px-2.5 text-muted-foreground focus-within:border-muted-foreground/40 sm:flex">
+          <select
+            value={sort}
+            onChange={(e) =>
+              setSort(e.target.value as (typeof SORTS)[number])
+            }
+            aria-label="Sort projects"
+            className="ml-auto h-[34px] rounded-md border bg-secondary px-2 text-[12.5px] font-semibold text-muted-foreground focus:border-muted-foreground/40 focus:outline-none"
+          >
+            {SORTS.map((s) => (
+              <option key={s} value={s}>
+                {SORT_LABELS[s]}
+              </option>
+            ))}
+          </select>
+          <div className="hidden h-[34px] w-[180px] items-center gap-2 rounded-md border bg-secondary px-2.5 text-muted-foreground focus-within:border-muted-foreground/40 sm:flex">
             <Search className="h-3.5 w-3.5 shrink-0" />
             <input
               type="text"
@@ -1300,12 +1333,12 @@ export default function Projects() {
               <Skeleton key={i} className="aspect-[9/16] w-full rounded-xl" />
             ))}
           </div>
-        ) : filtered.length ? (
+        ) : sorted.length ? (
           <div
             data-testid="projects-grid"
             className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5"
           >
-            {filtered.map((p, i) => (
+            {sorted.map((p, i) => (
               <ProjectCard
                 key={p.id}
                 project={p}
