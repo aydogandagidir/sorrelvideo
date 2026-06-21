@@ -17,7 +17,7 @@
     "@hyperframes/producer": "0.6.91",
     "@hyperframes/shader-transitions": "0.6.91",
     "@node-rs/argon2": "^2.0.2",
-    "@sentry/node": "^8.50.0",
+    "@sentry/node": "^10.57.0",
     "@workspace/ai": "workspace:*",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
