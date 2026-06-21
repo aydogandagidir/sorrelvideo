@@ -1085,12 +1085,17 @@ export async function executeRender(
       dir,
       outputPath,
       (j, msg) => {
+        // `j.progress` is already a 0–100 PERCENT from the producer (verified
+        // against 0.6.91: e.g. 25 at "Starting frame capture", 70 at the last
+        // frame, 100 at "Render complete") — NOT a 0–1 fraction. The old
+        // `* 100` pushed every tick to 500–10000, which markProgress clamped to
+        // 100, so the bar sat at 100% for the whole render.
         logger.debug(
-          { projectId, percent: Math.round(j.progress * 100), msg },
+          { projectId, percent: Math.round(j.progress), msg },
           "Render progress",
         );
         if (renderJobId) {
-          void markProgress(renderJobId, Math.round(j.progress * 100)).catch(
+          void markProgress(renderJobId, j.progress).catch(
             (err) =>
               logger.warn(
                 { renderJobId, err },

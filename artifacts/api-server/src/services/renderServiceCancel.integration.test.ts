@@ -66,7 +66,10 @@ vi.mock("@hyperframes/producer", () => ({
         h.aborted = true;
         throw new RenderCancelledError();
       }
-      job.progress = Math.min(1, (i + 1) / 200);
+      // `progress` is a 0–100 PERCENT, matching the real producer (verified
+      // against 0.6.91) — NOT a 0–1 fraction. renderService passes it straight to
+      // markProgress; an extra `* 100` would clamp every tick to 100 (the bug).
+      job.progress = Math.min(100, Math.round(((i + 1) / 200) * 100));
       onProgress?.(job, `frame ${i}`);
       // Yield so the async cancel poll (isCancelRequested → abort) can resolve
       // before the next iteration checks the signal.
@@ -150,6 +153,10 @@ describe.runIf(INTEGRATION_AVAILABLE)("executeRender — cancellation", () => {
       .from(renderJobsTable)
       .where(eq(renderJobsTable.id, renderJobId));
     expect(job.status).toBe("cancelled");
+    // Progress reflects the REAL early percent (a handful of ticks before the
+    // abort), not a unit-bug 100. The old `j.progress * 100` clamped every tick
+    // to 100, so this would have been 100 from the first frame.
+    expect(job.progress).toBeLessThan(100);
   });
 
   it("runs to completion (job → 'ready', project → 'ready') when never cancelled", async () => {
