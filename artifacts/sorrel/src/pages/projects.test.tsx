@@ -383,6 +383,40 @@ describe("Projects — duplicate", () => {
   });
 });
 
+describe("Projects — rename", () => {
+  it("renames via PATCH /projects/:id with the new name", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([draftProject({ id: 3, name: "Old Name" })]),
+      {
+        url: /\/api\/projects\/3$/,
+        method: "PATCH",
+        status: 200,
+        json: draftProject({ id: 3, name: "New Name" }),
+      },
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const dialog = await openDetail("Old Name");
+
+    await user.click(
+      within(dialog).getByRole("button", { name: /rename project/i }),
+    );
+    const input = within(dialog).getByLabelText(/project name/i);
+    await user.clear(input);
+    await user.type(input, "New Name");
+    await user.click(within(dialog).getByRole("button", { name: /save name/i }));
+
+    await waitFor(() => {
+      const patch = patchCalls().find((c) => /\/api\/projects\/3$/.test(c.url));
+      expect(patch).toBeTruthy();
+    });
+    const patch = patchCalls().find((c) => /\/api\/projects\/3$/.test(c.url));
+    expect((patch?.body as { name?: string }).name).toBe("New Name");
+  });
+});
+
 describe("Projects — delete confirmation AlertDialog", () => {
   it("opens the confirm dialog on trash, and only the Delete confirm fires DELETE", async () => {
     const user = userEvent.setup();
