@@ -6,6 +6,8 @@ import {
   buildUserPrompt,
   buildAvatarSystem,
   buildVideoIdeasUserText,
+  PICK_SECTIONS_SYSTEM,
+  buildPickSectionsUserText,
 } from "./prompt";
 
 const EMPTY_BRAND = {
@@ -195,5 +197,34 @@ describe("buildVideoIdeasUserText", () => {
     expect(text).toContain("Propose 3 distinct short-video concepts");
     expect(text).toContain("Acme");
     expect(text).toContain("Faster builds");
+  });
+});
+
+describe("buildPickSectionsUserText", () => {
+  it("indexes the candidate sections and embeds the prompt + title", () => {
+    const text = buildPickSectionsUserText({
+      prompt: "feature our AI products and the contact form",
+      title: "Acme",
+      sections: [
+        { label: "Hero" },
+        { label: "AI products" },
+        { label: "Contact" },
+      ],
+    });
+    expect(text).toContain("feature our AI products");
+    expect(text).toContain("Page title: Acme");
+    // Indexed list so the model can reference sections by number.
+    expect(text).toContain("0: Hero");
+    expect(text).toContain("1: AI products");
+    expect(text).toContain("2: Contact");
+  });
+});
+
+describe("PICK_SECTIONS_SYSTEM (the cacheable director prompt)", () => {
+  it("states the index/seconds/caption contract + JSON-only output", () => {
+    expect(PICK_SECTIONS_SYSTEM).toContain('"index"');
+    expect(PICK_SECTIONS_SYSTEM).toContain('"seconds"');
+    expect(PICK_SECTIONS_SYSTEM).toContain('"caption"');
+    expect(PICK_SECTIONS_SYSTEM).toMatch(/ONLY the JSON object/i);
   });
 });

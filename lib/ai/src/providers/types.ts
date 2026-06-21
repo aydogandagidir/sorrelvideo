@@ -7,6 +7,8 @@ import type {
   GenerateVideoIdeasResult,
   ChatInput,
   ChatResult,
+  PickSectionsInput,
+  PickSectionsResult,
 } from "../schema";
 
 export interface AiProvider {
@@ -33,4 +35,12 @@ export interface AiProvider {
   generateVideoIdeas(
     input: GenerateVideoIdeasInput,
   ): Promise<GenerateVideoIdeasResult>;
+  /**
+   * website→video "describe your video" director: given a captured page's
+   * candidate sections (labels) + the user's request, pick + order the sections
+   * to feature (by index) with a hold time and optional caption per beat. The
+   * caller maps indexes back to server-computed crops, so no geometry is trusted
+   * from the model.
+   */
+  pickSections(input: PickSectionsInput): Promise<PickSectionsResult>;
 }

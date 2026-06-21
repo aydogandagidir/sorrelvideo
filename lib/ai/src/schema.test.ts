@@ -4,6 +4,8 @@ import {
   CurrentCopySchema,
   SuggestInputSchema,
   SuggestOutputSchema,
+  PickSectionsInputSchema,
+  PickSectionsOutputSchema,
 } from "./schema";
 
 describe("BrandVoiceSchema", () => {
@@ -112,6 +114,48 @@ describe("SuggestOutputSchema", () => {
         bodyText: "y",
         ctaText: "z",
       }),
+    ).toThrow();
+  });
+});
+
+describe("PickSectionsInputSchema", () => {
+  it("requires a prompt and at least one section", () => {
+    expect(() =>
+      PickSectionsInputSchema.parse({ prompt: "", sections: [] }),
+    ).toThrow();
+  });
+
+  it("accepts a well-formed input", () => {
+    const ok = PickSectionsInputSchema.parse({
+      prompt: "show the hero and the contact section",
+      title: "Acme",
+      sections: [{ label: "Hero" }, { label: "Contact" }],
+    });
+    expect(ok.sections).toHaveLength(2);
+    expect(ok.title).toBe("Acme");
+  });
+});
+
+describe("PickSectionsOutputSchema", () => {
+  it("accepts ordered picks with seconds + an optional caption", () => {
+    expect(() =>
+      PickSectionsOutputSchema.parse({
+        picks: [
+          { index: 0, seconds: 3, caption: "Welcome" },
+          { index: 2, seconds: 2, caption: null },
+          { index: 1, seconds: 1.5 },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects an empty picks array", () => {
+    expect(() => PickSectionsOutputSchema.parse({ picks: [] })).toThrow();
+  });
+
+  it("rejects seconds out of range", () => {
+    expect(() =>
+      PickSectionsOutputSchema.parse({ picks: [{ index: 0, seconds: 99 }] }),
     ).toThrow();
   });
 });

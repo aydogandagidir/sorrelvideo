@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Globe, Loader2, Sparkles } from "lucide-react";
+import { Globe, Loader2, Sparkles, Wand2 } from "lucide-react";
 
 // Preset video lengths (seconds) + "Auto". Auto omits duration so the backend
 // scales the length to the captured page height — a calm, COMPLETE scroll
@@ -25,6 +26,9 @@ const DURATIONS: DurationChoice[] = ["auto", 10, 20, 30, 45];
 
 export default function WebsiteToVideo(): React.JSX.Element {
   const [url, setUrl] = useState("");
+  // "Describe your video": when filled, the AI picks + orders the page's sections
+  // into a curated pan/zoom tour (and drives the length), instead of a flat scroll.
+  const [aiPrompt, setAiPrompt] = useState("");
   const [duration, setDuration] = useState<DurationChoice>("auto");
   // "" = automatic (reuse a configured default, else detect); "detect" = always
   // detect fresh; a number = a specific kit id.
@@ -85,6 +89,7 @@ export default function WebsiteToVideo(): React.JSX.Element {
     createVideo.mutate({
       data: {
         url: full,
+        ...(aiPrompt.trim() ? { aiPrompt: aiPrompt.trim() } : {}),
         ...(duration !== "auto" ? { duration } : {}),
         ...(brandChoice === "detect"
           ? { autoBrand: true }
@@ -146,6 +151,30 @@ export default function WebsiteToVideo(): React.JSX.Element {
                     </>
                   )}
                 </Button>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  <Wand2 className="h-3.5 w-3.5 text-primary" />
+                  Describe your video{" "}
+                  <span className="font-normal text-muted-foreground">
+                    — optional
+                  </span>
+                </span>
+                <Textarea
+                  rows={2}
+                  placeholder="e.g. show the hero, then our AI products, and end on the contact section"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  disabled={createVideo.isPending}
+                  maxLength={800}
+                  aria-label="Describe your video"
+                />
+                <span className="text-xs text-muted-foreground">
+                  Tell the AI what to feature and in what order — it builds a
+                  curated pan/zoom tour of those sections (and sets the length).
+                  Leave empty for a full-page scroll.
+                </span>
               </div>
 
               <div className="flex flex-col gap-1.5">

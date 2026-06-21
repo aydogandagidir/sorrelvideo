@@ -7,8 +7,14 @@ import {
   type CaptureMediaType,
   type ScrapedBrandSignals,
 } from "./websiteCaptureService";
+import { getProvider } from "@workspace/ai";
 import { assertSafeCompositionVars } from "../lib/compositionVars";
-import { buildCropVars, heroCrop, type CropRegion } from "../lib/websiteCrop";
+import {
+  buildCropVars,
+  buildTour,
+  heroCrop,
+  type CropRegion,
+} from "../lib/websiteCrop";
 import {
   getBrandKit,
   getDefaultBrandKit,
@@ -288,6 +294,51 @@ async function resolveBrandKitId(
 }
 
 /**
+ * The "describe your video" AI tour: capture's candidate sections + the user's
+ * prompt → an ordered pan/zoom highlight reel (the composition's `capture.tour`).
+ * Best-effort + quota-gated — with no provider key / no AI quota, or if the model
+ * returns nothing usable, returns null and the caller renders the plain scroll.
+ * Charges one AI unit only when it actually produces a tour.
+ */
+async function buildAiTour(
+  userId: string,
+  prompt: string,
+  cap: ResolvedCapture,
+): Promise<{ b64: string; duration: number } | null> {
+  if (!cap.sections || cap.sections.length === 0) return null;
+  const allowAi = await consumeAiUnitIfAvailable(userId);
+  if (!allowAi) return null;
+  try {
+    const result = await getProvider().pickSections({
+      prompt,
+      title: cap.title,
+      sections: cap.sections.map((s) => ({ label: s.label })),
+    });
+    const tour = buildTour(result.picks, cap.sections);
+    if (!tour) return null;
+    logger.info(
+      {
+        userId,
+        url: cap.url,
+        beats: tour.beats.length,
+        duration: tour.duration,
+      },
+      "AI section tour built",
+    );
+    return {
+      b64: Buffer.from(JSON.stringify(tour.beats), "utf-8").toString("base64"),
+      duration: tour.duration,
+    };
+  } catch (err) {
+    logger.warn(
+      { err, userId, url: cap.url },
+      "AI section tour failed; falling back to scroll",
+    );
+    return null;
+  }
+}
+
+/**
  * website→video: build a draft `website-showcase` project from either a fresh URL
  * capture (`url`) or a previously-previewed capture (`previewId`, the crop flow).
  * The screenshot is embedded as a `capture.image` data URI; an optional `crop`
@@ -312,6 +363,13 @@ export async function createWebsiteVideoProject(
     crop?: CropRegion; // an explicit drag-selected region (with previewId)
     selector?: string; // a CSS element ("by element")
     section?: "hero"; // a preset — the first screen
+    /**
+     * "Describe your video" — a natural-language brief. When set, the page's
+     * sections are scraped and the AI picks + orders them into a curated pan/zoom
+     * tour (the composition's `capture.tour`) instead of a flat scroll. Best-
+     * effort: with no AI key / quota, or nothing usable, it falls back to scroll.
+     */
+    aiPrompt?: string;
   },
 ): Promise<typeof projectsTable.$inferSelect> {
   // Decide the brand kit BEFORE capture so we only pay to scrape brand signals
@@ -332,16 +390,32 @@ export async function createWebsiteVideoProject(
     url: opts.url,
     previewId: opts.previewId,
     selector: opts.selector,
+    // Scrape candidate sections only when the AI tour will use them.
+    extractSections: !!opts.aiPrompt,
     extractBrand: !reuseKit, // only when we'll auto-create a kit
   });
   try {
-    const duration = resolveDuration(opts.duration, cap.height);
     const brandKitId = await resolveBrandKitId(userId, cap, reuseKit);
 
-    // Resolve the region to feature from the chosen mode. Whole page → no crop.
+    // "Describe your video": the AI picks + orders sections into a curated tour.
+    // Best-effort — a null result falls through to the single-crop / scroll modes.
+    const tour = opts.aiPrompt
+      ? await buildAiTour(userId, opts.aiPrompt, cap)
+      : null;
+
+    // A tour drives its own length (intro + beats + outro); otherwise scale to
+    // the page height (or an explicit user duration).
+    const duration = tour
+      ? tour.duration
+      : resolveDuration(opts.duration, cap.height);
+
+    // Resolve the single-crop region to feature (ignored when a tour won — the
+    // tour owns the whole motion). Whole page → no crop.
     let crop = opts.crop;
-    if (!crop && opts.selector) crop = cap.selectorCrop;
-    if (!crop && opts.section === "hero") crop = heroCrop(cap.height);
+    if (!tour) {
+      if (!crop && opts.selector) crop = cap.selectorCrop;
+      if (!crop && opts.section === "hero") crop = heroCrop(cap.height);
+    }
 
     const compositionVars: Record<string, string> = {
       "capture.image": dataUri(cap.screenshotPath, cap.mediaType),
@@ -349,7 +423,7 @@ export async function createWebsiteVideoProject(
       "capture.url": cap.url,
       "capture.title": cap.title,
       duration: String(duration),
-      ...buildCropVars(crop),
+      ...(tour ? { "capture.tour": tour.b64 } : buildCropVars(crop)),
     };
 
     // Defense in depth: route this server-built map through the same injection

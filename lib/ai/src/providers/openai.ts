@@ -7,11 +7,14 @@ import {
   buildBrandExtractUserText,
   VIDEO_IDEAS_SYSTEM,
   buildVideoIdeasUserText,
+  PICK_SECTIONS_SYSTEM,
+  buildPickSectionsUserText,
 } from "../prompt";
 import {
   SuggestOutputSchema,
   ExtractBrandOutputSchema,
   GenerateVideoIdeasOutputSchema,
+  PickSectionsOutputSchema,
   type SuggestInput,
   type SuggestResult,
   type ExtractBrandInput,
@@ -20,6 +23,8 @@ import {
   type GenerateVideoIdeasResult,
   type ChatInput,
   type ChatResult,
+  type PickSectionsInput,
+  type PickSectionsResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -37,6 +42,7 @@ const TOKENS = {
   extractBrand: 2048,
   videoIdeas: 4096,
   chat: 600,
+  pickSections: 1024,
 } as const;
 
 let client: OpenAI | null = null;
@@ -127,6 +133,29 @@ const VIDEO_IDEAS_RESPONSE_SCHEMA = {
           headline: { type: "string" },
           bodyText: { type: "string" },
           ctaText: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
+
+const PICK_SECTIONS_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["picks"],
+  properties: {
+    picks: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        // OpenAI strict mode requires every property in `required`; `caption`
+        // is still nullable, which the Zod `.nullable().optional()` accepts.
+        required: ["index", "seconds", "caption"],
+        properties: {
+          index: { type: "integer" },
+          seconds: { type: "number" },
+          caption: { type: ["string", "null"] },
         },
       },
     },
@@ -292,6 +321,47 @@ export const openaiProvider: AiProvider = {
 
     const parsedJson: unknown = JSON.parse(text);
     const output = GenerateVideoIdeasOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+        cacheReadInputTokens:
+          response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
+      },
+    };
+  },
+
+  async pickSections(input: PickSectionsInput): Promise<PickSectionsResult> {
+    const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+
+    const response = await getClient().chat.completions.create({
+      model,
+      max_completion_tokens: input.maxTokens ?? TOKENS.pickSections,
+      store: true,
+      messages: [
+        { role: "system", content: PICK_SECTIONS_SYSTEM },
+        { role: "user", content: buildPickSectionsUserText(input) },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "pick_sections",
+          strict: true,
+          schema: PICK_SECTIONS_RESPONSE_SCHEMA,
+        },
+      },
+    });
+
+    const choice = response.choices[0];
+    const text = choice?.message?.content?.trim();
+    if (!text) {
+      throw new Error("OpenAI returned no message content");
+    }
+
+    const parsedJson: unknown = JSON.parse(text);
+    const output = PickSectionsOutputSchema.parse(parsedJson);
 
     return {
       ...output,

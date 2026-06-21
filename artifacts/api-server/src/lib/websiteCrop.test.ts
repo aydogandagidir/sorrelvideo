@@ -3,10 +3,21 @@ import {
   heroCrop,
   bboxToCrop,
   buildCropVars,
+  buildTour,
   clamp01,
   HERO_PX,
   MIN_CROP_SIZE,
+  TOUR_INTRO_SECONDS,
+  TOUR_OUTRO_SECONDS,
+  TOUR_TRANSITION_SECONDS,
+  TOUR_MAX_BEATS,
 } from "./websiteCrop";
+
+const SECTIONS = [
+  { crop: { x: 0, y: 0, w: 1, h: 0.2 } }, // 0: hero
+  { crop: { x: 0, y: 0.3, w: 1, h: 0.2 } }, // 1: middle
+  { crop: { x: 0, y: 0.7, w: 1, h: 0.2 } }, // 2: contact
+];
 
 describe("clamp01", () => {
   it("clamps to [0,1] and treats non-finite as 0", () => {
@@ -101,5 +112,83 @@ describe("buildCropVars", () => {
       expect(v).toMatch(/^\d+(\.\d+)?$/); // bare number, never exponential
       expect(v).not.toContain("e");
     }
+  });
+});
+
+describe("buildTour", () => {
+  it("maps ordered picks to beats + matches the composition's duration formula", () => {
+    const out = buildTour(
+      [
+        { index: 0, seconds: 3, caption: "Hero" },
+        { index: 2, seconds: 2, caption: "Contact" },
+      ],
+      SECTIONS,
+    );
+    expect(out).not.toBeNull();
+    expect(out?.beats).toHaveLength(2);
+    // Order preserved; crops come from the referenced sections.
+    expect(out?.beats[0].cropY).toBe(0);
+    expect(out?.beats[1].cropY).toBe(0.7);
+    expect(out?.beats[0].caption).toBe("Hero");
+    // duration = intro + holds(3+2) + (2-1)*transition + outro
+    const expected =
+      Math.round(
+        (TOUR_INTRO_SECONDS +
+          5 +
+          1 * TOUR_TRANSITION_SECONDS +
+          TOUR_OUTRO_SECONDS) *
+          10,
+      ) / 10;
+    expect(out?.duration).toBe(expected);
+  });
+
+  it("drops out-of-range + duplicate indexes (order kept)", () => {
+    const out = buildTour(
+      [
+        { index: 0, seconds: 2 },
+        { index: 9, seconds: 2 }, // out of range → dropped
+        { index: 0, seconds: 2 }, // duplicate → dropped
+        { index: 1, seconds: 2 },
+      ],
+      SECTIONS,
+    );
+    expect(out?.beats.map((b) => b.cropY)).toEqual([0, 0.3]);
+  });
+
+  it("clamps the hold seconds into [1.5, 6]", () => {
+    const out = buildTour(
+      [
+        { index: 0, seconds: 99 },
+        { index: 1, seconds: 0.1 },
+      ],
+      SECTIONS,
+    );
+    expect(out?.beats[0].seconds).toBe(6);
+    expect(out?.beats[1].seconds).toBe(1.5);
+  });
+
+  it("caps the beat count at TOUR_MAX_BEATS", () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({
+      crop: { x: 0, y: i / 10, w: 1, h: 0.1 },
+    }));
+    const out = buildTour(
+      many.map((_, i) => ({ index: i, seconds: 2 })),
+      many,
+    );
+    expect(out?.beats.length).toBe(TOUR_MAX_BEATS);
+  });
+
+  it("returns null when no pick is valid (caller falls back to scroll)", () => {
+    expect(buildTour([{ index: 99, seconds: 2 }], SECTIONS)).toBeNull();
+    expect(buildTour([], SECTIONS)).toBeNull();
+  });
+
+  it("floors a zero-size crop so a beat can't zoom to infinity", () => {
+    const out = buildTour(
+      [{ index: 0, seconds: 2 }],
+      [{ crop: { x: 0, y: 0, w: 0, h: 0 } }],
+    );
+    expect(out?.beats[0].cropW).toBe(MIN_CROP_SIZE);
+    expect(out?.beats[0].cropH).toBe(MIN_CROP_SIZE);
   });
 });

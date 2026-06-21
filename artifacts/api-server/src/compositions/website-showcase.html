@@ -73,6 +73,11 @@
           <div class="outro-title">{{capture.title}}</div>
           <div class="outro-pill">{{capture.url}}</div>
         </div>
+
+        <!-- AI-tour lower-third caption (text set at runtime from the decoded
+             tour data via textContent ONLY — never HTML-substituted, so an
+             AI-authored caption can't inject markup). Empty + hidden otherwise. -->
+        <div class="beat-caption"></div>
       </div>
 
       <style>
@@ -222,77 +227,174 @@
           opacity: 0;
           transform: translateY(20px);
         }
+
+        /* AI-tour caption: a branded lower-third just below the browser window.
+           Centered via gsap xPercent (NOT a CSS transform) so the entrance y/opacity
+           tween doesn't fight the centering. */
+        [data-composition-id="website-showcase"] .beat-caption {
+          position: absolute;
+          left: 50%;
+          top: 952px;
+          max-width: 1180px;
+          padding: 14px 36px;
+          border-radius: 100px;
+          background:
+            linear-gradient(135deg, {{brand.primaryColor}}, {{brand.secondaryColor}});
+          color: #fff;
+          font-size: 34px;
+          font-weight: 700;
+          letter-spacing: -0.5px;
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+          opacity: 0;
+          will-change: transform, opacity;
+        }
       </style>
 
       <script>
         (function () {
           const root = '[data-composition-id="website-showcase"]';
+          const shot = root + " .shot";
+          const captionEl = document.querySelector(root + " .beat-caption");
           const captureHeight = parseInt("{{capture.height}}", 10) || 800;
-          // Optional crop: the user can drag-select a region of the captured
-          // page to FEATURE. Values are 0–1 fractions of the capture; the default
-          // (whole page) reproduces the original full-page scroll byte-for-byte.
           const clamp01 = (v) => Math.min(1, Math.max(0, v));
-          const cropX = clamp01(parseFloat("{{capture.cropX}}") || 0);
-          const cropY = clamp01(parseFloat("{{capture.cropY}}") || 0);
-          // Floor width/height so a tiny selection can't divide-by-zero / zoom to ∞.
-          const cropW = Math.min(1, Math.max(0.05, parseFloat("{{capture.cropW}}") || 1));
-          const cropH = Math.min(1, Math.max(0.05, parseFloat("{{capture.cropH}}") || 1));
-
           const viewportW = 1300;
           const viewportH = 748;
-          // Zoom so the crop's WIDTH fills the viewport; keep the image's aspect.
-          const dispW = viewportW / cropW;
-          const dispH = captureHeight * (dispW / 1280);
-          const cropLeft = cropX * dispW;
-          const cropTop = cropY * dispH;
-          const cropRegionH = cropH * dispH;
-          // Scroll only within the cropped region (clamped to the image bounds).
-          const scrollStart = cropTop;
-          const scroll = Math.max(
-            scrollStart,
-            Math.min(dispH - viewportH, cropTop + cropRegionH - viewportH),
-          );
-
-          // Size + horizontally position the shot for the crop (no-op at 0/0/1/1).
-          gsap.set(root + " .shot", { width: dispW, x: -cropLeft });
 
           // User-chosen total duration (seconds). Substituted server-side as a
-          // clamped number, so it is always a safe numeric literal. The intro
-          // (reveal) and outro are fixed-length; the page SCROLL stretches to
-          // fill whatever is left — a longer video simply scrolls more slowly.
+          // clamped number, so it is always a safe numeric literal.
           const total = parseFloat("{{duration}}") || 9;
           const INTRO_END = 3.3; // intro hold + wipe + browser reveal complete
           const OUTRO_LEN = 1.3; // outro animations occupy the final stretch
-          const scrollDuration = Math.max(0.3, total - INTRO_END - OUTRO_LEN);
-          const outroBase = INTRO_END + scrollDuration; // = total - OUTRO_LEN
+
+          // Optional AI "tour": base64 JSON of ordered beats
+          // [{cropX,cropY,cropW,cropH,seconds,caption}] — when present the page is
+          // shown as a CURATED pan/zoom highlight reel of the chosen sections
+          // instead of a single full-page scroll (the core "no blank, user-
+          // directed" redesign). Decoded defensively: an unsubstituted "{{…}}"
+          // literal, an empty value, or bad JSON all fall back to scroll mode.
+          let tour = null;
+          try {
+            const raw = "{{capture.tour}}";
+            if (raw && raw.charAt(0) !== "{") {
+              // atob() yields a Latin-1 binary string, so decode the bytes as
+              // UTF-8 — otherwise non-ASCII captions (e.g. Turkish "İletişim")
+              // come out mojibake.
+              const bin = atob(raw);
+              const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+              tour = JSON.parse(new TextDecoder().decode(bytes));
+            }
+          } catch (e) {
+            tour = null;
+          }
+          if (!Array.isArray(tour) || !tour.length) tour = null;
+
+          // Map a beat's crop (0–1 fractions) to the shot's {width,x,y}: zoom so
+          // the crop WIDTH fills the viewport, then pan to its top-left (clamped to
+          // the image bounds so a beat never reveals past an edge).
+          function cropToShot(b) {
+            const cw = Math.min(1, Math.max(0.05, parseFloat(b.cropW) || 1));
+            const cx = clamp01(parseFloat(b.cropX) || 0);
+            const cy = clamp01(parseFloat(b.cropY) || 0);
+            const dispW = viewportW / cw;
+            const dispH = captureHeight * (dispW / 1280);
+            const x = -Math.min(Math.max(0, dispW - viewportW), cx * dispW);
+            const y = -Math.min(Math.max(0, dispH - viewportH), cy * dispH);
+            return { width: dispW, x: x, y: y };
+          }
 
           const tl = gsap.timeline({ paused: true });
 
-          // 1. Intro card holds, then wipes up to reveal the browser.
+          // 1. Intro card holds, then wipes up to reveal the browser (shared).
           tl.to(root + " .intro", { duration: 0.6, ease: "power3.inOut" }, 0); // hold
           tl.to(
             root + " .intro",
             { yPercent: -100, duration: 0.8, ease: "power4.inOut" },
             1.8,
           );
-
-          // 2. Browser window scales/fades in.
           tl.to(
             root + " .browser",
             { opacity: 1, scale: 1, duration: 0.9, ease: "power3.out" },
             2.2,
           );
 
-          // 3. Screenshot scrolls top → bottom to showcase the page (fills the
-          //    middle; its length is what scales with the chosen duration).
-          tl.fromTo(
-            root + " .shot",
-            { y: -scrollStart },
-            { y: -scroll, duration: scrollDuration, ease: "none" },
-            INTRO_END,
-          );
+          let outroBase;
+          if (tour) {
+            // 2a. AI-directed TOUR: pan/zoom to each chosen section, hold, caption.
+            const TRANS = 0.9; // pan/zoom transition between beats
+            if (captionEl) gsap.set(captionEl, { xPercent: -50 });
+            gsap.set(shot, cropToShot(tour[0]));
+            let t = INTRO_END;
+            for (let i = 0; i < tour.length; i++) {
+              const b = tour[i];
+              const hold = Math.min(8, Math.max(1, parseFloat(b.seconds) || 2.5));
+              if (i > 0) {
+                tl.to(
+                  shot,
+                  Object.assign(
+                    { duration: TRANS, ease: "power2.inOut" },
+                    cropToShot(b),
+                  ),
+                  t,
+                );
+                t += TRANS;
+              }
+              const cap = (b.caption == null ? "" : String(b.caption)).slice(0, 80);
+              if (cap && captionEl) {
+                tl.call(
+                  () => {
+                    captionEl.textContent = cap;
+                  },
+                  [],
+                  t,
+                );
+                tl.fromTo(
+                  root + " .beat-caption",
+                  { opacity: 0, y: 16 },
+                  { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" },
+                  t + 0.1,
+                );
+                tl.to(
+                  root + " .beat-caption",
+                  { opacity: 0, duration: 0.3, ease: "power2.in" },
+                  t + hold - 0.3,
+                );
+              }
+              t += hold;
+            }
+            outroBase = t;
+          } else {
+            // 2b. Single-crop full-page scroll (backward-compatible default; a
+            //     0/0/1/1 crop reproduces the original whole-page scroll exactly).
+            const cropX = clamp01(parseFloat("{{capture.cropX}}") || 0);
+            const cropY = clamp01(parseFloat("{{capture.cropY}}") || 0);
+            const cropW = Math.min(1, Math.max(0.05, parseFloat("{{capture.cropW}}") || 1));
+            const cropH = Math.min(1, Math.max(0.05, parseFloat("{{capture.cropH}}") || 1));
+            const dispW = viewportW / cropW;
+            const dispH = captureHeight * (dispW / 1280);
+            const cropLeft = cropX * dispW;
+            const cropTop = cropY * dispH;
+            const cropRegionH = cropH * dispH;
+            const scrollStart = cropTop;
+            const scroll = Math.max(
+              scrollStart,
+              Math.min(dispH - viewportH, cropTop + cropRegionH - viewportH),
+            );
+            gsap.set(shot, { width: dispW, x: -cropLeft });
+            const scrollDuration = Math.max(0.3, total - INTRO_END - OUTRO_LEN);
+            tl.fromTo(
+              shot,
+              { y: -scrollStart },
+              { y: -scroll, duration: scrollDuration, ease: "none" },
+              INTRO_END,
+            );
+            outroBase = INTRO_END + scrollDuration; // = total - OUTRO_LEN
+          }
 
-          // 4. Outro: darken + title/URL fade up, anchored to the final seconds.
+          // 3. Outro: darken + title/URL fade up, anchored to the final seconds (shared).
           tl.to(
             root + " .outro",
             { background: "rgba(7,7,11,0.82)", duration: 0.7, ease: "power2.out" },
