@@ -342,6 +342,16 @@
                 );
                 t += TRANS;
               }
+              // Ken Burns WITHIN the beat: slowly pan DOWN over the hold so a
+              // tall section scrolls through (revealing all of it) and even a
+              // short one drifts gently — no beat is a frozen frame.
+              const pos = cropToShot(b);
+              const beatDispH = captureHeight * (pos.width / 1280);
+              const beatMaxY = Math.max(0, beatDispH - viewportH);
+              const beatCh = Math.min(1, Math.max(0.05, parseFloat(b.cropH) || 0.2));
+              const drift = Math.max(40, beatCh * beatDispH - viewportH);
+              const endY = Math.max(-beatMaxY, pos.y - drift);
+              tl.to(shot, { y: endY, duration: hold, ease: "none" }, t);
               const cap = (b.caption == null ? "" : String(b.caption)).slice(0, 80);
               if (cap && captionEl) {
                 tl.call(
