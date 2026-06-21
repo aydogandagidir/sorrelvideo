@@ -122,6 +122,54 @@ describe("Projects — list states", () => {
   });
 });
 
+describe("Projects — sort", () => {
+  it("reorders the grid by the selected sort (updatedAt + name)", async () => {
+    const user = userEvent.setup();
+    // Names + dates are deliberately misaligned so each sort yields a DISTINCT
+    // order: alpha = Apple/Banana/Cherry, date desc = Banana/Apple/Cherry.
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([
+        draftProject({
+          id: 1,
+          name: "Banana",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        }),
+        draftProject({
+          id: 2,
+          name: "Apple",
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        }),
+        draftProject({
+          id: 3,
+          name: "Cherry",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }),
+      ]),
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+    await screen.findByTestId("projects-grid");
+
+    const order = () =>
+      Array.from(screen.getByTestId("projects-grid").children).map((card) =>
+        ["Apple", "Banana", "Cherry"].find((n) =>
+          card.textContent?.includes(n),
+        ),
+      );
+
+    // Default: Newest (updatedAt desc).
+    expect(order()).toEqual(["Banana", "Apple", "Cherry"]);
+
+    const sortSelect = screen.getByLabelText(/sort projects/i);
+    await user.selectOptions(sortSelect, "name");
+    expect(order()).toEqual(["Apple", "Banana", "Cherry"]);
+
+    await user.selectOptions(sortSelect, "oldest");
+    expect(order()).toEqual(["Cherry", "Apple", "Banana"]);
+  });
+});
+
 describe("Projects — card → detail controls", () => {
   it("a draft card opens a detail with Render + an enabled delete control", async () => {
     fetchMock = installApiFetchMock([
