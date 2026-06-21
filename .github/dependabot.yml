@@ -47,3 +47,13 @@ updates:
       # fails typecheck (nominal AbstractConnector mismatch). Keep ioredis aligned
       # with bullmq's pinned version — upgrade both together when bumping bullmq.
       - dependency-name: "ioredis"
+      # The embedded studio-editor (artifacts/studio-editor) is the repointed
+      # VENDORED @hyperframes/studio build, authored for Tailwind v3 (v3-style
+      # postcss.config.js + tailwind.config.js + @tailwind directives in the
+      # vendored studio.css). A v4 major breaks its build with "trying to use
+      # `tailwindcss` directly as a PostCSS plugin … moved to @tailwindcss/postcss"
+      # (verified — closed #59). The main app (sorrel) is already on v4 via the
+      # workspace catalog. Block tailwindcss majors until the editor's CSS/config
+      # is deliberately migrated off the vendored v3 build.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
