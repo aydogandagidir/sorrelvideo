@@ -19,7 +19,7 @@ catalog:
   framer-motion: ^12.40.0
   lucide-react: ^0.577.0
   react: 19.2.6
-  react-dom: 19.2.6
+  react-dom: 19.2.7
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.1.14
   tsx: ^4.22.3
