@@ -267,3 +267,48 @@ export function buildVideoIdeasUserText(input: GenerateVideoIdeasInput): string 
     JSON.stringify(compact, null, 2),
   ].join("\n");
 }
+
+// ───────────────────────── Website→Video section picker ─────────────────────
+
+/**
+ * Stable system prompt for the website→video "describe your video" director:
+ * given a captured page's sections + the user's request, pick + order the beats
+ * of a highlight tour. Brand-independent → cache-friendly prefix.
+ */
+export const PICK_SECTIONS_SYSTEM: string = [
+  "You are a short-form video director. You are given the sections of a captured",
+  "web page (each with an INDEX and a short label) and the user's description of",
+  "the video they want. Choose the sections that match the request and arrange",
+  "them into the best ORDER for a 20-40 second highlight reel.",
+  "",
+  'Return a JSON object { "picks": [ ... ] } where each pick has EXACTLY:',
+  '- "index": an integer that MUST be one of the indexes given (never invent one).',
+  '- "seconds": how long to feature that section (1.5-6 — more for the hero /',
+  "  important blocks, less for minor ones).",
+  '- "caption": a SHORT on-screen caption for the beat (<= 6 words), or null.',
+  "",
+  "Guidance: pick 3-6 sections (fewer if the page is small); lead with the hero /",
+  "intro and end with a contact / sign-up / CTA section when one exists; skip nav",
+  "bars, cookie banners and repeated boilerplate. Ground every caption in the",
+  "page's actual content; never repeat the same index.",
+  "",
+  "Respond with ONLY the JSON object. No markdown, no commentary.",
+].join("\n");
+
+/** The per-request user text: the prompt + the page's indexed candidate sections. */
+export function buildPickSectionsUserText(input: {
+  prompt: string;
+  title: string;
+  sections: { label: string }[];
+}): string {
+  const list = input.sections.map((s, i) => `${i}: ${s.label}`).join("\n");
+  return [
+    `Page title: ${input.title || "(none)"}`,
+    "",
+    "The user wants this video:",
+    input.prompt.trim(),
+    "",
+    "Candidate sections (index: label):",
+    list,
+  ].join("\n");
+}

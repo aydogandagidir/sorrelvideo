@@ -225,3 +225,45 @@ export type GenerateVideoIdeasOutput = z.infer<
 export interface GenerateVideoIdeasResult extends GenerateVideoIdeasOutput {
   usage: SuggestUsage;
 }
+
+// ───────────────────────── Website→Video section picker ─────────────────────
+// The "describe your video" mode for website→video. Given the candidate sections
+// a page scraper found (a short label per block) and the user's free-text
+// description, the model picks WHICH sections to feature, in what ORDER, how long
+// to hold each, and a short caption — turning a dumb full-page scroll into a
+// curated, user-directed highlight tour. The caller maps the returned indexes
+// back to server-computed crops, so the model never emits geometry.
+
+/** A candidate section the page scraper found (index = position in the array). */
+export const SectionCandidateSchema = z.object({
+  label: z.string().max(200),
+});
+export type SectionCandidate = z.infer<typeof SectionCandidateSchema>;
+
+export const PickSectionsInputSchema = z.object({
+  /** The user's free-text description of the video they want. */
+  prompt: z.string().min(1).max(800),
+  /** Page title, for context. */
+  title: z.string().default(""),
+  /** Candidate sections; the model references them by array index. */
+  sections: z.array(SectionCandidateSchema).min(1).max(40),
+  maxTokens: z.number().int().positive().max(1500).optional(),
+});
+export type PickSectionsInput = z.infer<typeof PickSectionsInputSchema>;
+
+/** One featured beat of the tour: which candidate, how long, optional caption. */
+export const SectionPickSchema = z.object({
+  index: z.number().int().min(0),
+  seconds: z.number().min(1).max(8),
+  caption: z.string().max(48).nullable().optional(),
+});
+export type SectionPick = z.infer<typeof SectionPickSchema>;
+
+export const PickSectionsOutputSchema = z.object({
+  picks: z.array(SectionPickSchema).min(1).max(8),
+});
+export type PickSectionsOutput = z.infer<typeof PickSectionsOutputSchema>;
+
+export interface PickSectionsResult extends PickSectionsOutput {
+  usage: SuggestUsage;
+}
