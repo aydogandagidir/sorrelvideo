@@ -1722,6 +1722,76 @@ export const useCancelProjectRender = <TError = ErrorType<void>,
       return useMutation(getCancelProjectRenderMutationOptions(options));
     }
 
+export const getDuplicateProjectUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/duplicate`
+}
+
+/**
+ * @summary Duplicate a project as a fresh draft (copies copy, brand & settings)
+ */
+export const duplicateProject = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getDuplicateProjectUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDuplicateProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateProject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof duplicateProject>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['duplicateProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof duplicateProject>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  duplicateProject(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DuplicateProjectMutationResult = NonNullable<Awaited<ReturnType<typeof duplicateProject>>>
+
+    export type DuplicateProjectMutationError = ErrorType<void>
+
+    /**
+ * @summary Duplicate a project as a fresh draft (copies copy, brand & settings)
+ */
+export const useDuplicateProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateProject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof duplicateProject>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDuplicateProjectMutationOptions(options));
+    }
+
 export const getGetProjectVideoUrl = (id: number,) => {
 
 
