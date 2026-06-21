@@ -997,6 +997,46 @@ export async function prepareCompositionFor(
 }
 
 /**
+ * Turn a raw engine/FFmpeg failure into a SHORT, actionable message for the
+ * project's `renderError` (the UI shows it verbatim). The full technical error
+ * is still logged. Most hard render failures on a constrained box share a single
+ * cause — the encoder was KILLED before it could finalize the mp4 (no `moov`
+ * atom), almost always the instance running out of memory on a heavy render (a
+ * tall website→video screenshot, a long or 4K clip). We detect those symptoms
+ * and tell the user what to actually do instead of surfacing an ffmpeg dump.
+ */
+export function renderFailureMessage(raw: string): string {
+  const r = raw.toLowerCase();
+  // Symptoms of the render being killed mid-encode (OOM / restart / SIGKILL) —
+  // the file never got its moov atom, so the faststart/remux step then fails.
+  const resourceSignals = [
+    "moov atom not found",
+    "faststart failed",
+    "out of memory",
+    "enomem",
+    "cannot allocate",
+    "killed",
+    "signal 9",
+    "code 137", // 128 + SIGKILL, the OOM-killer's exit code
+    "swscaler", // scaler allocation failing under memory pressure
+    "interrupted by a restart",
+    "page crashed",
+    "target closed",
+  ];
+  if (resourceSignals.some((s) => r.includes(s))) {
+    return (
+      "The render was interrupted before it could finish — the server most " +
+      "likely ran low on memory for a video this size. Try a shorter length or " +
+      "a lower resolution, then render again. If it keeps happening, let us know."
+    );
+  }
+  return (
+    "We couldn't finish this render. Please try again — if it keeps failing, " +
+    "contact support."
+  );
+}
+
+/**
  * Execute a Hyperframes render to completion (the "work" half of the pipeline).
  * Called either inline (no Redis) or by the BullMQ worker (see renderQueue.ts).
  * Sets project status: → rendering → ready/failed.
@@ -1170,8 +1210,12 @@ export async function executeRender(
       if (renderJobId) await markCancelled(renderJobId);
       return;
     }
-    const renderError = err instanceof Error ? err.message : String(err);
-    logger.error({ projectId, err }, "Render failed");
+    // Surface a short, actionable message to the user (the raw engine/ffmpeg
+    // error — e.g. "Faststart failed: … moov atom not found" — stays in the logs
+    // for diagnosis, but is no use to the person looking at the project).
+    const rawError = err instanceof Error ? err.message : String(err);
+    const renderError = renderFailureMessage(rawError);
+    logger.error({ projectId, err, rawError }, "Render failed");
     await setProjectStatus(projectId, "failed", { renderError });
     if (renderJobId) await markFailed(renderJobId, renderError);
 
