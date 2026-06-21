@@ -178,19 +178,34 @@ export async function captureWebsite(
     const primeCapPx = (opts?.maxHeight ?? MAX_CAPTURE_HEIGHT) * 1.2;
     await page
       .evaluate(async (maxPx) => {
-        const step = Math.max(200, Math.round(window.innerHeight * 0.8));
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        // Walk down in SMALL steps (half a viewport) with a real pause at each,
+        // so IntersectionObserver-gated sections AND their lazy images get both
+        // triggered and time to load/paint. Bigger steps + shorter waits left a
+        // whole mid-page band unpainted on some sites (bluedev.dev: services /
+        // tech sections rendered white between the projects and the footer).
+        const step = Math.max(150, Math.round(window.innerHeight * 0.5));
         for (
           let y = 0;
           y <= Math.min(maxPx, document.documentElement.scrollHeight);
           y += step
         ) {
           window.scrollTo(0, y);
-          await new Promise((r) => setTimeout(r, 110));
+          await sleep(250);
         }
+        // Settle at the bottom, then wait for any still-loading images to finish
+        // decoding (capped) so a lazy hero/section image doesn't shoot as blank.
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await sleep(250);
+        const pending = Array.from(document.images).filter((i) => !i.complete);
+        await Promise.race([
+          Promise.all(pending.map((i) => i.decode().catch(() => undefined))),
+          sleep(2000),
+        ]);
         window.scrollTo(0, 0);
       }, primeCapPx)
       .catch(() => undefined);
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 700));
 
     const fullHeight = await page
       .evaluate(() => document.documentElement.scrollHeight)
