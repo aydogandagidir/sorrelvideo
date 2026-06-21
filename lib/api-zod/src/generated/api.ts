@@ -1481,6 +1481,8 @@ export const websiteToVideoBodySelectorMax = 400;
 export const websiteToVideoBodyDurationMin = 3;
 export const websiteToVideoBodyDurationMax = 60;
 
+export const websiteToVideoBodyAiPromptMax = 800;
+
 
 
 export const WebsiteToVideoBody = zod.object({
@@ -1496,7 +1498,8 @@ export const WebsiteToVideoBody = zod.object({
   "section": zod.enum(['hero']).optional().describe('A preset section — \"hero\" features the first screen. Requires `url`.'),
   "brandKitId": zod.number().optional().describe('Brand kit to render the showcase with. Omit to use your configured default kit, or — if you have none — to auto-create one detected from the site.'),
   "autoBrand": zod.boolean().optional().describe('Force detecting a fresh brand kit from this site (and saving it), ignoring any existing default. Overridden by an explicit brandKitId.'),
-  "duration": zod.number().min(websiteToVideoBodyDurationMin).max(websiteToVideoBodyDurationMax).optional().describe('Video length in seconds. Clamped server-side to 3–60. OMIT for an automatic length scaled to the captured page height (a calm, complete scroll); a tall page therefore gets a longer video instead of racing. The intro\/outro are fixed-length; the page scroll fills the rest.')
+  "duration": zod.number().min(websiteToVideoBodyDurationMin).max(websiteToVideoBodyDurationMax).optional().describe('Video length in seconds. Clamped server-side to 3–60. OMIT for an automatic length scaled to the captured page height (a calm, complete scroll); a tall page therefore gets a longer video instead of racing. The intro\/outro are fixed-length; the page scroll fills the rest.'),
+  "aiPrompt": zod.string().max(websiteToVideoBodyAiPromptMax).optional().describe('\"Describe your video\" — a natural-language brief (what to show, in what order). When set, the AI picks + orders the page\'s sections into a curated pan\/zoom highlight tour instead of a flat scroll, and the length is driven by that tour (the `duration` field is ignored). Best- effort: with no AI quota or nothing usable it falls back to the scroll. Requires `url`.')
 }).describe('Provide either `url` (capture fresh — the one-shot flow) or `previewId` (from POST \/website-to-video\/preview — the crop flow). Exactly one.')
 
 

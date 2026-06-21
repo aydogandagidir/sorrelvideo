@@ -894,6 +894,11 @@ export interface WebsiteToVideoRequest {
      * @maximum 60
      */
   duration?: number;
+  /**
+     * "Describe your video" — a natural-language brief (what to show, in what order). When set, the AI picks + orders the page's sections into a curated pan/zoom highlight tour instead of a flat scroll, and the length is driven by that tour (the `duration` field is ignored). Best- effort: with no AI quota or nothing usable it falls back to the scroll. Requires `url`.
+     * @maxLength 800
+     */
+  aiPrompt?: string;
 }
 
 export interface AiSuggestResult {

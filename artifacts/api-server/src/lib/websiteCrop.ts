@@ -75,3 +75,74 @@ export function buildCropVars(crop: CropRegion | undefined): Record<string, stri
     "capture.cropH": cropToken(Math.max(MIN_CROP_SIZE, crop.h)),
   };
 }
+
+// ───────────────────────────── AI section tour ──────────────────────────────
+// The "describe your video" mode: the AI picks + orders sections, and we turn
+// those picks (by index, into the candidate `sections`) into the composition's
+// tour beats. These timing constants MUST stay in sync with website-showcase.html
+// (the tour timeline derives the total length from them).
+export const TOUR_INTRO_SECONDS = 3.3;
+export const TOUR_OUTRO_SECONDS = 1.3;
+export const TOUR_TRANSITION_SECONDS = 0.9;
+export const TOUR_MAX_BEATS = 6;
+const TOUR_MIN_HOLD = 1.5;
+const TOUR_MAX_HOLD = 6;
+
+/** One featured beat as the composition consumes it (crop fractions + timing). */
+export interface TourBeat {
+  cropX: number;
+  cropY: number;
+  cropW: number;
+  cropH: number;
+  seconds: number;
+  caption: string | null;
+}
+
+/**
+ * Turn the AI's ordered section picks + the candidate sections (each a label +
+ * crop) into the composition's tour beats and the matching total duration.
+ * Robust to a sloppy model: out-of-range / duplicate indexes are dropped, holds
+ * are clamped, the beat count is capped, and captions are trimmed (they render
+ * via textContent in the composition, so this is cosmetic, not a security gate).
+ * Returns null when no valid beat survives — the caller then falls back to the
+ * plain scroll.
+ */
+export function buildTour(
+  picks: { index: number; seconds: number; caption?: string | null }[],
+  sections: { crop: CropRegion }[],
+): { beats: TourBeat[]; duration: number } | null {
+  const seen = new Set<number>();
+  const beats: TourBeat[] = [];
+  for (const p of picks) {
+    if (beats.length >= TOUR_MAX_BEATS) break;
+    const i = Math.trunc(p.index);
+    const section = sections[i];
+    if (!section || seen.has(i)) continue;
+    seen.add(i);
+    const c = section.crop;
+    const hold = Math.min(
+      TOUR_MAX_HOLD,
+      Math.max(TOUR_MIN_HOLD, Number.isFinite(p.seconds) ? p.seconds : 2.5),
+    );
+    const caption =
+      typeof p.caption === "string" && p.caption.trim()
+        ? p.caption.trim().replace(/\s+/g, " ").slice(0, 48)
+        : null;
+    beats.push({
+      cropX: clamp01(c.x),
+      cropY: clamp01(c.y),
+      cropW: Math.max(MIN_CROP_SIZE, clamp01(c.w)),
+      cropH: Math.max(MIN_CROP_SIZE, clamp01(c.h)),
+      seconds: Math.round(hold * 100) / 100,
+      caption,
+    });
+  }
+  if (!beats.length) return null;
+  const holds = beats.reduce((s, b) => s + b.seconds, 0);
+  const transitions = (beats.length - 1) * TOUR_TRANSITION_SECONDS;
+  const duration =
+    Math.round(
+      (TOUR_INTRO_SECONDS + holds + transitions + TOUR_OUTRO_SECONDS) * 10,
+    ) / 10;
+  return { beats, duration };
+}

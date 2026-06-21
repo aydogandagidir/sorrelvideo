@@ -88,6 +88,7 @@ router.post(
       duration,
       brandKitId,
       autoBrand,
+      aiPrompt,
     } = parsed.data;
     if (!url && !previewId) {
       res.status(400).json({ error: "A url or previewId is required." });
@@ -107,6 +108,7 @@ router.post(
         duration: duration ?? undefined,
         brandKitId: brandKitId ?? undefined,
         autoBrand: autoBrand ?? undefined,
+        aiPrompt: aiPrompt?.trim() ? aiPrompt.trim() : undefined,
       });
       res.status(201).json(GetProjectResponse.parse(serializeDates(project)));
     } catch (err) {
