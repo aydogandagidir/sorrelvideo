@@ -48,6 +48,9 @@ import {
   PencilRuler,
   Sparkles,
   Copy,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
@@ -353,6 +356,12 @@ function ProjectDetail({
     "render_limit" | "premium_template" | "ai_limit"
   >("render_limit");
 
+  // Inline rename of the project title (any status — name is metadata, never the
+  // render state machine's columns). ProjectDetail is keyed by id, so this lazy
+  // seed is correct per project. Persisted via the validated PATCH /projects.
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [nameValue, setNameValue] = useState(project.name);
+
   // Editable headline/body/cta for a draft/failed project — the same copy the
   // Studio create page writes, but reachable AFTER creation so users can iterate
   // (manually or with "Edit with AI") instead of recreating the project. Seeded
@@ -605,6 +614,41 @@ function ProjectDetail({
       },
     );
 
+  const startRename = () => {
+    setNameValue(project.name);
+    setIsRenaming(true);
+  };
+  const cancelRename = () => {
+    setIsRenaming(false);
+    setNameValue(project.name);
+  };
+  const handleRename = () => {
+    const trimmed = nameValue.trim();
+    // Empty or unchanged → just exit (no pointless PATCH).
+    if (!trimmed || trimmed === project.name) {
+      cancelRename();
+      return;
+    }
+    updateProject.mutate(
+      { id: project.id, data: { name: trimmed } },
+      {
+        onSuccess: () => {
+          invalidate();
+          setIsRenaming(false);
+          toast({ title: "Project renamed" });
+        },
+        onError: (err) => {
+          const e = err as { data?: { error?: string } };
+          toast({
+            variant: "destructive",
+            title: "Couldn't rename the project",
+            description: e.data?.error ?? "Please try again.",
+          });
+        },
+      },
+    );
+  };
+
   const handleShare = async () => {
     if (typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
       try {
@@ -735,7 +779,62 @@ function ProjectDetail({
               <div className="mb-2">
                 <StatusDot status={project.status} />
               </div>
-              <h2 className="text-[22px] font-semibold">{project.name}</h2>
+              {isRenaming ? (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    autoFocus
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleRename();
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelRename();
+                      }
+                    }}
+                    maxLength={120}
+                    aria-label="Project name"
+                    className="h-9 text-[18px] font-semibold"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0"
+                    onClick={handleRename}
+                    disabled={updateProject.isPending}
+                    aria-label="Save name"
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 shrink-0"
+                    onClick={cancelRename}
+                    disabled={updateProject.isPending}
+                    aria-label="Cancel rename"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <h2 className="flex items-center gap-1.5 text-[22px] font-semibold">
+                  <span className="truncate">{project.name}</span>
+                  <button
+                    type="button"
+                    onClick={startRename}
+                    aria-label="Rename project"
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </h2>
+              )}
               <p className="mt-1 text-[12.5px] text-muted-foreground">
                 Updated {new Date(project.updatedAt).toLocaleDateString()}
                 {project.duration ? ` · ${project.duration}s` : ""} ·{" "}
