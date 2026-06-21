@@ -12,6 +12,7 @@ import {
   outputPathFor,
   renderCompositionTemplate,
   renderDirFor,
+  renderFailureMessage,
   resolveEntryFile,
   resolveVoiceoverTag,
   RENDERS_DIR,
@@ -423,5 +424,33 @@ describe("buildTransitionsInjection (M8)", () => {
       if (name === "fade-dissolve") continue; // Sorrel-side CSS-crossfade entry
       expect(out, `shader "${name}" missing from @hyperframes/shader-transitions bundle`).toContain(name);
     }
+  });
+});
+
+describe("renderFailureMessage", () => {
+  it("maps killed-encoder / OOM symptoms to a resource-guidance message", () => {
+    const raws = [
+      "Faststart failed: FFmpeg exited with code 1 ... moov atom not found /data/renders/17/.../video-only.mp4",
+      "ffmpeg was killed (signal 9)",
+      "Cannot allocate memory",
+      "Process exited with code 137",
+      "[swscaler @ 0x..] cannot allocate",
+      "Render interrupted by a restart",
+      "Page crashed",
+    ];
+    for (const raw of raws) {
+      const msg = renderFailureMessage(raw);
+      expect(msg).toMatch(/ran low on memory|shorter length|lower resolution/i);
+      // The scary technical dump must NOT leak into the user-facing message.
+      expect(msg.toLowerCase()).not.toContain("ffmpeg");
+      expect(msg.toLowerCase()).not.toContain("moov");
+      expect(msg.toLowerCase()).not.toContain("swscaler");
+    }
+  });
+
+  it("falls back to a short try-again message for an unknown error", () => {
+    const msg = renderFailureMessage("some unexpected internal failure zqx");
+    expect(msg).toMatch(/try again/i);
+    expect(msg).not.toContain("zqx");
   });
 });
