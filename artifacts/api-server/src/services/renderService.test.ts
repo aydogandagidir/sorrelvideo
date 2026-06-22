@@ -437,14 +437,37 @@ describe("renderFailureMessage", () => {
       "[swscaler @ 0x..] cannot allocate",
       "Render interrupted by a restart",
       "Page crashed",
+      "ENOSPC: no space left on device, write",
     ];
     for (const raw of raws) {
       const msg = renderFailureMessage(raw);
-      expect(msg).toMatch(/ran low on memory|shorter length|lower resolution/i);
+      expect(msg).toMatch(/ran out of memory or time|shorter length|lower resolution/i);
       // The scary technical dump must NOT leak into the user-facing message.
       expect(msg.toLowerCase()).not.toContain("ffmpeg");
       expect(msg.toLowerCase()).not.toContain("moov");
       expect(msg.toLowerCase()).not.toContain("swscaler");
+    }
+  });
+
+  it("maps capture timeouts and headless-Chrome death to the same guidance", () => {
+    // These are how a memory-starved / slow box most often fails a HEAVY render:
+    // the engine never reaches the encoder, so there's no moov/ffmpeg signature —
+    // before, every one of these fell through to the dead-end generic message.
+    const raws = [
+      "Navigation timeout of 30000 ms exceeded",
+      "Render timed out after 300s",
+      "Protocol error (Page.captureScreenshot): Target closed",
+      "Session closed. Most likely the page has been closed.",
+      "Error: Connection closed",
+      "Navigation failed because browser has disconnected!",
+      "WebSocket is not open: readyState 3 (CLOSED)",
+    ];
+    for (const raw of raws) {
+      const msg = renderFailureMessage(raw);
+      expect(msg).toMatch(/shorter length|lower resolution|memory or time/i);
+      // No raw Puppeteer/CDP internals leak to the user.
+      expect(msg.toLowerCase()).not.toContain("protocol error");
+      expect(msg.toLowerCase()).not.toContain("websocket");
     }
   });
 

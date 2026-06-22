@@ -765,7 +765,13 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   on purpose), `projectId`, `userId`, `backend` (`inline|bullmq|lambda`), `externalId`,
   `status` (`queued|rendering|ready|failed|cancelled`), `progress`, `costCents`, `format`,
   `config` (a `RenderSettings` snapshot), `outputPath`, `error`, `cancelRequested`,
-  timestamps. CRUD + lifecycle setters live in `services/renderJobsService.ts`;
+  timestamps. On failure the ledger's `error` keeps the **RAW** engine/ffmpeg
+  message for operator diagnosis (it is operator-only — `withRenderProgress` never
+  surfaces it to the client), while the project's `renderError` carries the SHORT,
+  classified guidance the UI shows verbatim (`renderFailureMessage` maps OOM /
+  capture-timeout / headless-Chrome-death / disk-full symptoms to a "render
+  something smaller" message, everything else to a generic try-again). CRUD +
+  lifecycle setters live in `services/renderJobsService.ts`;
   `recoverStuckRenders()` now reconciles orphaned `render_jobs` rows alongside stuck
   projects, and `truncateAll()` clears the table.
 - **Hyperframes API (verified against 0.6.91)**: producer `RenderConfig.fps` is an exact
