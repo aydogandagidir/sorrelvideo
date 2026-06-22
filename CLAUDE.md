@@ -774,6 +774,25 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   lifecycle setters live in `services/renderJobsService.ts`;
   `recoverStuckRenders()` now reconciles orphaned `render_jobs` rows alongside stuck
   projects, and `truncateAll()` clears the table.
+- **Render disk hygiene (the ENOSPC fix)**: the producer captures every frame to a
+  per-render scratch dir `renders/<id>/work-<jobId>-<hash>/` and encodes from there.
+  Those frames are the biggest disk consumer (a 38 s 1080p render ≈ 1100+ PNGs ≈ GBs).
+  Two layers keep the Railway `/data` volume from filling → `No space left on device`:
+  (1) `lib/renderDiskCleanup.ts` deletes `work-*` dirs in executeRender's `finally`
+  (success/failure/cancel) and sweeps orphans across all projects on boot
+  (`reclaimOrphanRenderDisk`, called in `index.ts` BEFORE `startRenderWorker()` so a
+  live render isn't swept) — this fixes the BETWEEN-render leak and self-heals a full
+  volume on deploy (deleting needs no free space). It matches ONLY the `work-` prefix,
+  so served artifacts (`output.<ext>`, png `frames/`, `composition.html`, `thumb.png`,
+  `voice.mp3`) are safe. (2) **Streaming encode** (`PRODUCER_ENABLE_STREAMING_ENCODE=true`,
+  baked into the Dockerfile) pipes frames straight to the encoder instead of holding the
+  WHOLE set on disk first, capping a SINGLE render's peak scratch to ~the output size —
+  cleanup alone can't help mid-render, and a single 1080p clip's frames can overflow a
+  small volume on their own. The engine gates streaming to mp4/webm/mov + `RENDER_WORKERS=1`
+  (the small-box setting; our `DEFAULT_RENDER_WORKERS` is 2, so the env must be 1 for it to
+  engage) + duration ≤ `PRODUCER_STREAMING_ENCODE_MAX_DURATION_SECONDS` (240 s); other
+  renders fall back to the disk path unchanged (verified: streaming render serves a valid
+  MP4 via the RENDER_SMOKE smoke).
 - **Hyperframes API (verified against 0.6.91)**: producer `RenderConfig.fps` is an exact
   rational `{ num, den }` (NOT an enum); `format` ∈ `mp4|webm|mov|png-sequence` (webm/mov/
   png-sequence carry true alpha); `executeRenderJob(job, dir, out, onProgress?, abortSignal?)`
