@@ -63,6 +63,13 @@ const SECTIONS = [
 
 beforeEach(async () => {
   await truncateAll();
+  // The AI tour is gated by `isAiConfigured()` (a provider key must be present)
+  // BEFORE `getProvider().pickSections` is ever called — so mocking the provider
+  // alone is not enough. CI has no ANTHROPIC_API_KEY, so without this the gate
+  // closes, `buildAiTour` returns null, and `capture.tour` is undefined. Stub the
+  // default (anthropic) key so the gate opens; the provider itself stays mocked.
+  vi.stubEnv("AI_PROVIDER", "anthropic");
+  vi.stubEnv("ANTHROPIC_API_KEY", "sk-test");
   pickSections.mockReset();
   captureWebsite.mockReset();
   shotDir = fs.mkdtempSync(path.join(os.tmpdir(), "w2v-tour-test-"));
@@ -72,6 +79,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   if (shotDir) fs.rmSync(shotDir, { recursive: true, force: true });
 });
 
