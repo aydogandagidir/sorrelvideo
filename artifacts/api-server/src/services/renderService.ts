@@ -20,6 +20,7 @@ import {
   type RenderVoiceover,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { cleanupProjectWorkDirs } from "../lib/renderDiskCleanup";
 import { buildCaptionOverlay } from "../lib/captionStyles";
 import { getBrandKit, getDefaultBrandKit } from "./brandKitService";
 import {
@@ -1262,6 +1263,15 @@ export async function executeRender(
         );
       }
     }
+  } finally {
+    // Reclaim the engine's per-render scratch (`work-*` = the captured frames +
+    // intermediate mux). They're pure intermediates — the served output
+    // (`output.<ext>` / png `frames/`) lives directly under the project dir,
+    // never inside work-*. Without this, every render — success OR failure —
+    // leaks GBs of frames onto the volume until a later render dies mid-encode
+    // with "No space left on device" (what repeatedly killed project 17).
+    // cleanupProjectWorkDirs never throws, so it can't mask the render outcome.
+    await cleanupProjectWorkDirs(outputDir);
   }
 }
 
