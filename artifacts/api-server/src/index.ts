@@ -7,6 +7,8 @@ import { applyBrandKitMigration } from "./lib/applyBrandKitMigration";
 import { applyAvatarSessionsMigration } from "./lib/applyAvatarSessionsMigration";
 import { closeRenderQueue, startRenderWorker } from "./lib/renderQueue";
 import { recoverStuckRenders } from "./lib/recoverStuckRenders";
+import { reclaimOrphanRenderDisk } from "./lib/renderDiskCleanup";
+import { RENDERS_DIR } from "./services/renderService";
 import {
   startLambdaProgressPoller,
   stopLambdaProgressPoller,
@@ -130,6 +132,14 @@ await initBrandKits();
 await initAvatarSessions();
 await initTemplates();
 await initModules();
+
+// Reclaim leaked render scratch BEFORE the worker can start draining a persisted
+// job. At process start no render is in flight, so every `work-*` frame pile is
+// an orphan from a render that crashed or filled the disk before its `finally`
+// cleanup ran — sweeping now self-heals a "No space left on device" volume on
+// deploy, and doing it pre-worker guarantees we never delete a live render's
+// in-progress frames. No-op (and fast) on an already-clean volume.
+await reclaimOrphanRenderDisk(RENDERS_DIR);
 
 // Boot the render worker before recovery so any jobs already persisted in Redis
 // start draining immediately; recovery then only resets true orphans (rows in
