@@ -1007,27 +1007,48 @@ export async function prepareCompositionFor(
  */
 export function renderFailureMessage(raw: string): string {
   const r = raw.toLowerCase();
-  // Symptoms of the render being killed mid-encode (OOM / restart / SIGKILL) —
-  // the file never got its moov atom, so the faststart/remux step then fails.
+  // Symptoms of a render that ran out of RESOURCES (memory / time / disk) on a
+  // constrained box, rather than a deterministic bug. They share one user fix —
+  // render something smaller — so they all map to the same actionable message.
   const resourceSignals = [
+    // FFmpeg / encoder killed mid-write — the mp4 never got its moov atom, so the
+    // faststart/remux step then fails on the half-written file.
     "moov atom not found",
     "faststart failed",
+    // Explicit out-of-memory from Node / FFmpeg / the allocator.
     "out of memory",
     "enomem",
     "cannot allocate",
+    "swscaler", // scaler allocation failing under memory pressure
+    // SIGKILL — almost always the OS OOM-killer on a small container.
     "killed",
     "signal 9",
     "code 137", // 128 + SIGKILL, the OOM-killer's exit code
-    "swscaler", // scaler allocation failing under memory pressure
-    "interrupted by a restart",
+    // Disk exhaustion mid-encode (temp frames / output file).
+    "enospc",
+    "no space left",
+    // Headless Chrome died / was killed mid-capture — Puppeteer + CDP surface
+    // these when the browser process is OOM-killed or the container restarts
+    // under load. (Capture is the dominant cost of a render, so this is where a
+    // memory-starved box most often falls over.)
     "page crashed",
     "target closed",
+    "session closed",
+    "connection closed",
+    "browser has disconnected",
+    "protocol error",
+    "websocket",
+    // Capture / encode exceeded its time budget — a heavy render (long, 4K, or a
+    // tall website→video screenshot) on a slow or contended box. Same user fix.
+    "timeout",
+    "timed out",
+    "interrupted by a restart",
   ];
   if (resourceSignals.some((s) => r.includes(s))) {
     return (
-      "The render was interrupted before it could finish — the server most " +
-      "likely ran low on memory for a video this size. Try a shorter length or " +
-      "a lower resolution, then render again. If it keeps happening, let us know."
+      "This render couldn't finish — for a video this size the server most " +
+      "likely ran out of memory or time. Try a shorter length or a lower " +
+      "resolution, then render again. If it keeps happening, let us know."
     );
   }
   return (
@@ -1210,14 +1231,19 @@ export async function executeRender(
       if (renderJobId) await markCancelled(renderJobId);
       return;
     }
-    // Surface a short, actionable message to the user (the raw engine/ffmpeg
-    // error — e.g. "Faststart failed: … moov atom not found" — stays in the logs
-    // for diagnosis, but is no use to the person looking at the project).
+    // Two audiences, two messages. The PROJECT carries a short, actionable
+    // message the UI shows verbatim (the raw engine/ffmpeg dump — e.g.
+    // "Faststart failed: … moov atom not found" — is no use to the person looking
+    // at the project). The render_jobs LEDGER instead keeps the RAW technical
+    // error: it's an operator-only audit row (never surfaced to the client —
+    // withRenderProgress only exposes progress/cost), so the true cause stays
+    // retrievable for diagnosis without log-diving, even after the friendly
+    // message has masked it in the UI.
     const rawError = err instanceof Error ? err.message : String(err);
     const renderError = renderFailureMessage(rawError);
     logger.error({ projectId, err, rawError }, "Render failed");
     await setProjectStatus(projectId, "failed", { renderError });
-    if (renderJobId) await markFailed(renderJobId, renderError);
+    if (renderJobId) await markFailed(renderJobId, rawError);
 
     // REFUND the Free-quota render: it was charged at claim time but produced no
     // output, so a failure must not permanently burn the user's monthly render.
