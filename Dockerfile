@@ -181,6 +181,15 @@ RUN set -eux; \
     chmod +x "$SHELL_BIN"; \
     ln -sf "$SHELL_BIN" /usr/local/bin/chrome-headless-shell
 ENV PRODUCER_HEADLESS_SHELL_PATH=/usr/local/bin/chrome-headless-shell
+# Stream frames straight to the encoder instead of writing the WHOLE frame set
+# to the work dir first. A render's captured frames are by far the biggest disk
+# consumer (a 38 s 1080p render ≈ 1100+ PNGs ≈ GBs); holding them all at once
+# overflowed the Railway volume mid-encode → "No space left on device" (ENOSPC).
+# Streaming caps peak scratch to ~the output size. The engine only engages it for
+# mp4/webm/mov, a single worker (RENDER_WORKERS=1 — already our small-box setting),
+# and clips ≤ PRODUCER_STREAMING_ENCODE_MAX_DURATION_SECONDS (default 240 s), so
+# png-sequence/gif/multi-worker renders fall back to the disk path unchanged.
+ENV PRODUCER_ENABLE_STREAMING_ENCODE=true
 
 # Preserve the EXACT monorepo layout so pnpm's relative symlinks keep working.
 # The esbuild bundle externalizes native deps (@node-rs/argon2, puppeteer,
