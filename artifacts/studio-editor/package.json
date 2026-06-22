@@ -9,8 +9,8 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@hyperframes/core": "0.6.91",
-    "@hyperframes/player": "0.6.91",
+    "@hyperframes/core": "0.6.120",
+    "@hyperframes/player": "0.6.120",
     "@hyperframes/studio": "0.6.91",
     "react": "catalog:",
     "react-dom": "catalog:",
