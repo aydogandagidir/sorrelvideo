@@ -57,3 +57,14 @@ updates:
       # is deliberately migrated off the vendored v3 build.
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
+      # vite is pinned DIRECTLY (not via the catalog) in the same vendored
+      # studio-editor at ^6.4.2; its vite config + plugins are authored for
+      # vite 6. A major bump (6 -> 8, closed #138) CANNOT be validated by CI:
+      # the Build step only builds @workspace/api-server + @workspace/sorrel,
+      # so the studio-editor is compiled ONLY in the Dockerfile at deploy time —
+      # a vite-major break passes CI green and then fails the Railway deploy.
+      # The main app (sorrel/mockup-sandbox/auth-web) is already on vite 8 via
+      # the workspace catalog. Block vite majors until the vendored editor is
+      # deliberately migrated (allows 6.x minor/patch).
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
