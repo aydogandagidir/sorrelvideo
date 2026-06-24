@@ -7,14 +7,17 @@ import {
   type CaptureMediaType,
   type ScrapedBrandSignals,
 } from "./websiteCaptureService";
-import { getProvider } from "@workspace/ai";
+import { getProvider, type SectionPick } from "@workspace/ai";
 import { assertSafeCompositionVars } from "../lib/compositionVars";
 import {
   buildCropVars,
   buildTour,
   heroCrop,
+  clamp01,
   type CropRegion,
+  type TourBeat,
 } from "../lib/websiteCrop";
+import { loadVisionScreenshot } from "../lib/visionImage";
 import {
   getBrandKit,
   getDefaultBrandKit,
@@ -293,12 +296,80 @@ async function resolveBrandKitId(
   }
 }
 
+/** One built candidate tour: the model's picks + the composition-ready tour. */
+type TourCandidate = {
+  picks: SectionPick[];
+  tour: { beats: TourBeat[]; duration: number };
+};
+
+// A second pickSections call gets this nudge so the best-of-N judge has two
+// genuinely different reels to choose between (sampling alone often repeats).
+const TOUR_VARIANT_HINT =
+  "Offer an ALTERNATIVE take: pick a different mix and order of sections than " +
+  "the most obvious one, keep it tight, and still lead with the hero and end on " +
+  "a call-to-action when one is present.";
+
+/**
+ * Best-of-N tour selection (vision). Describe each candidate to the judge (its
+ * beats' labels + where they sit on the page + timing), downscale the capture so
+ * the model can SEE the page, and ask it to pick the best one. Best-effort —
+ * returns null (caller keeps the first candidate) on any failure, so the judge
+ * can only IMPROVE the pick, never break the flow.
+ */
+async function pickBestTourCandidate(
+  provider: ReturnType<typeof getProvider>,
+  prompt: string,
+  cap: ResolvedCapture,
+  candidates: TourCandidate[],
+): Promise<number | null> {
+  try {
+    const sections = cap.sections ?? [];
+    const screenshot = await loadVisionScreenshot(
+      cap.screenshotPath,
+      cap.mediaType,
+      cap.height,
+    );
+    const judgeCandidates = candidates.map((c) => ({
+      beats: c.picks.map((p) => {
+        const section = sections[p.index];
+        return {
+          label: section?.label ?? "section",
+          atY: section ? clamp01(section.crop.y) : 0,
+          seconds: p.seconds,
+          caption: typeof p.caption === "string" ? p.caption : null,
+        };
+      }),
+    }));
+    const verdict = await provider.judgeTours({
+      prompt,
+      screenshot,
+      candidates: judgeCandidates,
+    });
+    if (verdict.bestIndex >= 0 && verdict.bestIndex < candidates.length) {
+      logger.info(
+        { url: cap.url, bestIndex: verdict.bestIndex, reason: verdict.reason },
+        "Tour judge picked a candidate",
+      );
+      return verdict.bestIndex;
+    }
+    return null;
+  } catch (err) {
+    logger.warn(
+      { err, url: cap.url },
+      "Tour judge failed; using the first candidate",
+    );
+    return null;
+  }
+}
+
 /**
  * The "describe your video" AI tour: capture's candidate sections + the user's
  * prompt → an ordered pan/zoom highlight reel (the composition's `capture.tour`).
- * Best-effort + quota-gated — with no provider key / no AI quota, or if the model
- * returns nothing usable, returns null and the caller renders the plain scroll.
- * Charges one AI unit only when it actually produces a tour.
+ * Generates N candidate tours (one base + one variant, in parallel) and a VISION
+ * judge that sees the page picks the best — raising first-try acceptance. Best-
+ * effort + quota-gated: no provider key / no AI quota, or nothing usable, returns
+ * null and the caller renders the plain scroll. Charges ONE AI unit regardless of
+ * how many internal calls it makes.
  */
 async function buildAiTour(
   userId: string,
@@ -308,26 +379,50 @@ async function buildAiTour(
   if (!cap.sections || cap.sections.length === 0) return null;
   const allowAi = await consumeAiUnitIfAvailable(userId);
   if (!allowAi) return null;
+  const sections = cap.sections;
   try {
-    const result = await getProvider().pickSections({
-      prompt,
-      title: cap.title,
-      sections: cap.sections.map((s) => ({ label: s.label })),
+    const provider = getProvider();
+    const sectionLabels = sections.map((s) => ({ label: s.label }));
+    // Two candidates in PARALLEL (the variant nudges diversity) so the judge has
+    // a real choice without doubling latency.
+    const results = await Promise.all([
+      provider.pickSections({ prompt, title: cap.title, sections: sectionLabels }),
+      provider.pickSections({
+        prompt,
+        title: cap.title,
+        sections: sectionLabels,
+        variant: TOUR_VARIANT_HINT,
+      }),
+    ]);
+    const candidates: TourCandidate[] = results.flatMap((r) => {
+      const tour = buildTour(r.picks, sections);
+      return tour ? [{ picks: r.picks, tour }] : [];
     });
-    const tour = buildTour(result.picks, cap.sections);
-    if (!tour) return null;
+    if (candidates.length === 0) return null;
+
+    let chosenIndex = 0;
+    if (candidates.length > 1) {
+      const best = await pickBestTourCandidate(provider, prompt, cap, candidates);
+      if (best !== null) chosenIndex = best;
+    }
+    const chosen = candidates[chosenIndex];
+
     logger.info(
       {
         userId,
         url: cap.url,
-        beats: tour.beats.length,
-        duration: tour.duration,
+        candidates: candidates.length,
+        chosenIndex,
+        beats: chosen.tour.beats.length,
+        duration: chosen.tour.duration,
       },
       "AI section tour built",
     );
     return {
-      b64: Buffer.from(JSON.stringify(tour.beats), "utf-8").toString("base64"),
-      duration: tour.duration,
+      b64: Buffer.from(JSON.stringify(chosen.tour.beats), "utf-8").toString(
+        "base64",
+      ),
+      duration: chosen.tour.duration,
     };
   } catch (err) {
     logger.warn(

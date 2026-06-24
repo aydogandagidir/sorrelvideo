@@ -12,6 +12,8 @@ import {
   buildPickSectionsUserText,
   REFINE_VIDEO_SYSTEM,
   buildRefineVideoUserText,
+  JUDGE_TOURS_SYSTEM,
+  buildJudgeToursUserText,
 } from "../prompt";
 import {
   SuggestOutputSchema,
@@ -19,6 +21,7 @@ import {
   GenerateVideoIdeasOutputSchema,
   PickSectionsOutputSchema,
   RefineWebsiteVideoOutputSchema,
+  JudgeToursOutputSchema,
   type SuggestInput,
   type SuggestResult,
   type ExtractBrandInput,
@@ -31,6 +34,8 @@ import {
   type PickSectionsResult,
   type RefineWebsiteVideoInput,
   type RefineWebsiteVideoResult,
+  type JudgeToursInput,
+  type JudgeToursResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -359,6 +364,65 @@ export const anthropicProvider: AiProvider = {
 
     const parsedJson: unknown = JSON.parse(extractJsonObject(text));
     const output = RefineWebsiteVideoOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheCreationInputTokens:
+          response.usage.cache_creation_input_tokens ?? undefined,
+        cacheReadInputTokens:
+          response.usage.cache_read_input_tokens ?? undefined,
+      },
+    };
+  },
+
+  async judgeTours(input: JudgeToursInput): Promise<JudgeToursResult> {
+    const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
+
+    const userContent: Anthropic.ContentBlockParam[] = [
+      { type: "text", text: buildJudgeToursUserText(input) },
+    ];
+    if (input.screenshot) {
+      userContent.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: input.screenshot.mediaType,
+          data: input.screenshot.base64,
+        },
+      });
+    }
+
+    const response = await getClient().messages.create({
+      model,
+      max_tokens: input.maxTokens ?? 200,
+      system: [
+        {
+          type: "text",
+          text: JUDGE_TOURS_SYSTEM,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [{ role: "user", content: userContent }],
+    });
+
+    const text = response.content
+      .filter(
+        (block): block is Extract<typeof block, { type: "text" }> =>
+          block.type === "text",
+      )
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
+
+    if (!text) {
+      throw new Error("Anthropic returned no text content");
+    }
+
+    const parsedJson: unknown = JSON.parse(extractJsonObject(text));
+    const output = JudgeToursOutputSchema.parse(parsedJson);
 
     return {
       ...output,

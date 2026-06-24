@@ -11,6 +11,8 @@ import type {
   PickSectionsResult,
   RefineWebsiteVideoInput,
   RefineWebsiteVideoResult,
+  JudgeToursInput,
+  JudgeToursResult,
 } from "../schema";
 
 export interface AiProvider {
@@ -54,4 +56,10 @@ export interface AiProvider {
   refineWebsiteVideo(
     input: RefineWebsiteVideoInput,
   ): Promise<RefineWebsiteVideoResult>;
+  /**
+   * website→video best-of-N tour judge (VISION): shown the captured page
+   * screenshot + several candidate tours, return the index of the best one (the
+   * caller maps it back to a candidate). Raises first-try acceptance.
+   */
+  judgeTours(input: JudgeToursInput): Promise<JudgeToursResult>;
 }

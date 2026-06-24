@@ -10,6 +10,8 @@ import {
   buildPickSectionsUserText,
   REFINE_VIDEO_SYSTEM,
   buildRefineVideoUserText,
+  JUDGE_TOURS_SYSTEM,
+  buildJudgeToursUserText,
 } from "./prompt";
 
 const EMPTY_BRAND = {
@@ -253,5 +255,40 @@ describe("buildRefineVideoUserText", () => {
     expect(text).toContain("make it shorter");
     // A tall page is flagged so the model can reason about reading pace.
     expect(text).toContain("tall");
+  });
+});
+
+describe("buildPickSectionsUserText — variant hint (best-of-N diversity)", () => {
+  it("appends the variant nudge only when present", () => {
+    const args = { prompt: "p", title: "T", sections: [{ label: "A" }] };
+    expect(buildPickSectionsUserText(args)).not.toContain("ALTERNATIVE take");
+    expect(
+      buildPickSectionsUserText({ ...args, variant: "ALTERNATIVE take please" }),
+    ).toContain("ALTERNATIVE take please");
+  });
+});
+
+describe("JUDGE_TOURS_SYSTEM (the cacheable judge prompt)", () => {
+  it("asks for a bestIndex + reason and JSON-only", () => {
+    expect(JUDGE_TOURS_SYSTEM).toContain('"bestIndex"');
+    expect(JUDGE_TOURS_SYSTEM).toContain('"reason"');
+    expect(JUDGE_TOURS_SYSTEM).toMatch(/ONLY the JSON object/i);
+  });
+});
+
+describe("buildJudgeToursUserText", () => {
+  it("lists each candidate's beats with label, position, and timing", () => {
+    const text = buildJudgeToursUserText({
+      prompt: "show pricing",
+      candidates: [
+        { beats: [{ label: "Hero", atY: 0, seconds: 3, caption: "Hi" }] },
+        { beats: [{ label: "Pricing", atY: 0.5, seconds: 2, caption: null }] },
+      ],
+    });
+    expect(text).toContain("show pricing");
+    expect(text).toContain("Candidate 0:");
+    expect(text).toContain("Candidate 1:");
+    expect(text).toContain("Hero (at 0% down, 3s)");
+    expect(text).toContain("Pricing (at 50% down, 2s)");
   });
 });

@@ -112,6 +112,10 @@ async function buildAll() {
       "sass-embedded",
       "sequelize",
       "serialport",
+      // sharp ships a prebuilt native libvips binary (@img/sharp-*); bundling it
+      // breaks the native .node resolution. Keep external — visionImage.ts loads
+      // it at runtime to downscale a tall capture before vision (the tour judge).
+      "sharp",
       "snappy",
       "tinypool",
       "usb",
