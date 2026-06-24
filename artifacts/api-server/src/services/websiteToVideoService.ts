@@ -519,6 +519,17 @@ export async function createWebsiteVideoProject(
       "capture.title": cap.title,
       duration: String(duration),
       ...(tour ? { "capture.tour": tour.b64 } : buildCropVars(crop)),
+      // Persist the candidate sections (base64 JSON, inert — the composition
+      // never reads it) ONLY for a tour, so "Prompt ile düzelt" can later
+      // re-pick / re-order the tour from a natural-language instruction.
+      ...(tour && cap.sections?.length
+        ? {
+            "capture.sections": Buffer.from(
+              JSON.stringify(cap.sections),
+              "utf-8",
+            ).toString("base64"),
+          }
+        : {}),
     };
 
     // Defense in depth: route this server-built map through the same injection
