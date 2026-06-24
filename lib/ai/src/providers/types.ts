@@ -9,6 +9,8 @@ import type {
   ChatResult,
   PickSectionsInput,
   PickSectionsResult,
+  RefineWebsiteVideoInput,
+  RefineWebsiteVideoResult,
 } from "../schema";
 
 export interface AiProvider {
@@ -43,4 +45,13 @@ export interface AiProvider {
    * from the model.
    */
   pickSections(input: PickSectionsInput): Promise<PickSectionsResult>;
+  /**
+   * website→video "fix it in the preview": a natural-language instruction →
+   * bounded presentation knobs (a new length + which region to feature). The
+   * model never emits geometry; the caller clamps the duration and maps the
+   * region enum to a server-computed crop.
+   */
+  refineWebsiteVideo(
+    input: RefineWebsiteVideoInput,
+  ): Promise<RefineWebsiteVideoResult>;
 }

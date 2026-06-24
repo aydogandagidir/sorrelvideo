@@ -3,6 +3,7 @@ import {
   heroCrop,
   bboxToCrop,
   buildCropVars,
+  regionCrop,
   buildTour,
   clamp01,
   HERO_PX,
@@ -190,5 +191,22 @@ describe("buildTour", () => {
     );
     expect(out?.beats[0].cropW).toBe(MIN_CROP_SIZE);
     expect(out?.beats[0].cropH).toBe(MIN_CROP_SIZE);
+  });
+});
+
+describe("regionCrop", () => {
+  it("whole = the full page (explicit 0,0,1,1 so it RESETS a prior crop)", () => {
+    expect(regionCrop("whole", 5000)).toEqual({ x: 0, y: 0, w: 1, h: 1 });
+  });
+
+  it("hero = the top viewport (matches heroCrop)", () => {
+    expect(regionCrop("hero", 4000)).toEqual(heroCrop(4000));
+    // HERO_PX / 4000 = 0.2
+    expect(regionCrop("hero", 4000).h).toBeCloseTo(HERO_PX / 4000, 6);
+  });
+
+  it("top / bottom = the upper / lower half", () => {
+    expect(regionCrop("top", 3000)).toEqual({ x: 0, y: 0, w: 1, h: 0.5 });
+    expect(regionCrop("bottom", 3000)).toEqual({ x: 0, y: 0.5, w: 1, h: 0.5 });
   });
 });

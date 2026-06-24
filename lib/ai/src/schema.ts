@@ -267,3 +267,53 @@ export type PickSectionsOutput = z.infer<typeof PickSectionsOutputSchema>;
 export interface PickSectionsResult extends PickSectionsOutput {
   usage: SuggestUsage;
 }
+
+// ───────────────────────── Website→Video prompt-refine ──────────────────────
+// "Fix it in the preview" for a website→video showcase: a natural-language
+// instruction ("make it shorter", "focus on the hero") → a small set of
+// presentation knobs the composition already exposes. The model returns only
+// BOUNDED scalars/enums, never geometry — the caller clamps the duration and
+// maps the region to a server-computed crop (same trust model as pickSections).
+// "No change" is explicit ("keep" / 0) so the strict OpenAI json_schema needs no
+// nullables.
+
+/** Which part of the captured page to feature. "keep" = leave the crop as-is. */
+export const RefineRegionSchema = z.enum([
+  "keep",
+  "whole",
+  "hero",
+  "top",
+  "bottom",
+]);
+export type RefineRegion = z.infer<typeof RefineRegionSchema>;
+
+export const RefineWebsiteVideoInputSchema = z.object({
+  /** The user's free-text edit instruction (in their own language). */
+  instruction: z.string().min(1).max(500),
+  current: z.object({
+    /** The project's current video length, so the model can reason about it. */
+    durationSeconds: z.number(),
+    /** Captured page height in px (tall pages read slower). */
+    captureHeight: z.number(),
+  }),
+  maxTokens: z.number().int().positive().max(800).optional(),
+});
+export type RefineWebsiteVideoInput = z.infer<
+  typeof RefineWebsiteVideoInputSchema
+>;
+
+export const RefineWebsiteVideoOutputSchema = z.object({
+  /** New length in seconds (caller clamps to 3-60); 0 = leave unchanged. */
+  duration: z.number(),
+  /** Which region to feature, or "keep" to leave the framing unchanged. */
+  region: RefineRegionSchema,
+  /** One short sentence describing the change, in the instruction's language. */
+  note: z.string().max(200),
+});
+export type RefineWebsiteVideoOutput = z.infer<
+  typeof RefineWebsiteVideoOutputSchema
+>;
+
+export interface RefineWebsiteVideoResult extends RefineWebsiteVideoOutput {
+  usage: SuggestUsage;
+}

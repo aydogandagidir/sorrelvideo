@@ -76,6 +76,33 @@ export function buildCropVars(crop: CropRegion | undefined): Record<string, stri
   };
 }
 
+/** A named region of the captured page to feature (the prompt-refine "fix it"). */
+export type FeatureRegion = "whole" | "hero" | "top" | "bottom";
+
+/**
+ * Map a named region to a CropRegion. "whole" = the full page (an explicit
+ * 0,0,1,1 so it RESETS any prior crop when merged over saved vars, rather than
+ * being dropped); "hero" = the top viewport; "top"/"bottom" = the upper/lower
+ * half. The "keep" case (leave the crop untouched) is handled by the caller — it
+ * never reaches here.
+ */
+export function regionCrop(
+  region: FeatureRegion,
+  captureHeight: number,
+): CropRegion {
+  switch (region) {
+    case "hero":
+      return heroCrop(captureHeight);
+    case "top":
+      return { x: 0, y: 0, w: 1, h: 0.5 };
+    case "bottom":
+      return { x: 0, y: 0.5, w: 1, h: 0.5 };
+    case "whole":
+    default:
+      return { x: 0, y: 0, w: 1, h: 1 };
+  }
+}
+
 // ───────────────────────────── AI section tour ──────────────────────────────
 // The "describe your video" mode: the AI picks + orders sections, and we turn
 // those picks (by index, into the candidate `sections`) into the composition's

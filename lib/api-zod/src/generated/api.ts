@@ -724,6 +724,28 @@ export const UpdateProjectRenderSettingsResponse = zod.object({
 
 
 /**
+ * @summary Refine a website→video project from a natural-language instruction
+ */
+export const RefineProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const refineProjectBodyInstructionMin = 3;
+export const refineProjectBodyInstructionMax = 500;
+
+
+
+export const RefineProjectBody = zod.object({
+  "instruction": zod.string().min(refineProjectBodyInstructionMin).max(refineProjectBodyInstructionMax).describe('The natural-language change to apply (e.g. \"make it shorter\").')
+})
+
+export const RefineProjectResponse = zod.object({
+  "vars": zod.record(zod.string(), zod.string()).describe('The CHANGED compositionVars only, for the live-preview ?vars= override.'),
+  "note": zod.string().describe('One short sentence describing the change, in the instruction\'s language.')
+})
+
+
+/**
  * @summary Get the current brand kit
  */
 export const GetBrandKitResponse = zod.object({

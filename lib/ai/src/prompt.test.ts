@@ -8,6 +8,8 @@ import {
   buildVideoIdeasUserText,
   PICK_SECTIONS_SYSTEM,
   buildPickSectionsUserText,
+  REFINE_VIDEO_SYSTEM,
+  buildRefineVideoUserText,
 } from "./prompt";
 
 const EMPTY_BRAND = {
@@ -226,5 +228,30 @@ describe("PICK_SECTIONS_SYSTEM (the cacheable director prompt)", () => {
     expect(PICK_SECTIONS_SYSTEM).toContain('"seconds"');
     expect(PICK_SECTIONS_SYSTEM).toContain('"caption"');
     expect(PICK_SECTIONS_SYSTEM).toMatch(/ONLY the JSON object/i);
+  });
+});
+
+describe("REFINE_VIDEO_SYSTEM (the cacheable refine prompt)", () => {
+  it("declares the bounded output keys + JSON-only contract", () => {
+    expect(REFINE_VIDEO_SYSTEM).toContain('"duration"');
+    expect(REFINE_VIDEO_SYSTEM).toContain('"region"');
+    expect(REFINE_VIDEO_SYSTEM).toContain('"note"');
+    // The region enum the server maps to a crop.
+    expect(REFINE_VIDEO_SYSTEM).toContain('"keep"');
+    expect(REFINE_VIDEO_SYSTEM).toContain('"hero"');
+    expect(REFINE_VIDEO_SYSTEM).toMatch(/ONLY the JSON object/i);
+  });
+});
+
+describe("buildRefineVideoUserText", () => {
+  it("includes the current length and the user's instruction", () => {
+    const text = buildRefineVideoUserText({
+      instruction: "make it shorter",
+      current: { durationSeconds: 38, captureHeight: 5200 },
+    });
+    expect(text).toContain("38 seconds");
+    expect(text).toContain("make it shorter");
+    // A tall page is flagged so the model can reason about reading pace.
+    expect(text).toContain("tall");
   });
 });

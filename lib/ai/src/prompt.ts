@@ -312,3 +312,45 @@ export function buildPickSectionsUserText(input: {
     list,
   ].join("\n");
 }
+
+/**
+ * The website→video "fix it in the preview" director. Brand-independent
+ * (cache-friendly prefix): the model adjusts only the overall LENGTH and which
+ * REGION of the captured page to feature, per a natural-language instruction. It
+ * returns bounded knobs, NEVER geometry — the server clamps the duration and
+ * computes the crop from the region enum.
+ */
+export const REFINE_VIDEO_SYSTEM: string = [
+  "You tune a website-showcase video. The video screenshots a web page and",
+  "pans/scrolls through it. The user gives a short instruction to adjust it. You",
+  "can change TWO things: the overall LENGTH (seconds) and which REGION of the",
+  "page to feature.",
+  "",
+  "Return a JSON object with EXACTLY these keys:",
+  '- "duration": the new length in seconds (3-60), or 0 to leave the length',
+  "  unchanged. Use a smaller number for 'make it quick/snappy/shorter' and a",
+  "  larger one for 'slower/calmer/longer'.",
+  '- "region": one of "keep" | "whole" | "hero" | "top" | "bottom". "keep" leaves',
+  '  the framing as-is; "whole" features the entire page; "hero" the top headline',
+  '  screen; "top"/"bottom" the upper/lower half.',
+  '- "note": ONE short sentence telling the user what you changed, written in the',
+  "  SAME language as their instruction.",
+  "",
+  "Only change what the instruction asks for — leave the rest as \"keep\" / 0.",
+  "Respond with ONLY the JSON object. No markdown, no commentary.",
+].join("\n");
+
+/** The per-request user text: the current video state + the user's instruction. */
+export function buildRefineVideoUserText(input: {
+  instruction: string;
+  current: { durationSeconds: number; captureHeight: number };
+}): string {
+  const tall = input.current.captureHeight >= 4000 ? "tall" : "short";
+  return [
+    `Current length: ${Math.round(input.current.durationSeconds)} seconds.`,
+    `Captured page: ${tall} (${Math.round(input.current.captureHeight)} px high).`,
+    "",
+    "The user's instruction:",
+    input.instruction.trim(),
+  ].join("\n");
+}
