@@ -300,9 +300,10 @@ export function buildPickSectionsUserText(input: {
   prompt: string;
   title: string;
   sections: { label: string }[];
+  variant?: string;
 }): string {
   const list = input.sections.map((s, i) => `${i}: ${s.label}`).join("\n");
-  return [
+  const lines = [
     `Page title: ${input.title || "(none)"}`,
     "",
     "The user wants this video:",
@@ -310,7 +311,10 @@ export function buildPickSectionsUserText(input: {
     "",
     "Candidate sections (index: label):",
     list,
-  ].join("\n");
+  ];
+  // A best-of-N second call passes a variant hint to steer toward a different reel.
+  if (input.variant?.trim()) lines.push("", input.variant.trim());
+  return lines.join("\n");
 }
 
 /**
@@ -353,4 +357,57 @@ export function buildRefineVideoUserText(input: {
     "The user's instruction:",
     input.instruction.trim(),
   ].join("\n");
+}
+
+/**
+ * The website→video tour JUDGE (vision). Brand-independent (cache-friendly): the
+ * model is shown the captured page screenshot + several candidate tours and picks
+ * the one that best matches the request and showcases the page. The caller maps
+ * `bestIndex` back to a candidate, so the model only returns an index + a reason.
+ */
+export const JUDGE_TOURS_SYSTEM: string = [
+  "You are a short-form video director choosing between candidate highlight reels",
+  "of ONE captured web page. You are shown the page screenshot (a tall full-page",
+  "capture, scaled down) and several candidate tours. Each candidate is an ordered",
+  "list of beats; each beat features a section of the page (a label, an approximate",
+  "vertical position atY where 0=top and 1=bottom, a hold time, and an optional",
+  "caption).",
+  "",
+  "Pick the candidate that BEST matches the user's request and showcases the page:",
+  "favour candidates that feature sections with real, substantive content in the",
+  "screenshot (avoid blank / near-empty bands), follow a sensible order (usually",
+  "lead with the hero, end with a CTA / contact), and avoid redundant or weak beats.",
+  "",
+  'Return a JSON object { "bestIndex": <0-based index of the best candidate>,',
+  '"reason": "<one short sentence>" }. Respond with ONLY the JSON object. No',
+  "markdown, no commentary.",
+].join("\n");
+
+/** The per-request user text: the prompt + each candidate's beats (label/where/timing). */
+export function buildJudgeToursUserText(input: {
+  prompt: string;
+  candidates: {
+    beats: {
+      label: string;
+      atY: number;
+      seconds: number;
+      caption?: string | null;
+    }[];
+  }[];
+}): string {
+  const lines: string[] = [
+    "The user wants this video:",
+    input.prompt.trim(),
+    "",
+    "Candidates:",
+  ];
+  input.candidates.forEach((c, i) => {
+    lines.push(`Candidate ${i}:`);
+    for (const b of c.beats) {
+      const at = Math.round(Math.max(0, Math.min(1, b.atY)) * 100);
+      const cap = b.caption ? ` — “${b.caption}”` : "";
+      lines.push(`  - ${b.label} (at ${at}% down, ${b.seconds}s)${cap}`);
+    }
+  });
+  return lines.join("\n");
 }

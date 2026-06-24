@@ -11,6 +11,8 @@ import {
   buildPickSectionsUserText,
   REFINE_VIDEO_SYSTEM,
   buildRefineVideoUserText,
+  JUDGE_TOURS_SYSTEM,
+  buildJudgeToursUserText,
 } from "../prompt";
 import {
   SuggestOutputSchema,
@@ -18,6 +20,7 @@ import {
   GenerateVideoIdeasOutputSchema,
   PickSectionsOutputSchema,
   RefineWebsiteVideoOutputSchema,
+  JudgeToursOutputSchema,
   type SuggestInput,
   type SuggestResult,
   type ExtractBrandInput,
@@ -30,6 +33,8 @@ import {
   type PickSectionsResult,
   type RefineWebsiteVideoInput,
   type RefineWebsiteVideoResult,
+  type JudgeToursInput,
+  type JudgeToursResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -49,6 +54,7 @@ const TOKENS = {
   chat: 600,
   pickSections: 1024,
   refineWebsiteVideo: 400,
+  judgeTours: 300,
 } as const;
 
 let client: OpenAI | null = null;
@@ -181,6 +187,18 @@ const REFINE_VIDEO_RESPONSE_SCHEMA = {
       enum: ["keep", "whole", "hero", "top", "bottom"],
     },
     note: { type: "string" },
+  },
+} as const;
+
+// Strict json_schema for the website→video tour judge — index of the best
+// candidate + a one-line reason.
+const JUDGE_TOURS_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["bestIndex", "reason"],
+  properties: {
+    bestIndex: { type: "integer" },
+    reason: { type: "string" },
   },
 } as const;
 
@@ -427,6 +445,59 @@ export const openaiProvider: AiProvider = {
 
     const parsedJson: unknown = JSON.parse(text);
     const output = RefineWebsiteVideoOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+        cacheReadInputTokens:
+          response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
+      },
+    };
+  },
+
+  async judgeTours(input: JudgeToursInput): Promise<JudgeToursResult> {
+    const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+
+    const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+      { type: "text", text: buildJudgeToursUserText(input) },
+    ];
+    if (input.screenshot) {
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${input.screenshot.mediaType};base64,${input.screenshot.base64}`,
+        },
+      });
+    }
+
+    const response = await getClient().chat.completions.create({
+      model,
+      max_completion_tokens: input.maxTokens ?? TOKENS.judgeTours,
+      store: true,
+      messages: [
+        { role: "system", content: JUDGE_TOURS_SYSTEM },
+        { role: "user", content: userContent },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "judge_tours",
+          strict: true,
+          schema: JUDGE_TOURS_RESPONSE_SCHEMA,
+        },
+      },
+    });
+
+    const choice = response.choices[0];
+    const text = choice?.message?.content?.trim();
+    if (!text) {
+      throw new Error("OpenAI returned no message content");
+    }
+
+    const parsedJson: unknown = JSON.parse(text);
+    const output = JudgeToursOutputSchema.parse(parsedJson);
 
     return {
       ...output,

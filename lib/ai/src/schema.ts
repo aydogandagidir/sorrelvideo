@@ -247,6 +247,12 @@ export const PickSectionsInputSchema = z.object({
   title: z.string().default(""),
   /** Candidate sections; the model references them by array index. */
   sections: z.array(SectionCandidateSchema).min(1).max(40),
+  /**
+   * Optional nudge for candidate diversity (best-of-N): a second call passes a
+   * hint to steer it toward an ALTERNATIVE selection/order, so the judge has two
+   * genuinely different reels to choose between.
+   */
+  variant: z.string().max(200).optional(),
   maxTokens: z.number().int().positive().max(1500).optional(),
 });
 export type PickSectionsInput = z.infer<typeof PickSectionsInputSchema>;
@@ -315,5 +321,48 @@ export type RefineWebsiteVideoOutput = z.infer<
 >;
 
 export interface RefineWebsiteVideoResult extends RefineWebsiteVideoOutput {
+  usage: SuggestUsage;
+}
+
+// ──────────────────────── Website→Video tour judge (vision) ──────────────────
+// Best-of-N for the AI section tour: given the captured page (a downscaled
+// screenshot) + a few candidate tours, the model SEES the page and picks the
+// candidate that best matches the request and showcases the page (substantive
+// sections, sensible order, no blank bands). Raises first-try acceptance — the
+// user sees the best candidate, not a coin-flip.
+
+/** One beat of a candidate tour, described for the judge (label + where + timing). */
+export const JudgeTourBeatSchema = z.object({
+  label: z.string().max(120),
+  /** Where the beat's region sits on the page (0 = top, 1 = bottom). */
+  atY: z.number(),
+  seconds: z.number(),
+  caption: z.string().max(48).nullable().optional(),
+});
+export type JudgeTourBeat = z.infer<typeof JudgeTourBeatSchema>;
+
+export const JudgeTourCandidateSchema = z.object({
+  beats: z.array(JudgeTourBeatSchema).min(1).max(8),
+});
+export type JudgeTourCandidate = z.infer<typeof JudgeTourCandidateSchema>;
+
+export const JudgeToursInputSchema = z.object({
+  /** The user's free-text description of the video they want. */
+  prompt: z.string().min(1).max(800),
+  /** The captured page, downscaled for vision (optional → text-only fallback). */
+  screenshot: BrandScreenshotSchema.optional(),
+  candidates: z.array(JudgeTourCandidateSchema).min(2).max(4),
+  maxTokens: z.number().int().positive().max(500).optional(),
+});
+export type JudgeToursInput = z.infer<typeof JudgeToursInputSchema>;
+
+export const JudgeToursOutputSchema = z.object({
+  /** The chosen candidate's 0-based index. */
+  bestIndex: z.number().int().min(0),
+  reason: z.string().max(200),
+});
+export type JudgeToursOutput = z.infer<typeof JudgeToursOutputSchema>;
+
+export interface JudgeToursResult extends JudgeToursOutput {
   usage: SuggestUsage;
 }
