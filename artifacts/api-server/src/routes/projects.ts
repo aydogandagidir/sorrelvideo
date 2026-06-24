@@ -1,6 +1,7 @@
 import fs from "fs";
 import archiver from "archiver";
 import { Router, type IRouter } from "express";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
 import {
   db,
@@ -45,6 +46,11 @@ import { variablesForModule } from "../services/registryTemplates";
 import { logger } from "../lib/logger";
 import { serveTemplateAsset } from "../lib/templateAssets";
 import { resolveByteRange } from "../lib/httpRange";
+import { aiSuggestLimiter } from "../middlewares/rateLimit";
+import {
+  refineWebsiteVideoVars,
+  RefineNotApplicableError,
+} from "../services/websiteRefineService";
 
 /**
  * Validate a project's compositionVars against the typed variables its module
@@ -771,6 +777,84 @@ router.get("/projects/:id/composition", async (req, res): Promise<void> => {
   // affects res.sendFile, which we deliberately avoid here.
   res.send(html);
 });
+
+// POST /api/projects/:id/refine — "fix it in the preview": a natural-language
+// instruction → the CHANGED compositionVars (a new length and/or featured
+// region) so the SPA live-previews the edit via the `/composition?vars=` route
+// and the user refines WITHOUT a blind regenerate. Owner-scoped; AI-quota +
+// rate-limited (mirrors /ai/edit). website→video showcase projects only.
+const RefineProjectBody = z.object({
+  instruction: z.string().min(3).max(500),
+});
+
+router.post(
+  "/projects/:id/refine",
+  aiSuggestLimiter,
+  async (req, res): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+
+    const parsed = RefineProjectBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: parsed.error.issues[0]?.message ?? "Invalid instruction",
+      });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, id));
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (project.userId !== req.user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    try {
+      const result = await refineWebsiteVideoVars(
+        req.user.id,
+        project,
+        parsed.data.instruction,
+      );
+      res.status(200).json(result);
+    } catch (err) {
+      if (err instanceof RefineNotApplicableError) {
+        res.status(422).json({ error: err.message });
+        return;
+      }
+      const e = err as { reason?: string; message?: string };
+      if (e.reason === "upgrade_required") {
+        res.status(403).json({
+          error: e.message ?? "AI suggestion limit reached",
+          reason: "upgrade_required",
+        });
+        return;
+      }
+      const detail = err instanceof Error ? err.message : String(err);
+      const notConfigured = /API_KEY is not set|not configured/i.test(detail);
+      req.log.error({ err }, "project refine failed");
+      res.status(notConfigured ? 503 : 502).json({
+        error: notConfigured
+          ? "AI isn't configured on the server yet. An admin needs to set ANTHROPIC_API_KEY (or OPENAI_API_KEY)."
+          : "AI provider could not refine the video",
+      });
+    }
+  },
+);
 
 // GET /api/projects/:id/assets/:name — serve a vendored sibling asset
 // (avatar/background/sfx) for a project created from a multi-file template, so

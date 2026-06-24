@@ -930,6 +930,27 @@ export interface AiEditRequest {
   current: AiEditRequestCurrent;
 }
 
+export interface RefineProjectRequest {
+  /**
+     * The natural-language change to apply (e.g. "make it shorter").
+     * @minLength 3
+     * @maxLength 500
+     */
+  instruction: string;
+}
+
+/**
+ * The CHANGED compositionVars only, for the live-preview ?vars= override.
+ */
+export type RefineProjectResultVars = {[key: string]: string};
+
+export interface RefineProjectResult {
+  /** The CHANGED compositionVars only, for the live-preview ?vars= override. */
+  vars: RefineProjectResultVars;
+  /** One short sentence describing the change, in the instruction's language. */
+  note: string;
+}
+
 export interface CheckoutRequest {
   priceId: string;
 }

@@ -9,12 +9,15 @@ import {
   buildVideoIdeasUserText,
   PICK_SECTIONS_SYSTEM,
   buildPickSectionsUserText,
+  REFINE_VIDEO_SYSTEM,
+  buildRefineVideoUserText,
 } from "../prompt";
 import {
   SuggestOutputSchema,
   ExtractBrandOutputSchema,
   GenerateVideoIdeasOutputSchema,
   PickSectionsOutputSchema,
+  RefineWebsiteVideoOutputSchema,
   type SuggestInput,
   type SuggestResult,
   type ExtractBrandInput,
@@ -25,6 +28,8 @@ import {
   type ChatResult,
   type PickSectionsInput,
   type PickSectionsResult,
+  type RefineWebsiteVideoInput,
+  type RefineWebsiteVideoResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -43,6 +48,7 @@ const TOKENS = {
   videoIdeas: 4096,
   chat: 600,
   pickSections: 1024,
+  refineWebsiteVideo: 400,
 } as const;
 
 let client: OpenAI | null = null;
@@ -159,6 +165,22 @@ const PICK_SECTIONS_RESPONSE_SCHEMA = {
         },
       },
     },
+  },
+} as const;
+
+// Strict json_schema for the website→video refine call. All keys required, no
+// nullables — "no change" is the explicit "keep" / 0 (see RefineWebsiteVideoOutputSchema).
+const REFINE_VIDEO_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["duration", "region", "note"],
+  properties: {
+    duration: { type: "number" },
+    region: {
+      type: "string",
+      enum: ["keep", "whole", "hero", "top", "bottom"],
+    },
+    note: { type: "string" },
   },
 } as const;
 
@@ -362,6 +384,49 @@ export const openaiProvider: AiProvider = {
 
     const parsedJson: unknown = JSON.parse(text);
     const output = PickSectionsOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+        cacheReadInputTokens:
+          response.usage?.prompt_tokens_details?.cached_tokens ?? undefined,
+      },
+    };
+  },
+
+  async refineWebsiteVideo(
+    input: RefineWebsiteVideoInput,
+  ): Promise<RefineWebsiteVideoResult> {
+    const model = process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+
+    const response = await getClient().chat.completions.create({
+      model,
+      max_completion_tokens: input.maxTokens ?? TOKENS.refineWebsiteVideo,
+      store: true,
+      messages: [
+        { role: "system", content: REFINE_VIDEO_SYSTEM },
+        { role: "user", content: buildRefineVideoUserText(input) },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "refine_video",
+          strict: true,
+          schema: REFINE_VIDEO_RESPONSE_SCHEMA,
+        },
+      },
+    });
+
+    const choice = response.choices[0];
+    const text = choice?.message?.content?.trim();
+    if (!text) {
+      throw new Error("OpenAI returned no message content");
+    }
+
+    const parsedJson: unknown = JSON.parse(text);
+    const output = RefineWebsiteVideoOutputSchema.parse(parsedJson);
 
     return {
       ...output,

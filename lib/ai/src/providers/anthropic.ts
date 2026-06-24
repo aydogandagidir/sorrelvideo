@@ -10,12 +10,15 @@ import {
   buildVideoIdeasUserText,
   PICK_SECTIONS_SYSTEM,
   buildPickSectionsUserText,
+  REFINE_VIDEO_SYSTEM,
+  buildRefineVideoUserText,
 } from "../prompt";
 import {
   SuggestOutputSchema,
   ExtractBrandOutputSchema,
   GenerateVideoIdeasOutputSchema,
   PickSectionsOutputSchema,
+  RefineWebsiteVideoOutputSchema,
   type SuggestInput,
   type SuggestResult,
   type ExtractBrandInput,
@@ -26,6 +29,8 @@ import {
   type ChatResult,
   type PickSectionsInput,
   type PickSectionsResult,
+  type RefineWebsiteVideoInput,
+  type RefineWebsiteVideoResult,
 } from "../schema";
 import type { AiProvider } from "./types";
 
@@ -307,6 +312,53 @@ export const anthropicProvider: AiProvider = {
 
     const parsedJson: unknown = JSON.parse(extractJsonObject(text));
     const output = PickSectionsOutputSchema.parse(parsedJson);
+
+    return {
+      ...output,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheCreationInputTokens:
+          response.usage.cache_creation_input_tokens ?? undefined,
+        cacheReadInputTokens:
+          response.usage.cache_read_input_tokens ?? undefined,
+      },
+    };
+  },
+
+  async refineWebsiteVideo(
+    input: RefineWebsiteVideoInput,
+  ): Promise<RefineWebsiteVideoResult> {
+    const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
+
+    const response = await getClient().messages.create({
+      model,
+      max_tokens: input.maxTokens ?? 400,
+      system: [
+        {
+          type: "text",
+          text: REFINE_VIDEO_SYSTEM,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [{ role: "user", content: buildRefineVideoUserText(input) }],
+    });
+
+    const text = response.content
+      .filter(
+        (block): block is Extract<typeof block, { type: "text" }> =>
+          block.type === "text",
+      )
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
+
+    if (!text) {
+      throw new Error("Anthropic returned no text content");
+    }
+
+    const parsedJson: unknown = JSON.parse(extractJsonObject(text));
+    const output = RefineWebsiteVideoOutputSchema.parse(parsedJson);
 
     return {
       ...output,

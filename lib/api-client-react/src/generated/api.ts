@@ -62,6 +62,8 @@ import type {
   Project,
   ProjectInput,
   ProjectUpdate,
+  RefineProjectRequest,
+  RefineProjectResult,
   RenderSettingsInput,
   ResendVerificationRequest,
   ResetPasswordRequest,
@@ -2095,6 +2097,78 @@ export const useUpdateProjectRenderSettings = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateProjectRenderSettingsMutationOptions(options));
+    }
+
+export const getRefineProjectUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/refine`
+}
+
+/**
+ * @summary Refine a website→video project from a natural-language instruction
+ */
+export const refineProject = async (id: number,
+    refineProjectRequest: RefineProjectRequest, options?: RequestInit): Promise<RefineProjectResult> => {
+
+  return customFetch<RefineProjectResult>(getRefineProjectUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      refineProjectRequest,)
+  }
+);}
+
+
+
+
+export const getRefineProjectMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refineProject>>, TError,{id: number;data: BodyType<RefineProjectRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof refineProject>>, TError,{id: number;data: BodyType<RefineProjectRequest>}, TContext> => {
+
+const mutationKey = ['refineProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refineProject>>, {id: number;data: BodyType<RefineProjectRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  refineProject(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefineProjectMutationResult = NonNullable<Awaited<ReturnType<typeof refineProject>>>
+    export type RefineProjectMutationBody = BodyType<RefineProjectRequest>
+    export type RefineProjectMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Refine a website→video project from a natural-language instruction
+ */
+export const useRefineProject = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refineProject>>, TError,{id: number;data: BodyType<RefineProjectRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof refineProject>>,
+        TError,
+        {id: number;data: BodyType<RefineProjectRequest>},
+        TContext
+      > => {
+      return useMutation(getRefineProjectMutationOptions(options));
     }
 
 export const getGetBrandKitUrl = () => {

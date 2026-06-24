@@ -671,6 +671,73 @@ paths:
         "404":
           description: Not found
 
+  /projects/{id}/refine:
+    post:
+      operationId: refineProject
+      tags: [projects]
+      summary: Refine a website→video project from a natural-language instruction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefineProjectRequest"
+      responses:
+        "200":
+          description: The changed compositionVars + a note, for the live preview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefineProjectResult"
+        "400":
+          description: Request failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: AI quota exhausted — upgrade required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Project not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Not a website→video project, or it uses an AI tour.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too many requests; back off.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: Provider call failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /brand:
     get:
       operationId: getBrandKit
@@ -2637,6 +2704,29 @@ components:
             ctaText:
               type: string
               maxLength: 48
+
+    RefineProjectRequest:
+      type: object
+      required: [instruction]
+      properties:
+        instruction:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: The natural-language change to apply (e.g. "make it shorter").
+
+    RefineProjectResult:
+      type: object
+      required: [vars, note]
+      properties:
+        vars:
+          type: object
+          additionalProperties:
+            type: string
+          description: The CHANGED compositionVars only, for the live-preview ?vars= override.
+        note:
+          type: string
+          description: One short sentence describing the change, in the instruction's language.
 
     CheckoutRequest:
       type: object
