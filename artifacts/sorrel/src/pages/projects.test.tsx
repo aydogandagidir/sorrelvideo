@@ -526,3 +526,103 @@ function requestsOf(method: string): Array<{ url: string; body: unknown }> {
 
 const patchCalls = () => requestsOf("PATCH");
 const postCalls = () => requestsOf("POST");
+
+/** A website→video showcase draft (no user.* copy; carries a capture). */
+function w2vProject(over: Record<string, unknown> = {}) {
+  return draftProject({
+    id: 9,
+    name: "Site Video",
+    module: "website-showcase",
+    compositionVars: {
+      "capture.image": "data:image/jpeg;base64,AAAA",
+      "capture.height": "4000",
+      "capture.url": "https://acme.test",
+      "capture.title": "Acme",
+      duration: "38",
+    },
+    ...over,
+  });
+}
+
+/** Decode the HfPlayer's `?vars=` override (UTF-8-safe base64, see b64UrlVars). */
+function decodePreviewVars(src: string): Record<string, string> {
+  const m = src.match(/[?&]vars=([^&]+)/);
+  if (!m) return {};
+  const bin = atob(decodeURIComponent(m[1]));
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+describe("Projects — refine (website→video, no regenerate)", () => {
+  it("‘Düzelt’ posts the instruction and rides the result into the live preview", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([w2vProject()]),
+      {
+        url: "/api/projects/9/refine",
+        method: "POST",
+        status: 200,
+        json: {
+          vars: {
+            duration: "20",
+            "capture.cropX": "0",
+            "capture.cropY": "0",
+            "capture.cropW": "1",
+            "capture.cropH": "0.2",
+          },
+          note: "Süreyi 20 saniyeye indirdim ve hero'ya odakladım.",
+        },
+      },
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const dialog = await openDetail("Site Video");
+
+    await user.type(
+      within(dialog).getByPlaceholderText(/videoyu kısalt/i),
+      "kısalt ve hero'ya odakla",
+    );
+    await user.click(within(dialog).getByRole("button", { name: /^düzelt$/i }));
+
+    // The model's note is shown to the user.
+    await waitFor(() =>
+      expect(
+        within(dialog).getByText(/hero'ya odakladım/i),
+      ).toBeInTheDocument(),
+    );
+
+    // The instruction was posted to the project's refine endpoint.
+    const post = postCalls().find((c) =>
+      /\/api\/projects\/9\/refine$/.test(c.url),
+    );
+    expect((post?.body as { instruction?: string }).instruction).toBe(
+      "kısalt ve hero'ya odakla",
+    );
+
+    // The returned vars ride into the live preview's ?vars= override — no render.
+    const src = within(dialog)
+      .getByTestId("hf-player")
+      .getAttribute("data-src")!;
+    const vars = decodePreviewVars(src);
+    expect(vars.duration).toBe("20");
+    expect(vars["capture.cropH"]).toBe("0.2");
+
+    // A Save button appears now that there's a pending refine to persist.
+    expect(
+      within(dialog).getByRole("button", { name: /^kaydet$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show the refine box for a non-website-showcase project", async () => {
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([draftProject({ id: 3, name: "Studio One", module: "studio" })]),
+    ]);
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const dialog = await openDetail("Studio One");
+    expect(
+      within(dialog).queryByText(/prompt ile düzelt/i),
+    ).not.toBeInTheDocument();
+  });
+});

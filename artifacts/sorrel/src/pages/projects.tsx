@@ -13,6 +13,7 @@ import {
   useListTemplates,
   useGetBrandKit,
   useAiEdit,
+  useRefineProject,
   getListProjectsQueryKey,
   type Project,
   type BrandKit,
@@ -350,6 +351,7 @@ function ProjectDetail({
   const updateSettings = useUpdateProjectRenderSettings();
   const updateProject = useUpdateProject();
   const aiEdit = useAiEdit();
+  const refineProject = useRefineProject();
   const { toast } = useToast();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<
@@ -375,6 +377,15 @@ function ProjectDetail({
   });
   const [aiInstruction, setAiInstruction] = useState("");
   const [aiCopyError, setAiCopyError] = useState<string | null>(null);
+
+  // website→video "prompt ile düzelt": a natural-language refine of the length /
+  // featured region. The returned vars accumulate into a LOCAL override so the
+  // live preview (?vars=) reflects the edit before any render is spent; "Kaydet"
+  // persists them. Mirrors the copy editor's local-edit → ?vars= → save flow.
+  const [refineVars, setRefineVars] = useState<Record<string, string>>({});
+  const [refineInstruction, setRefineInstruction] = useState("");
+  const [refineNote, setRefineNote] = useState<string | null>(null);
+  const [refineError, setRefineError] = useState<string | null>(null);
 
   // Typed template parameters (the engine's native composition variables). The
   // templates list carries each template's `variables` (read-time enrichment);
@@ -419,9 +430,17 @@ function ProjectDetail({
     hasCopy &&
     (project.status === "draft" || project.status === "failed");
 
+  // "Prompt ile düzelt" is website→video only and not for an AI-tour project
+  // (the backend 422s those — tour editing is a later slice), in the states that
+  // render the live preview so a refine is visible before a render is spent.
+  const canRefine =
+    project.module === "website-showcase" &&
+    !v["capture.tour"] &&
+    (project.status === "draft" || project.status === "failed");
+
   // The live composition preview rides unsaved edits as a ?vars= override so the
   // picture matches before a render is spent: typed params always, plus the copy
-  // fields while they're editable (draft/failed).
+  // fields while editable (draft/failed), plus any pending prompt-refine deltas.
   const previewVars: Record<string, string> = {
     ...paramValues,
     ...(canEditCopy
@@ -431,6 +450,7 @@ function ProjectDetail({
           "user.ctaText": copyValues.ctaText,
         }
       : {}),
+    ...refineVars,
   };
 
   // Aspect ratio / publishing format (the project's render resolution).
@@ -557,6 +577,80 @@ function ProjectDetail({
       setAiCopyError(anyErr.data?.error ?? anyErr.message ?? "AI edit failed");
     }
   }
+
+  // "Prompt ile düzelt": apply a natural-language instruction to the website→video
+  // length / featured region. Merges the returned vars into the LOCAL override so
+  // the live preview reflects it WITHOUT a render; the user then Saves. Mirrors
+  // handleAiEditCopy's quota/rate-limit handling.
+  async function handleRefine() {
+    setRefineError(null);
+    setRefineNote(null);
+    const instruction = refineInstruction.trim();
+    if (instruction.length < 3) {
+      setRefineError("Ne değiştireyim, kısaca yaz (en az 3 karakter).");
+      return;
+    }
+    try {
+      const result = await refineProject.mutateAsync({
+        id: project.id,
+        data: { instruction },
+      });
+      setRefineVars((prev) => ({ ...prev, ...result.vars }));
+      setRefineNote(result.note);
+      setRefineInstruction("");
+    } catch (err) {
+      const anyErr = err as {
+        status?: number;
+        data?: { reason?: string; error?: string };
+        message?: string;
+      };
+      if (anyErr.status === 403 && anyErr.data?.reason === "upgrade_required") {
+        setUpgradeReason("ai_limit");
+        setUpgradeOpen(true);
+        return;
+      }
+      if (anyErr.status === 429) {
+        setRefineError("Biraz yavaşla — bir dakika sonra tekrar dene.");
+        return;
+      }
+      setRefineError(
+        anyErr.data?.error ?? anyErr.message ?? "Düzeltme başarısız.",
+      );
+    }
+  }
+
+  // Persist the accumulated prompt-refine deltas onto the project (re-render to
+  // apply). Mirrors handleSaveCopy.
+  const handleSaveRefine = () =>
+    updateProject.mutate(
+      {
+        id: project.id,
+        data: {
+          compositionVars: {
+            ...((project.compositionVars ?? {}) as Record<string, string>),
+            ...refineVars,
+          },
+        },
+      },
+      {
+        onSuccess: () => {
+          invalidate();
+          setRefineVars({});
+          setRefineNote(null);
+          toast({
+            title: "Düzeltme kaydedildi — uygulamak için yeniden render et",
+          });
+        },
+        onError: (err) => {
+          const e = err as { data?: { error?: string } };
+          toast({
+            title: "Düzeltme kaydedilemedi",
+            description: e.data?.error,
+            variant: "destructive",
+          });
+        },
+      },
+    );
 
   const handleRender = () =>
     renderMutation.mutate(
@@ -939,6 +1033,71 @@ function ProjectDetail({
                           style={{ background: c as string }}
                         />
                       ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {canRefine && (
+              <div>
+                <div className="mb-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground/70">
+                  Prompt ile düzelt
+                </div>
+                <div className="space-y-2 rounded-lg border bg-muted/30 p-2.5">
+                  <p className="text-[11.5px] text-muted-foreground">
+                    Önizlemeyi değiştirmek için yaz — örn. “kısalt”, “hero’ya
+                    odakla”, “tüm sayfayı göster”. Render beklemeden uygulanır.
+                  </p>
+                  <Input
+                    value={refineInstruction}
+                    onChange={(e) => setRefineInstruction(e.target.value)}
+                    maxLength={500}
+                    placeholder="örn. videoyu kısalt ve üst kısma odakla"
+                    disabled={refineProject.isPending}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleRefine();
+                    }}
+                  />
+                  {refineNote && (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      role="status"
+                    >
+                      ✨ {refineNote}
+                    </p>
+                  )}
+                  {refineError && (
+                    <p className="text-xs text-destructive" role="alert">
+                      {refineError}
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleRefine()}
+                      disabled={refineProject.isPending}
+                    >
+                      {refineProject.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      {refineProject.isPending ? "Düzeltiliyor…" : "Düzelt"}
+                    </Button>
+                    {Object.keys(refineVars).length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSaveRefine}
+                        disabled={updateProject.isPending}
+                      >
+                        {updateProject.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : null}
+                        Kaydet
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
