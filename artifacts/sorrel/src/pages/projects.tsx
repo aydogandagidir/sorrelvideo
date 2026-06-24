@@ -430,12 +430,12 @@ function ProjectDetail({
     hasCopy &&
     (project.status === "draft" || project.status === "failed");
 
-  // "Prompt ile düzelt" is website→video only and not for an AI-tour project
-  // (the backend 422s those — tour editing is a later slice), in the states that
-  // render the live preview so a refine is visible before a render is spent.
+  // "Prompt ile düzelt" is website→video only, in the states that render the live
+  // preview so a refine is visible before a render is spent. Both modes are
+  // supported: a single-crop showcase (length / featured region) AND an AI-tour
+  // project (re-pick / re-order the tour) — the backend routes by capture.tour.
   const canRefine =
     project.module === "website-showcase" &&
-    !v["capture.tour"] &&
     (project.status === "draft" || project.status === "failed");
 
   // The live composition preview rides unsaved edits as a ?vars= override so the
@@ -1045,14 +1045,15 @@ function ProjectDetail({
                 </div>
                 <div className="space-y-2 rounded-lg border bg-muted/30 p-2.5">
                   <p className="text-[11.5px] text-muted-foreground">
-                    Önizlemeyi değiştirmek için yaz — örn. “kısalt”, “hero’ya
-                    odakla”, “tüm sayfayı göster”. Render beklemeden uygulanır.
+                    Önizlemeyi değiştirmek için yaz — örn. “kısalt”,
+                    “fiyatlandırmayı öne çıkar”, “iletişim bölümünü çıkar”.
+                    Render beklemeden uygulanır.
                   </p>
                   <Input
                     value={refineInstruction}
                     onChange={(e) => setRefineInstruction(e.target.value)}
                     maxLength={500}
-                    placeholder="örn. videoyu kısalt ve üst kısma odakla"
+                    placeholder="örn. fiyatlandırmayı öne çıkar, sonra iletişim"
                     disabled={refineProject.isPending}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void handleRefine();

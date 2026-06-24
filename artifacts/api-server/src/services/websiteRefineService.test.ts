@@ -9,10 +9,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 
 const refineWebsiteVideo = vi.fn();
+const pickSections = vi.fn();
 const checkAndIncrementAiCount = vi.fn();
 
 vi.mock("@workspace/ai", () => ({
-  getProvider: () => ({ name: "anthropic" as const, refineWebsiteVideo }),
+  getProvider: () => ({
+    name: "anthropic" as const,
+    refineWebsiteVideo,
+    pickSections,
+  }),
 }));
 vi.mock("./billingService", () => ({ checkAndIncrementAiCount }));
 
@@ -25,6 +30,12 @@ const showcase = (vars: Record<string, string>) => ({
   module: "website-showcase",
   compositionVars: vars,
 });
+const b64 = (obj: unknown) =>
+  Buffer.from(JSON.stringify(obj), "utf-8").toString("base64");
+const SECTIONS = [
+  { label: "Hero", crop: { x: 0, y: 0, w: 1, h: 0.2 } },
+  { label: "Pricing", crop: { x: 0, y: 0.5, w: 1, h: 0.2 } },
+];
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -128,15 +139,56 @@ describe("refineWebsiteVideoVars", () => {
     expect(checkAndIncrementAiCount).not.toHaveBeenCalled();
   });
 
-  it("rejects an AI-tour project (tour editing comes later)", async () => {
+  it("422s a tour project missing its persisted sections (old project)", async () => {
     await expect(
       refineWebsiteVideoVars(
         "u1",
-        showcase({ "capture.tour": "eyJ4Ijoxf", "capture.height": "4000" }),
+        showcase({ "capture.tour": "abc", "capture.height": "4000" }),
         "kısalt",
       ),
     ).rejects.toBeInstanceOf(RefineNotApplicableError);
+    expect(pickSections).not.toHaveBeenCalled();
     expect(refineWebsiteVideo).not.toHaveBeenCalled();
+  });
+
+  it("re-picks the tour for a tour project from the instruction", async () => {
+    pickSections.mockResolvedValue({
+      picks: [{ index: 1, seconds: 3, caption: "Pricing" }],
+      usage,
+    });
+    checkAndIncrementAiCount.mockResolvedValue(undefined);
+
+    const res = await refineWebsiteVideoVars(
+      "u1",
+      showcase({
+        "capture.tour": "old",
+        "capture.sections": b64(SECTIONS),
+        "capture.title": "Acme",
+        "capture.image": "data:image/jpeg;base64,AAAA",
+      }),
+      "fiyatlandırmayı öne çıkar",
+    );
+
+    // The single-crop refine path was NOT used; pickSections drove a new tour.
+    expect(refineWebsiteVideo).not.toHaveBeenCalled();
+    expect(pickSections).toHaveBeenCalledTimes(1);
+    const input = pickSections.mock.calls[0][0] as {
+      prompt: string;
+      sections: { label: string }[];
+    };
+    expect(input.prompt).toBe("fiyatlandırmayı öne çıkar");
+    expect(input.sections.map((s) => s.label)).toEqual(["Hero", "Pricing"]);
+    // A new tour + duration came back; the big capture.image is NOT echoed.
+    expect(res.vars["capture.tour"]).toBeTruthy();
+    expect(res.vars["duration"]).toBeTruthy();
+    expect(res.vars["capture.image"]).toBeUndefined();
+    // The chosen beat (index 1) maps to the Pricing section's crop (y=0.5).
+    const beats = JSON.parse(
+      Buffer.from(res.vars["capture.tour"], "base64").toString("utf-8"),
+    );
+    expect(beats).toHaveLength(1);
+    expect(beats[0].cropY).toBe(0.5);
+    expect(checkAndIncrementAiCount).toHaveBeenCalledTimes(1);
   });
 
   it("propagates a quota upgrade_required error", async () => {

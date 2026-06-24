@@ -580,7 +580,7 @@ describe("Projects — refine (website→video, no regenerate)", () => {
     const dialog = await openDetail("Site Video");
 
     await user.type(
-      within(dialog).getByPlaceholderText(/videoyu kısalt/i),
+      within(dialog).getByPlaceholderText(/fiyatlandırmayı öne çıkar/i),
       "kısalt ve hero'ya odakla",
     );
     await user.click(within(dialog).getByRole("button", { name: /^düzelt$/i }));
