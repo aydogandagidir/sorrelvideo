@@ -459,6 +459,70 @@ export function injectFitScript(html: string): string {
   return injectBeforeBodyEnd(html, FIT_SCRIPT);
 }
 
+// A few hand-rolled copy compositions (studio-default / brand-promo /
+// product-launch / social-teaser) drive playback through a LEGACY
+// `window.__hf.seek(seconds)` host and never register `window.__timelines`. The
+// preview player (`<hyperframes-player>`) and the Studio transport poll for
+// `window.__timelines[<data-composition-id>]` and, not finding it, fail after 8s
+// with "Composition timeline not found" — a dead preview. This bridge adapts a
+// legacy `window.__hf` into the FULL TimelineLike contract the player needs
+// (play/pause/seek/time/duration/isActive, all in SECONDS). It is a NO-OP when
+// the composition already registered a real timeline (GSAP-based ones) or
+// exposes no `__hf`, so it's safe to inject into every composition. rAF advances
+// via the callback's own timestamp — no wall-clock (performance.now/Date.now),
+// which the engine's determinism lint forbids.
+const TIMELINE_BRIDGE = `<script data-sorrel-timeline-bridge>
+(function () {
+  var hf = window.__hf;
+  if (!hf || typeof hf.seek !== "function") return;
+  var root = document.querySelector("[data-composition-id]");
+  var id = (root && root.getAttribute("data-composition-id")) || "root";
+  window.__timelines = window.__timelines || {};
+  if (window.__timelines[id]) return;
+  var DUR = Number(hf.duration) > 0 ? Number(hf.duration) : 5;
+  var now = 0, playing = false, rafId = null, lastTick = null;
+  function tick(ts) {
+    if (!playing) return;
+    if (lastTick === null) lastTick = ts;
+    now += (ts - lastTick) / 1000;
+    lastTick = ts;
+    if (now >= DUR) { now = DUR; playing = false; hf.seek(now); return; }
+    hf.seek(now);
+    rafId = requestAnimationFrame(tick);
+  }
+  window.__timelines[id] = {
+    id: id,
+    play: function () {
+      if (playing) return;
+      if (now >= DUR) now = 0;
+      playing = true; lastTick = null;
+      rafId = requestAnimationFrame(tick);
+    },
+    pause: function () {
+      playing = false;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = null;
+    },
+    seek: function (s) {
+      now = Math.max(0, Math.min(DUR, Number(s) || 0));
+      hf.seek(now);
+    },
+    time: function () { return now; },
+    duration: function () { return DUR; },
+    isActive: function () { return playing; }
+  };
+})();
+</script>`;
+
+/**
+ * Inject the legacy-`__hf` → `__timelines` bridge before the last `</body>` (so
+ * it runs AFTER the composition's own script has set `window.__hf`). Pure +
+ * idempotent at runtime (no-op when a real timeline is already registered).
+ */
+export function injectTimelineBridge(html: string): string {
+  return injectBeforeBodyEnd(html, TIMELINE_BRIDGE);
+}
+
 /** Map an uploaded audio object's content-type to a file extension. */
 function audioExtForContentType(contentType: string | undefined): string {
   switch ((contentType ?? "").toLowerCase()) {
@@ -838,7 +902,9 @@ export async function buildCompositionHtml(project: {
     typeof project.compositionHtml === "string" &&
     project.compositionHtml.length > 0
   ) {
-    return injectFitScript(inlineVendorScripts(project.compositionHtml));
+    return injectFitScript(
+      injectTimelineBridge(inlineVendorScripts(project.compositionHtml)),
+    );
   }
 
   const baseEntryFile = resolveEntryFile(project.module);
@@ -867,7 +933,11 @@ export async function buildCompositionHtml(project: {
   vars["layout.aspect"] =
     width > height ? "landscape" : width < height ? "portrait" : "square";
 
-  return injectFitScript(inlineVendorScripts(renderCompositionTemplate(source, vars)));
+  return injectFitScript(
+    injectTimelineBridge(
+      inlineVendorScripts(renderCompositionTemplate(source, vars)),
+    ),
+  );
 }
 
 /**

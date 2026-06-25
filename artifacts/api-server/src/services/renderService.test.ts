@@ -1,11 +1,12 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildTransitionsInjection,
   copyTemplateAssets,
   injectFitScript,
+  injectTimelineBridge,
   injectWatermark,
   inlineVendorScripts,
   isContentCustomizable,
@@ -92,6 +93,89 @@ describe("injectFitScript", () => {
 
   it("still injects when there is no closing body tag (never silently dropped)", () => {
     expect(injectFitScript("<div>no body</div>")).toContain("data-sorrel-fit");
+  });
+});
+
+describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
+  it("injects the bridge just before </body>, content untouched", () => {
+    const out = injectTimelineBridge("<html><body><div>x</div></body></html>");
+    expect(out).toContain("data-sorrel-timeline-bridge");
+    expect(out.indexOf("data-sorrel-timeline-bridge")).toBeLessThan(
+      out.indexOf("</body>"),
+    );
+    expect(out).toContain("<div>x</div>");
+  });
+
+  // Extract + run the bridge IIFE against mocked browser globals.
+  function runBridge(
+    win: Record<string, unknown>,
+    compositionId: string | null,
+  ): void {
+    const js = injectTimelineBridge("<body></body>")
+      .replace(/^[\s\S]*?<script data-sorrel-timeline-bridge>/, "")
+      .replace(/<\/script>[\s\S]*$/, "");
+    const doc = {
+      querySelector: () =>
+        compositionId === null ? null : { getAttribute: () => compositionId },
+    };
+    const raf = (): number => 1;
+    const caf = (): void => undefined;
+    new Function(
+      "window",
+      "document",
+      "requestAnimationFrame",
+      "cancelAnimationFrame",
+      js,
+    )(win, doc, raf, caf);
+  }
+
+  it("adapts window.__hf into a full TimelineLike on window.__timelines[id]", () => {
+    const seek = vi.fn();
+    const win: Record<string, unknown> = { __hf: { duration: 5, seek } };
+    runBridge(win, "studio");
+    const tl = (win.__timelines as Record<string, any>).studio;
+    expect(tl).toBeTruthy();
+    expect(tl.duration()).toBe(5);
+    expect(tl.isActive()).toBe(false);
+    tl.seek(2);
+    expect(seek).toHaveBeenCalledWith(2);
+    expect(tl.time()).toBe(2);
+  });
+
+  it("is a no-op when the composition exposes no __hf (a GSAP composition)", () => {
+    const win: Record<string, unknown> = {};
+    runBridge(win, "brand-story");
+    expect(win.__timelines).toBeUndefined();
+  });
+
+  it("never overwrites a timeline the composition already registered", () => {
+    const existing = { id: "studio", real: true };
+    const win: Record<string, unknown> = {
+      __hf: { duration: 5, seek: () => undefined },
+      __timelines: { studio: existing },
+    };
+    runBridge(win, "studio");
+    expect((win.__timelines as Record<string, unknown>).studio).toBe(existing);
+  });
+
+  // Real-file quality gate: the legacy copy compositions must satisfy the bridge's
+  // precondition (a window.__hf + a data-composition-id) and must NOT self-register
+  // __timelines — otherwise the preview would dead-end on "timeline not found".
+  describe.each([
+    "studio-default.html",
+    "brand-promo.html",
+    "product-launch.html",
+    "social-teaser.html",
+  ])("legacy composition %s is bridge-compatible", (file) => {
+    const html = fs.readFileSync(
+      path.join(__dirname, "..", "compositions", file),
+      "utf-8",
+    );
+    it("exposes window.__hf + a data-composition-id, and self-registers no timeline", () => {
+      expect(html).toMatch(/window\.__hf\s*=/);
+      expect(html).toMatch(/data-composition-id\s*=/);
+      expect(html).not.toContain("window.__timelines");
+    });
   });
 });
 
