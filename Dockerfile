@@ -87,27 +87,36 @@ RUN mkdir -p core \
 # headless build that still implements beginFrame; puppeteer@24.43.1 pins its
 # revision (148.x — no drift).
 #
-# Why we unzip by hand instead of `puppeteer browsers install`: puppeteer's
-# npm-postinstall (deps stage) DOWNLOADS the chrome-headless-shell zip into
-# /root/.cache/puppeteer but FAILS to extract the executable here (Debian slim —
-# only ABOUT + LICENSE land, the ~188 MB binary never extracts). The wrapper
-# `install` then sees that stub folder, declares "already installed" and no-ops;
-# `--path` isn't exposed by the wrapper and the low-level `@puppeteer/browsers`
-# bin isn't on PATH. The downloaded .zip itself is intact (118 MB, verified), so
-# we extract it ourselves into /opt/hf-cache — version-agnostic (glob), no
-# network, none of puppeteer's cache-resolution guesswork. find+test fails the
-# build LOUD here if the zip is ever absent (e.g. an upstream PUPPETEER_SKIP_-
-# DOWNLOAD) instead of silently degrading to screenshot mode at runtime.
+# puppeteer's npm-postinstall (deps stage) materializes chrome-headless-shell into
+# /root/.cache/puppeteer. Its SHAPE varies by @puppeteer/browsers version, and we
+# must handle both — CI never builds this Dockerfile, so a mismatch only surfaces
+# at deploy:
+#   • CURRENT (@puppeteer/browsers 2.13.x): the binary is extracted straight into
+#     `chrome-headless-shell/<rev>/chrome-headless-shell-linux64/chrome-headless-shell`
+#     and the .zip is DELETED. (The older "Debian slim only extracts ABOUT+LICENSE,
+#     keep the .zip" behavior is gone — assuming a .zip here made the build fail
+#     with an empty `find`.)
+#   • LEGACY: only the intact `…-linux64.zip` was left, to be unzipped by hand.
+# Prefer the already-extracted binary; fall back to unzipping a cached archive.
+# Copy the WHOLE platform dir so the binary keeps its sibling resources. Pin it
+# into /opt/hf-cache and fail LOUD if neither shape yields a binary (better than
+# silently degrading to slow screenshot mode at runtime).
 RUN set -eux; \
     apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*; \
-    ZIP="$(find /root/.cache/puppeteer/chrome-headless-shell -name '*chrome-headless-shell-linux64.zip' | head -n1)"; \
-    test -n "$ZIP"; \
     mkdir -p /opt/hf-cache; \
-    unzip -q -o "$ZIP" -d /opt/hf-cache; \
+    CACHE=/root/.cache/puppeteer/chrome-headless-shell; \
+    PRE_BIN="$(find "$CACHE" -type f -name chrome-headless-shell 2>/dev/null | head -n1)"; \
+    if [ -n "$PRE_BIN" ]; then \
+      cp -a "$(dirname "$PRE_BIN")" /opt/hf-cache/; \
+    else \
+      ZIP="$(find "$CACHE" -name '*chrome-headless-shell-linux64.zip' 2>/dev/null | head -n1)"; \
+      test -n "$ZIP"; \
+      unzip -q -o "$ZIP" -d /opt/hf-cache; \
+    fi; \
     SHELL_BIN="$(find /opt/hf-cache -type f -name chrome-headless-shell | head -n1)"; \
     test -n "$SHELL_BIN"; \
     chmod +x "$SHELL_BIN"; \
-    echo "chrome-headless-shell extracted to: $SHELL_BIN"
+    echo "chrome-headless-shell ready at: $SHELL_BIN"
 
 # ---------- Stage 4: runtime ----------
 # Slim image with Chromium system deps + production node_modules. Puppeteer's
