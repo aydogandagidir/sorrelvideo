@@ -75,8 +75,8 @@ importers:
   .:
     dependencies:
       stripe:
-        specifier: ^22.2.2
-        version: 22.2.2(@types/node@26.0.0)
+        specifier: ^22.3.0
+        version: 22.3.0(@types/node@26.0.0)
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.4
@@ -121,8 +121,8 @@ importers:
         specifier: ^4.4.1
         version: 4.4.1(@typescript-eslint/eslint-plugin@8.61.1(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))
       globals:
-        specifier: ^17.6.0
-        version: 17.6.0
+        specifier: ^17.7.0
+        version: 17.7.0
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -133,8 +133,8 @@ importers:
         specifier: ^17.0.8
         version: 17.0.8
       prettier:
-        specifier: ^3.8.4
-        version: 3.8.4
+        specifier: ^3.9.1
+        version: 3.9.1
       supertest:
         specifier: ^7.1.4
         version: 7.2.2
@@ -232,8 +232,8 @@ importers:
         specifier: ^0.35.2
         version: 0.35.2
       stripe:
-        specifier: ^22.2.2
-        version: 22.2.2(@types/node@25.9.1)
+        specifier: ^22.3.0
+        version: 22.3.0(@types/node@25.9.1)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -735,7 +735,7 @@ importers:
     devDependencies:
       orval:
         specifier: ^8.9.1
-        version: 8.9.1(prettier@3.8.4)(typescript@5.9.3)
+        version: 8.9.1(prettier@3.9.1)(typescript@5.9.3)
 
   lib/api-zod:
     dependencies:
@@ -809,8 +809,8 @@ importers:
   scripts:
     dependencies:
       stripe:
-        specifier: ^22.2.2
-        version: 22.2.2(@types/node@25.9.1)
+        specifier: ^22.3.0
+        version: 22.3.0(@types/node@25.9.1)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -5630,8 +5630,8 @@ packages:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
     engines: {node: '>=18'}
 
-  globals@17.6.0:
-    resolution: {integrity: sha512-sepffkT8stwnIYbsMBpoCHJuJM5l98FUF2AnE07hfvE0m/qp3R586hw4jF4uadbhvg1ooIdzuu7CsfD2jzCaNA==}
+  globals@17.7.0:
+    resolution: {integrity: sha512-Czmyns5dUsq4seFBR/Kdydhmo8y9kC79hiSkPn0YcGtNnYWnrgt0vjrSjx9tspoDGWm2CMarffRuLjM4xUz8xg==}
     engines: {node: '>=18'}
 
   globalthis@1.0.4:
@@ -6876,8 +6876,8 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
-  prettier@3.8.4:
-    resolution: {integrity: sha512-N2MylSdi48+5N/6S5j+maeHbUSIzzZ5uOcX5Hm4QpV8Dkb1HFjfAKTKX6yNPJQD9AhcT3ifHNB66tWTTJDi11Q==}
+  prettier@3.9.1:
+    resolution: {integrity: sha512-ppiDo2CSwexck1eyZUwJHg/N3nf1+6IRCv7W/VJ5vaLnVCmB7+3CdRfMwoCHBBX6xTrREDTksZ4OZl5SSf4zXA==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -7514,8 +7514,8 @@ packages:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
 
-  stripe@22.2.2:
-    resolution: {integrity: sha512-lRXLiarjW/I2QVa6QuFfz1Ma7Dc2yBQ7vlYH6NEmp5htMJNQGfiWExmOv0McfqY5wMCGV8DLuCvsyVRIPJlUUQ==}
+  stripe@22.3.0:
+    resolution: {integrity: sha512-ypO6xjVrMWs9SmIMeHr8naCx3dAQ0clxMdUTxn7Ejd7hmY9meBGfE+N4pVHkf9sUNebAHp6uJo6mV3GxDIc2cA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@types/node': '>=18'
@@ -13222,7 +13222,7 @@ snapshots:
 
   globals@14.0.0: {}
 
-  globals@17.6.0: {}
+  globals@17.7.0: {}
 
   globalthis@1.0.4:
     dependencies:
@@ -14164,7 +14164,7 @@ snapshots:
       type-check: 0.4.0
       word-wrap: 1.2.5
 
-  orval@8.9.1(prettier@3.8.4)(typescript@5.9.3):
+  orval@8.9.1(prettier@3.9.1)(typescript@5.9.3):
     dependencies:
       '@commander-js/extra-typings': 14.0.0(commander@14.0.3)
       '@orval/angular': 8.9.1(typescript@5.9.3)
@@ -14196,7 +14196,7 @@ snapshots:
       typedoc-plugin-coverage: 4.0.3(typedoc@0.28.19(typescript@5.9.3))
       typedoc-plugin-markdown: 4.11.0(typedoc@0.28.19(typescript@5.9.3))
     optionalDependencies:
-      prettier: 3.8.4
+      prettier: 3.9.1
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
@@ -14476,7 +14476,7 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier@3.8.4: {}
+  prettier@3.9.1: {}
 
   pretty-bytes@6.1.1: {}
 
@@ -15342,11 +15342,11 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
-  stripe@22.2.2(@types/node@25.9.1):
+  stripe@22.3.0(@types/node@25.9.1):
     optionalDependencies:
       '@types/node': 25.9.1
 
-  stripe@22.2.2(@types/node@26.0.0):
+  stripe@22.3.0(@types/node@26.0.0):
     optionalDependencies:
       '@types/node': 26.0.0
 
