@@ -8,7 +8,7 @@ FROM node:24-slim AS base
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
     CI=true
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.4 --activate
 WORKDIR /repo
 
 # ---------- Stage 2: deps ----------
@@ -175,7 +175,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.4 --activate
 WORKDIR /app
 
 # chrome-headless-shell (beginFrame-capable) extracted in the build stage into

@@ -41,6 +41,14 @@ onlyBuiltDependencies:
   - esbuild
   - msw
   - puppeteer
+  # sharp: runtime-required (lib/visionImage AI-tour vision downscale). Its
+  # postinstall links the prebuilt @img/sharp-linux-x64 libvips binary (no
+  # compile); pnpm 10.34.4 logs it "Ignored" when absent here, risking a
+  # cold-cache runtime failure of the vision judge. (ssh2 is also logged
+  # "Ignored" but is a dev-graph transitive that works via its JS fallback and
+  # whose optional cpu-features binding would need a C toolchain the slim deps
+  # stage deliberately lacks — left ignored on purpose.)
+  - sharp
   - unrs-resolver
 
 overrides:

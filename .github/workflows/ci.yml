@@ -44,7 +44,11 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10
+          # Pin EXACT (matches package.json packageManager + the Dockerfile's
+          # corepack) so local / CI / Docker all run the same pnpm. A floating
+          # `10` silently drifted to 10.34.4 and changed @puppeteer/browsers'
+          # behavior, breaking the Railway Docker build — see #153.
+          version: 10.34.4
           run_install: false
 
       - name: Setup Node.js
@@ -77,6 +81,41 @@ jobs:
         run: pnpm test
 
       - name: Build
-        # mockup-sandbox is a dev-only playground; only the shipping packages
-        # need a production build. Typecheck above still covers everything.
-        run: pnpm --filter @workspace/api-server --filter @workspace/sorrel run build
+        # Build every package the Docker image SHIPS: api-server, the sorrel SPA,
+        # AND the embedded studio-editor (Dockerfile builds it too). studio-editor
+        # runs its OWN vite/tailwind majors (different from sorrel's catalog), so
+        # without it here a breaking bump passed CI green and only failed at the
+        # Railway deploy. mockup-sandbox stays excluded (dev-only, never shipped).
+        run: pnpm --filter @workspace/api-server --filter @workspace/sorrel --filter @workspace/studio-editor run build
+
+  docker-build:
+    name: Docker build (deploy parity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build through the `build` stage of the SAME Dockerfile Railway deploys.
+      # The `validate` job never builds the Dockerfile, so a whole class of
+      # failures only surfaced at deploy: the chrome-headless-shell extraction
+      # (a @puppeteer/browsers shape change broke it — #153), native postinstall
+      # shape changes (sharp/puppeteer under a drifted pnpm), and the
+      # studio-editor build. `--target build` runs deps (the REAL `pnpm install`
+      # + postinstalls), typecheck, every shipped build, AND the chrome-headless-
+      # shell step — every step that has bitten us — while skipping the slow
+      # runtime apt layer. GHA cache keeps warm runs to a few minutes.
+      - name: Build the Docker `build` stage (deploy parity)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: build
+          push: false
+          load: false
+          build-args: |
+            VITE_GIT_SHA=ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
