@@ -15,6 +15,17 @@
         display: flex; flex-direction: column; justify-content: center;
         background: linear-gradient(155deg, {{brand.secondaryColor}} 0%, #08080d 75%);
       }
+      /* AI background image (generative media) — z-index:-1 paints above the
+         .scene gradient but below the in-flow content; a scrim keeps overlay
+         text readable. ai.backgroundImage unset → src="" collapses the layer, so
+         a no-AI render is byte-identical to the authored gradient. */
+      .ai-bg-layer { position: absolute; inset: 0; z-index: -1; }
+      .ai-bg-layer img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .ai-bg-layer::after {
+        content: ""; position: absolute; inset: 0;
+        background: linear-gradient(180deg, rgba(8, 8, 13, 0.5), rgba(8, 8, 13, 0.72));
+      }
+      .ai-bg-layer:has(img[src=""]) { display: none; }
       .bar { position: absolute; top: 0; left: 0; right: 0; height: 20px; background: linear-gradient(90deg, {{brand.primaryColor}}, {{brand.accentColor}}); }
       .brand { display: flex; align-items: center; gap: 28px; margin-bottom: 90px; }
       .brand-logo {
@@ -35,6 +46,14 @@
   </head>
   <body>
     <div class="scene" data-composition-id="brand-promo" data-duration="5">
+      <div class="ai-bg-layer">
+        <img
+          class="ai-bg"
+          src="{{ai.backgroundImage}}"
+          alt=""
+          onerror="this.parentElement.style.display='none'"
+        />
+      </div>
       <div class="bar"></div>
       <div class="brand anim" data-from="0.15" data-to="0.9" data-slide="-34">
         <div class="brand-logo">{{brand.initial}}</div>

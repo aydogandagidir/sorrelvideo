@@ -194,6 +194,7 @@ export const ListTemplatesResponseItem = zod.object({
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
   "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
+  "supportsAiBackground": zod.boolean().optional().describe('True when the template\'s composition declares a full-bleed ai.backgroundImage layer, so POST \/projects\/{id}\/ai-image can stamp an AI-generated background into it. Derived server-side from the shipped composition (services\/aiBackgroundTemplates.ts) — the UI shows the \"AI background\" control only when true.'),
   "customizable": zod.boolean().optional().describe('True when the template can be tailored to the user IN-APP — it declares typed `variables`, or its composition substitutes the user\'s brand\/copy\/website-capture\/talking-host content via `{{brand.|user.|capture.|host.}}` placeholders. False for pure-demo registry compositions that render a fixed sample regardless of brand\/content. Derived server-side at read time (not persisted); the gallery foregrounds customizable templates and labels the demos.'),
   "variables": zod.array(zod.object({
   "id": zod.string(),
@@ -250,6 +251,7 @@ export const GetTemplateResponse = zod.object({
   "isPremium": zod.boolean(),
   "tags": zod.array(zod.string()).optional(),
   "supportsTransitions": zod.boolean().optional().describe('True when the template\'s composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services\/transitionCapableTemplates.ts) — the editor disables the transitions picker when false.'),
+  "supportsAiBackground": zod.boolean().optional().describe('True when the template\'s composition declares a full-bleed ai.backgroundImage layer, so POST \/projects\/{id}\/ai-image can stamp an AI-generated background into it. Derived server-side from the shipped composition (services\/aiBackgroundTemplates.ts) — the UI shows the \"AI background\" control only when true.'),
   "customizable": zod.boolean().optional().describe('True when the template can be tailored to the user IN-APP — it declares typed `variables`, or its composition substitutes the user\'s brand\/copy\/website-capture\/talking-host content via `{{brand.|user.|capture.|host.}}` placeholders. False for pure-demo registry compositions that render a fixed sample regardless of brand\/content. Derived server-side at read time (not persisted); the gallery foregrounds customizable templates and labels the demos.'),
   "variables": zod.array(zod.object({
   "id": zod.string(),
@@ -742,6 +744,85 @@ export const RefineProjectBody = zod.object({
 export const RefineProjectResponse = zod.object({
   "vars": zod.record(zod.string(), zod.string()).describe('The CHANGED compositionVars only, for the live-preview ?vars= override.'),
   "note": zod.string().describe('One short sentence describing the change, in the instruction\'s language.')
+})
+
+
+/**
+ * Generate an on-brand AI background image (OpenAI gpt-image-1) and stamp it into the project's compositionVars (ai.backgroundImage). Only templates whose composition supports it (Template.supportsAiBackground) accept this. Free spends one AI unit (charged after success); Pro is unlimited.
+ * @summary Generate an AI background image for a project
+ */
+export const GenerateProjectAiImageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const generateProjectAiImageBodyPromptMin = 3;
+export const generateProjectAiImageBodyPromptMax = 500;
+
+
+
+export const GenerateProjectAiImageBody = zod.object({
+  "prompt": zod.string().min(generateProjectAiImageBodyPromptMin).max(generateProjectAiImageBodyPromptMax).describe('What the AI background should depict (grounded in the brand DNA server-side).')
+})
+
+export const generateProjectAiImageResponseRenderSettingsOneBackgroundAudioVolumeMin = 0;
+export const generateProjectAiImageResponseRenderSettingsOneBackgroundAudioVolumeMax = 100;
+
+export const generateProjectAiImageResponseRenderSettingsOneVoiceoverVolumeMin = 0;
+export const generateProjectAiImageResponseRenderSettingsOneVoiceoverVolumeMax = 100;
+
+export const generateProjectAiImageResponseRenderProgressMin = 0;
+export const generateProjectAiImageResponseRenderProgressMax = 100;
+
+
+
+export const GenerateProjectAiImageResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['draft', 'rendering', 'ready', 'failed']),
+  "module": zod.string(),
+  "templateId": zod.number().nullish(),
+  "brandKitId": zod.number().nullish().describe('The brand kit this project renders with. Null → the user\'s default.'),
+  "thumbnailUrl": zod.string().nullish(),
+  "videoUrl": zod.string().nullish(),
+  "duration": zod.number().nullish(),
+  "renderError": zod.string().nullish(),
+  "compositionVars": zod.union([zod.record(zod.string(), zod.string()),zod.null()]).optional().describe('Studio placeholder values keyed by `user.\*` \/ `brand.\*`. Optional.'),
+  "renderSettings": zod.union([zod.object({
+  "fps": zod.union([zod.literal(24),zod.literal(30),zod.literal(60)]),
+  "quality": zod.enum(['draft', 'standard', 'high']),
+  "format": zod.enum(['mp4', 'webm', 'mov', 'png-sequence', 'gif']),
+  "resolution": zod.enum(['landscape', 'portrait', 'square', 'landscape-4k', 'portrait-4k', 'square-4k']),
+  "transparent": zod.boolean(),
+  "watermark": zod.boolean(),
+  "transitions": zod.array(zod.object({
+  "time": zod.number(),
+  "shader": zod.string(),
+  "duration": zod.number(),
+  "ease": zod.string()
+})).optional(),
+  "backgroundAudio": zod.object({
+  "objectPath": zod.string().describe('\/objects\/... path of the user\'s uploaded audio object.'),
+  "volume": zod.number().min(generateProjectAiImageResponseRenderSettingsOneBackgroundAudioVolumeMin).max(generateProjectAiImageResponseRenderSettingsOneBackgroundAudioVolumeMax)
+}).nullish().describe('Optional background audio track (Pro). null → silent output.'),
+  "captions": zod.object({
+  "words": zod.array(zod.object({
+  "text": zod.string(),
+  "start": zod.number(),
+  "end": zod.number()
+})),
+  "style": zod.enum(['classic', 'pill-karaoke', 'neon-accent', 'kinetic-slam']).optional().describe('Caption visual preset. Absent === classic.')
+}).nullish().describe('Optional word-timed captions (Pro). null → none.'),
+  "voiceover": zod.object({
+  "objectPath": zod.string().nullable().describe('\/objects\/... path of the persisted TTS audio, or null when only the local render-dir copy exists.\n'),
+  "startAt": zod.number().describe('Seconds into the composition where speech starts.'),
+  "volume": zod.number().min(generateProjectAiImageResponseRenderSettingsOneVoiceoverVolumeMin).max(generateProjectAiImageResponseRenderSettingsOneVoiceoverVolumeMax).optional()
+}).nullish().describe('Talking-host narration (server-managed — set by POST \/avatar\/video, not client-writable; deliberately absent from RenderSettingsInput).\n')
+}),zod.null()]).optional().describe('Per-project render configuration. Null → server defaults.'),
+  "renderProgress": zod.number().min(generateProjectAiImageResponseRenderProgressMin).max(generateProjectAiImageResponseRenderProgressMax).nullish().describe('Live render progress (0–100) of the latest render job. Populated only while `status` is `rendering`; null otherwise. Additive\/optional.'),
+  "renderCost": zod.number().nullish().describe('Estimated render cost in cents from the latest render job. Populated only while `status` is `rendering` (when a metered backend reports it); null otherwise. Additive\/optional.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 })
 
 

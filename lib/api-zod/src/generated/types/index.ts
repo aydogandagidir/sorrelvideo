@@ -50,6 +50,7 @@ export * from './extractedBrand';
 export * from './finalizeUploadRequest';
 export * from './finalizeUploadResult';
 export * from './forgotPasswordRequest';
+export * from './generateAiImageRequest';
 export * from './generateCaptionsRequest';
 export * from './generateCaptionsResult';
 export * from './generateCaptionsResultWordsItem';

@@ -169,6 +169,8 @@ export interface Template {
   tags?: string[];
   /** True when the template's composition declares the scene structure required by shader transitions (>=2 .scene elements + a data-scene-boundary). Derived server-side from the shipped composition (services/transitionCapableTemplates.ts) — the editor disables the transitions picker when false. */
   supportsTransitions?: boolean;
+  /** True when the template's composition declares a full-bleed ai.backgroundImage layer, so POST /projects/{id}/ai-image can stamp an AI-generated background into it. Derived server-side from the shipped composition (services/aiBackgroundTemplates.ts) — the UI shows the "AI background" control only when true. */
+  supportsAiBackground?: boolean;
   /** True when the template can be tailored to the user IN-APP — it declares typed `variables`, or its composition substitutes the user's brand/copy/website-capture/talking-host content via `{{brand.|user.|capture.|host.}}` placeholders. False for pure-demo registry compositions that render a fixed sample regardless of brand/content. Derived server-side at read time (not persisted); the gallery foregrounds customizable templates and labels the demos. */
   customizable?: boolean;
   /** Typed editable parameters the composition declares via the engine's native data-composition-variables. Present only for parametric templates (e.g. data-chart); the Studio form renders one control per entry's type. Derived from the manifest at read time (not persisted). */
@@ -949,6 +951,15 @@ export interface RefineProjectResult {
   vars: RefineProjectResultVars;
   /** One short sentence describing the change, in the instruction's language. */
   note: string;
+}
+
+export interface GenerateAiImageRequest {
+  /**
+     * What the AI background should depict (grounded in the brand DNA server-side).
+     * @minLength 3
+     * @maxLength 500
+     */
+  prompt: string;
 }
 
 export interface CheckoutRequest {

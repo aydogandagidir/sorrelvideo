@@ -20,6 +20,7 @@ import {
 } from "@workspace/api-zod";
 import { getUserPlan } from "../services/billingService";
 import { supportsTransitions } from "../services/transitionCapableTemplates";
+import { supportsAiBackground } from "../services/aiBackgroundTemplates";
 import {
   resolveEntryFile,
   renderCompositionTemplate,
@@ -106,6 +107,9 @@ const PREVIEW_FALLBACKS: Record<string, string> = {
   "user.bodyText":
     "Sorrel turns a template, your brand kit, and a few sentences into branded video — ready to ship.",
   "user.ctaText": "Try it free",
+  // AI background: empty in the brand-neutral gallery preview (the composition's
+  // img.ai-bg[src=""] collapses it) — kept in sync with renderService's STUDIO_FALLBACKS.
+  "ai.backgroundImage": "",
   // Canvas dims for the brand-neutral gallery preview (portrait default, matching
   // studio-default's authored aspect) so {{layout.*}} placeholders resolve to a
   // valid canvas instead of leaking into the CSS.
@@ -140,6 +144,7 @@ function withTransitionCapability<T extends { module: string }>(row: T): T {
   return {
     ...row,
     supportsTransitions: supportsTransitions(row.module),
+    supportsAiBackground: supportsAiBackground(row.module),
     customizable: isContentCustomizable(row.module),
     ...(variables ? { variables } : {}),
   };

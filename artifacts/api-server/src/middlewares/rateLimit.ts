@@ -149,3 +149,13 @@ export const brandExtractLimiter = createLimiter({
   max: 10,
   name: "brand-extract",
 });
+
+// Authenticated AI background-image generation. Each call hits an image model
+// (gpt-image-1) which is materially pricier + slower than the text endpoints, so
+// cap a single client tighter than aiSuggest (matches brandExtract: 10 / window).
+// Monthly AI quota is still enforced separately in billingService.
+export const aiImageLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  name: "ai-image",
+});

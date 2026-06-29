@@ -54,6 +54,7 @@ Copy `.env.example` to `.env` and fill in values before booting the API server.
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`                         | api-server (when AI_PROVIDER=anthropic) | API key + optional model override (defaults to `claude-haiku-4-5`).                              |
 | `OPENAI_API_KEY` / `OPENAI_MODEL`                               | api-server (when AI_PROVIDER=openai)    | API key + optional model override (defaults to `gpt-4o-mini`). Also powers Whisper auto-captions (`POST /captions/generate`; set `WHISPER_API_KEY` to override). |
 | `TTS_API_KEY` / `OPENAI_TTS_MODEL`                              | api-server (talking-host, optional)     | Script→video narration via OpenAI TTS. Falls back to `OPENAI_API_KEY`; model defaults to `gpt-4o-mini-tts` (brand-tone `instructions` only sent on that family). Unset (and no OpenAI key) → `POST /avatar/video` 503s. |
+| `IMAGE_API_KEY` / `OPENAI_IMAGE_MODEL` / `OPENAI_IMAGE_QUALITY` / `OPENAI_IMAGE_FORMAT` | api-server (AI background, optional) | AI background-image generation (`POST /projects/:id/ai-image`). **OpenAI-only** (independent of `AI_PROVIDER` — Anthropic has no image API). Key falls back to `OPENAI_API_KEY`; model defaults to `gpt-image-1`, quality `medium` (low/medium/high/auto), format `jpeg` (png/jpeg/webp — bounds the persisted data URI). Unset (and no OpenAI key) → the endpoint 503s. |
 | `LOCAL_MEDIA_MODELS`                                            | api-server (**dev only**, optional)     | `=true` + no OpenAI/TTS/Whisper key → TTS (Kokoro-82M) + caption transcription (Whisper base.en) run on LOCAL ONNX models (`kokoro-js` + `@huggingface/transformers`, devDeps). First use downloads ~250MB to the HF cache. An OpenAI key always wins; **ignored when `NODE_ENV=production`** (the fallback never ships). |
 | `SENTRY_DSN`                                                    | api-server (optional)                   | Backend Sentry error tracking (runtime). Init is a no-op when unset, app still runs.             |
 | `VITE_SENTRY_DSN` / `VITE_SENTRY_TRACES_SAMPLE_RATE`           | sorrel (optional, **build-time**)       | Frontend Sentry. Vite inlines `import.meta.env.VITE_*` at build → must be a Docker build ARG (Railway injects matching service vars). Unset → browser SDK no-ops. |
@@ -605,6 +606,50 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
   `scripts/generate-thumbnails.mjs` and the slug is allow-listed in
   `THUMBNAIL_SLUGS`. A template-gallery project without a payload renders the
   DEMO silently (no voiceover in settings → no injection → no strict failure).
+
+## AI background image (generative media)
+
+`POST /api/projects/:id/ai-image { prompt }` generates an on-brand BACKGROUND
+image and stamps it into the project's `compositionVars["ai.backgroundImage"]`
+(a data URI, the SAME channel website→video uses for `capture.image`), so the
+live preview + render pipeline need no new asset plumbing. The route lives in
+`routes/projects.ts`; the live preview reflects it immediately and `POST /render`
+bakes it in. This is Sorrel's first GENERATIVE-media feature (everything else is
+deterministic template rendering).
+
+- **OpenAI-only, off the AiProvider interface**: image generation is OpenAI's
+  `gpt-image-1` (Anthropic has no image API), so it is a standalone
+  `generateBrandImage()` in `lib/ai/src/imageGen.ts` — NOT a method on
+  `AiProvider` — and runs regardless of `AI_PROVIDER` (which only picks the TEXT
+  provider). Key: `IMAGE_API_KEY ?? OPENAI_API_KEY` (talking-host's
+  `TTS_API_KEY ?? OPENAI_API_KEY` precedent). No key → the route 503s.
+- **On-brand prompt**: `buildImagePrompt` (`lib/ai/src/prompt.ts`) grounds the
+  user's brief in the DEFAULT Brand DNA (palette hex hints + `imageStyle` +
+  industry/keywords/personality) and leads with hard guardrails — no text/logos,
+  atmospheric, darker/low-contrast so light overlay copy stays readable. Aspect
+  is derived from the project's render resolution → the closest gpt-image-1 size.
+- **Gating**: NOT Pro-only — Free spends **1 AI unit** (`checkAndIncrementAiCount`
+  AFTER a successful generation, the `/ai/suggest` precedent: a provider error
+  never burns a unit), Pro unlimited. A separate `aiImageLimiter` (10/15min, the
+  brandExtract tier — image gen is pricier/slower than text) bounds abuse.
+- **Capability set**: only compositions that host the layer consume the var —
+  `services/aiBackgroundTemplates.ts` (`AI_BACKGROUND_MODULES = {studio,
+  brand-promo}`, the `transitionCapableTemplates.ts` pattern), surfaced as
+  `Template.supportsAiBackground` (read-time enrichment in `routes/templates.ts`,
+  never persisted) so the project dialog shows the "AI arka plan" control only
+  where it works. Add a module + wire its composition to grow the set.
+- **Composition wiring**: a capable composition declares a full-bleed
+  `<img class="ai-bg" src="{{ai.backgroundImage}}">` inside a `.ai-bg-layer` at
+  `z-index:-1` (paints above the authored gradient, below content — no content
+  z-index edits) + a readability scrim. `STUDIO_FALLBACKS["ai.backgroundImage"]`
+  (and the templates route's `PREVIEW_FALLBACKS`) default it to `""`, and
+  `.ai-bg-layer:has(img[src=""]){display:none}` collapses the layer when unset —
+  so a no-AI render is **byte-identical** to the authored gradient.
+- **Security**: the new `ai.backgroundImage` key is added to
+  `lib/compositionVars.ts` `URL_ATTRIBUTE_KEYS` as kind `"image"` (same
+  `isSafeImageSrc` gate as `capture.image`: http(s) URL or a raster
+  `data:image/*;base64,…`, no attribute-breakout chars) — server-produced today
+  but user-overridable via the `?vars=` preview path, so it must be gated.
 
 ## Billing
 

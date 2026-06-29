@@ -179,6 +179,41 @@ describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
   });
 });
 
+// AI background wiring (generative media): the capable compositions host a
+// full-bleed ai.backgroundImage layer that collapses when the var is unset, so a
+// no-AI render stays byte-identical. Real-file gate so a composition edit can't
+// silently break the contract.
+describe.each(["studio-default.html", "brand-promo.html"])(
+  "AI-background composition %s",
+  (file) => {
+    const html = fs.readFileSync(
+      path.join(__dirname, "..", "compositions", file),
+      "utf-8",
+    );
+
+    it("declares the ai.backgroundImage layer + the empty-src collapse rule", () => {
+      expect(html).toContain('src="{{ai.backgroundImage}}"');
+      // The collapse rule is what guarantees a no-image render is unchanged.
+      expect(html).toMatch(/\.ai-bg-layer:has\(img\[src=""\]\)\s*\{\s*display:\s*none/);
+    });
+
+    it("substitutes an unset var to src=\"\" (collapsed) and a data URI through", () => {
+      const empty = renderCompositionTemplate(html, {
+        "ai.backgroundImage": "",
+      });
+      expect(empty).toContain('src=""');
+
+      const dataUri =
+        "data:image/jpeg;base64," + Buffer.from("img").toString("base64");
+      const withImage = renderCompositionTemplate(html, {
+        "ai.backgroundImage": dataUri,
+      });
+      expect(withImage).toContain(`src="${dataUri}"`);
+      expect(withImage).not.toContain("{{ai.backgroundImage}}");
+    });
+  },
+);
+
 describe("isContentCustomizable", () => {
   it("is true for templates that consume brand/user content or declare variables", () => {
     // Hand-authored content templates carry {{brand.*}}/{{user.*}} placeholders…

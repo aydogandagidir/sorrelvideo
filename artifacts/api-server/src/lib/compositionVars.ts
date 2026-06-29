@@ -15,6 +15,9 @@
  *     closes the attribute and the rest becomes live markup (`onerror=…`).
  *   - `capture.image`  → `<img src="{{capture.image}}">` (website-showcase.html).
  *     Same attribute-breakout vector; legitimately a `data:image/*;base64,…` URI.
+ *   - `ai.backgroundImage` → `<img src="{{ai.backgroundImage}}">` (studio-default,
+ *     brand-promo). The AI-generated background; same vector + data-URI shape as
+ *     `capture.image`. Server-produced today, but user-overridable via `?vars=`.
  *   - `brand.{primary,secondary,accent}Color` → injected UNQUOTED into `<style>`
  *     and SVG `fill`/`stroke` (data-chart, product-launch, website-showcase, …).
  *     A crafted value can inject a CSS `url(…)` (exfiltration) or extra
@@ -60,6 +63,7 @@ import { isSafeLogoUrl } from "./logoUrl";
 const URL_ATTRIBUTE_KEYS: Readonly<Record<string, "http" | "image">> = {
   "brand.logoUrl": "http",
   "capture.image": "image",
+  "ai.backgroundImage": "image",
 };
 
 /**

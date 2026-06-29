@@ -14,6 +14,7 @@ import {
   useGetBrandKit,
   useAiEdit,
   useRefineProject,
+  useGenerateProjectAiImage,
   getListProjectsQueryKey,
   type Project,
   type BrandKit,
@@ -352,6 +353,7 @@ function ProjectDetail({
   const updateProject = useUpdateProject();
   const aiEdit = useAiEdit();
   const refineProject = useRefineProject();
+  const aiImage = useGenerateProjectAiImage();
   const { toast } = useToast();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<
@@ -377,6 +379,14 @@ function ProjectDetail({
   });
   const [aiInstruction, setAiInstruction] = useState("");
   const [aiCopyError, setAiCopyError] = useState<string | null>(null);
+
+  // AI background image (generative media). The image is persisted server-side
+  // immediately (POST /projects/:id/ai-image stamps ai.backgroundImage into the
+  // saved compositionVars), so unlike copy there is no local "save" step — we
+  // just bump `bgBust` to force the live-preview iframe to reload and show it.
+  const [aiBgPrompt, setAiBgPrompt] = useState("");
+  const [aiBgError, setAiBgError] = useState<string | null>(null);
+  const [bgBust, setBgBust] = useState(0);
 
   // website→video "prompt ile düzelt": a natural-language refine of the length /
   // featured region. The returned vars accumulate into a LOCAL override so the
@@ -436,6 +446,17 @@ function ProjectDetail({
   // project (re-pick / re-order the tour) — the backend routes by capture.tour.
   const canRefine =
     project.module === "website-showcase" &&
+    (project.status === "draft" || project.status === "failed");
+
+  // AI background: only for compositions whose shipped HTML hosts the
+  // ai.backgroundImage layer (Template.supportsAiBackground, read-time enrichment
+  // off the templates list), in the preview states so the generated image is
+  // visible before a render is spent.
+  const supportsAiBg = Boolean(
+    templates?.find((t) => t.module === project.module)?.supportsAiBackground,
+  );
+  const canEditAiBackground =
+    supportsAiBg &&
     (project.status === "draft" || project.status === "failed");
 
   // The live composition preview rides unsaved edits as a ?vars= override so the
@@ -615,6 +636,45 @@ function ProjectDetail({
       }
       setRefineError(
         anyErr.data?.error ?? anyErr.message ?? "Düzeltme başarısız.",
+      );
+    }
+  }
+
+  // "AI arka plan": generate an on-brand background image and persist it into the
+  // project's compositionVars (server-side, immediately). On success we refetch +
+  // bump `bgBust` so the live preview reloads and shows it. Same quota/rate-limit
+  // handling as handleAiEditCopy (403 upgrade_required → UpgradeModal, 429 → slow
+  // down). Available only on supportsAiBackground templates in draft/failed.
+  async function handleGenerateAiBackground() {
+    setAiBgError(null);
+    const prompt = aiBgPrompt.trim();
+    if (prompt.length < 3) {
+      setAiBgError("Arka planı kısaca tarif et (en az 3 karakter).");
+      return;
+    }
+    try {
+      await aiImage.mutateAsync({ id: project.id, data: { prompt } });
+      invalidate();
+      setBgBust((n) => n + 1);
+      setAiBgPrompt("");
+      toast({ title: "AI arka plan eklendi — önizlemede görünür" });
+    } catch (err) {
+      const anyErr = err as {
+        status?: number;
+        data?: { reason?: string; error?: string };
+        message?: string;
+      };
+      if (anyErr.status === 403 && anyErr.data?.reason === "upgrade_required") {
+        setUpgradeReason("ai_limit");
+        setUpgradeOpen(true);
+        return;
+      }
+      if (anyErr.status === 429) {
+        setAiBgError("Biraz yavaşla — bir dakika sonra tekrar dene.");
+        return;
+      }
+      setAiBgError(
+        anyErr.data?.error ?? anyErr.message ?? "Görsel üretilemedi.",
       );
     }
   }
@@ -834,9 +894,9 @@ function ProjectDetail({
                 )}
               >
                 <HfPlayer
-                  src={`/api/projects/${project.id}/composition${
+                  src={`/api/projects/${project.id}/composition?bg=${bgBust}${
                     Object.keys(previewVars).length > 0
-                      ? `?vars=${b64UrlVars(previewVars)}`
+                      ? `&vars=${b64UrlVars(previewVars)}`
                       : ""
                   }`}
                   aspect={ratioLabel}
@@ -1238,6 +1298,44 @@ function ProjectDetail({
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {canEditAiBackground && (
+              <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-center gap-1.5 text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground/70">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" /> AI arka plan
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Arka planı tarif et; markana uygun bir görsel üretip yazının
+                  arkasına koyarız.
+                </p>
+                <Textarea
+                  rows={2}
+                  value={aiBgPrompt}
+                  onChange={(e) => setAiBgPrompt(e.target.value)}
+                  maxLength={500}
+                  placeholder="örn. koyu degrade üzerinde soyut yeşil ışık çizgileri"
+                  disabled={aiImage.isPending}
+                />
+                {aiBgError && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {aiBgError}
+                  </p>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleGenerateAiBackground()}
+                  disabled={aiImage.isPending}
+                >
+                  {aiImage.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  {aiImage.isPending ? "Üretiliyor…" : "Arka plan üret"}
+                </Button>
               </div>
             )}
 

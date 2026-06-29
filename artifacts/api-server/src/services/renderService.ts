@@ -147,6 +147,11 @@ const STUDIO_FALLBACKS = {
   "user.bodyText":
     "Sorrel turns a template, your brand kit, and a few sentences into branded video — ready to ship.",
   "user.ctaText": "Try it free",
+  // AI background image (generative media): empty by default so a project that
+  // never ran "AI background" renders byte-identical (the composition's
+  // `img.ai-bg[src=""]` collapses to display:none). Set to a data URI by
+  // POST /projects/:id/ai-image; gated to AI_BACKGROUND_MODULES compositions.
+  "ai.backgroundImage": "",
   // Per-render canvas dimensions + aspect class. Default = the authored portrait
   // canvas, so a no-vars / null-settings render is byte-identical to before.
   // buildCompositionHtml overrides these from the project's render resolution so

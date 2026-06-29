@@ -366,3 +366,58 @@ export type JudgeToursOutput = z.infer<typeof JudgeToursOutputSchema>;
 export interface JudgeToursResult extends JudgeToursOutput {
   usage: SuggestUsage;
 }
+
+// ─────────────────────────── AI background image ────────────────────────────
+// Generative media (NOT on the AiProvider interface — Anthropic can't make
+// images): turn a short prompt + the user's Brand DNA into an on-brand,
+// full-bleed BACKGROUND image for a composition. The image is returned as an
+// inline data URI so the caller can drop it straight into `compositionVars`
+// (same channel website→video uses for `capture.image`). OpenAI Images only
+// (gpt-image-1); see `imageGen.ts`.
+
+/** The frame aspect to size the generated image to (maps to an OpenAI size). */
+export const ImageAspectSchema = z.enum(["portrait", "landscape", "square"]);
+export type ImageAspect = z.infer<typeof ImageAspectSchema>;
+
+/**
+ * The Brand DNA subset that keeps a generated background on-brand. All optional
+ * — a brand-less request still produces a sensible abstract background. The
+ * colors are advisory hints baked into the text prompt (the image model has no
+ * structured color input), so they need not be validated hex here.
+ */
+export const ImageBrandSchema = z.object({
+  companyName: z.string().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  primaryColor: z.string().nullable().optional(),
+  secondaryColor: z.string().nullable().optional(),
+  accentColor: z.string().nullable().optional(),
+  keywords: z.array(z.string()).nullable().optional(),
+  personality: z.array(z.string()).nullable().optional(),
+  imageStyle: z.string().nullable().optional(),
+});
+export type ImageBrand = z.infer<typeof ImageBrandSchema>;
+
+export const GenerateImageInputSchema = z.object({
+  /** The user's free-text description of the background they want. */
+  prompt: z.string().min(3).max(500),
+  /** Optional brand DNA to steer palette / style / mood. */
+  brand: ImageBrandSchema.optional(),
+  /** Frame aspect → OpenAI image size. Defaults to portrait (Sorrel's default). */
+  aspect: ImageAspectSchema.default("portrait"),
+});
+// INPUT type (not z.infer/output): `aspect` carries a default, so callers may
+// omit it — `generateBrandImage` parses to fill it in.
+export type GenerateImageInput = z.input<typeof GenerateImageInputSchema>;
+
+export interface GenerateImageResult {
+  /**
+   * `data:image/<jpeg|png|webp>;base64,…` — ready to inline into a
+   * `compositionVars` image key (validated by `compositionVars.ts`'s
+   * `isSafeImageSrc`). The base64 alphabet carries no attribute-breakout chars.
+   */
+  dataUri: string;
+  /** The model that produced it, for cost/observability logging. */
+  model: string;
+  /** Decoded byte size, so callers can log/guard the persisted blob size. */
+  bytes: number;
+}

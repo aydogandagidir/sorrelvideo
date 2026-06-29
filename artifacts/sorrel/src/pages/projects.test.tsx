@@ -191,12 +191,14 @@ describe("Projects — card → detail controls", () => {
       within(dialog).getByRole("button", { name: /delete project/i }),
     ).toBeEnabled();
     // The draft stage shows the REAL composition preview pointed at this
-    // project's composition route (not the generic mock thumbnail). Unsaved copy
-    // / param edits ride along as a ?vars= override (the fixture has copy), so
-    // assert the route prefix rather than an exact, override-free URL.
+    // project's composition route (not the generic mock thumbnail). The src
+    // carries a `?bg=<n>` cache-bust (bumped after an AI-background generation to
+    // force the iframe to reload) and any unsaved copy / param edits ride along as
+    // a &vars= override (the fixture has copy), so assert the route prefix rather
+    // than an exact URL.
     const preview = within(dialog).getByTestId("hf-player");
     expect(preview.getAttribute("data-src")).toMatch(
-      /^\/api\/projects\/1\/composition(\?vars=|$)/,
+      /^\/api\/projects\/1\/composition\?bg=\d+(&vars=|$)/,
     );
   });
 
