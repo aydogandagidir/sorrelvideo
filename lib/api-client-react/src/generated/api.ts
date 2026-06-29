@@ -45,6 +45,7 @@ import type {
   FinalizeUploadRequest,
   FinalizeUploadResult,
   ForgotPasswordRequest,
+  GenerateAiImageRequest,
   GenerateCaptionsRequest,
   GenerateCaptionsResult,
   GenericSuccess,
@@ -2169,6 +2170,79 @@ export const useRefineProject = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getRefineProjectMutationOptions(options));
+    }
+
+export const getGenerateProjectAiImageUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/ai-image`
+}
+
+/**
+ * Generate an on-brand AI background image (OpenAI gpt-image-1) and stamp it into the project's compositionVars (ai.backgroundImage). Only templates whose composition supports it (Template.supportsAiBackground) accept this. Free spends one AI unit (charged after success); Pro is unlimited.
+ * @summary Generate an AI background image for a project
+ */
+export const generateProjectAiImage = async (id: number,
+    generateAiImageRequest: GenerateAiImageRequest, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getGenerateProjectAiImageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateAiImageRequest,)
+  }
+);}
+
+
+
+
+export const getGenerateProjectAiImageMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateProjectAiImage>>, TError,{id: number;data: BodyType<GenerateAiImageRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateProjectAiImage>>, TError,{id: number;data: BodyType<GenerateAiImageRequest>}, TContext> => {
+
+const mutationKey = ['generateProjectAiImage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateProjectAiImage>>, {id: number;data: BodyType<GenerateAiImageRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  generateProjectAiImage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateProjectAiImageMutationResult = NonNullable<Awaited<ReturnType<typeof generateProjectAiImage>>>
+    export type GenerateProjectAiImageMutationBody = BodyType<GenerateAiImageRequest>
+    export type GenerateProjectAiImageMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Generate an AI background image for a project
+ */
+export const useGenerateProjectAiImage = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateProjectAiImage>>, TError,{id: number;data: BodyType<GenerateAiImageRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateProjectAiImage>>,
+        TError,
+        {id: number;data: BodyType<GenerateAiImageRequest>},
+        TContext
+      > => {
+      return useMutation(getGenerateProjectAiImageMutationOptions(options));
     }
 
 export const getGetBrandKitUrl = () => {

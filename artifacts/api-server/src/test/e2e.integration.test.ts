@@ -184,6 +184,67 @@ describe.runIf(INTEGRATION_AVAILABLE)("E2E — projects + tenant isolation", () 
   });
 });
 
+describe.runIf(INTEGRATION_AVAILABLE)("E2E — AI background gating", () => {
+  // These cover every gate that runs BEFORE the image provider is called, so
+  // they're deterministic without an OpenAI key. The success / 503 paths depend
+  // on a provider key + a real (slow, billed) image call and are left to manual
+  // verification.
+  it("401 without a session (before any work)", async () => {
+    const res = await request(app)
+      .post("/api/projects/1/ai-image")
+      .send({ prompt: "soft dark gradient" });
+    expect(res.status).toBe(401);
+  });
+
+  it("400 for a too-short prompt", async () => {
+    const { agent } = await signup("aibg-shortprompt@test.local");
+    const create = await agent
+      .post("/api/projects")
+      .send({ name: "AIBG", module: "studio" });
+    const projectId = create.body.id as number;
+    const res = await agent
+      .post(`/api/projects/${projectId}/ai-image`)
+      .send({ prompt: "ab" });
+    expect(res.status).toBe(400);
+  });
+
+  it("404 for a project that does not exist", async () => {
+    const { agent } = await signup("aibg-missing@test.local");
+    const res = await agent
+      .post("/api/projects/99999999/ai-image")
+      .send({ prompt: "soft dark gradient" });
+    expect(res.status).toBe(404);
+  });
+
+  it("403 to a non-owner", async () => {
+    const a = await signup("aibg-owner@test.local");
+    const create = await a.agent
+      .post("/api/projects")
+      .send({ name: "Owned", module: "studio" });
+    const projectId = create.body.id as number;
+
+    const b = await signup("aibg-intruder@test.local");
+    const res = await b.agent
+      .post(`/api/projects/${projectId}/ai-image`)
+      .send({ prompt: "soft dark gradient" });
+    expect(res.status).toBe(403);
+  });
+
+  it("400 for a template that does not support an AI background", async () => {
+    const { agent } = await signup("aibg-unsupported@test.local");
+    // data-chart is NOT in AI_BACKGROUND_MODULES → rejected before the provider.
+    const create = await agent
+      .post("/api/projects")
+      .send({ name: "Chart", module: "data-chart" });
+    const projectId = create.body.id as number;
+    const res = await agent
+      .post(`/api/projects/${projectId}/ai-image`)
+      .send({ prompt: "soft dark gradient" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not support/i);
+  });
+});
+
 describe.runIf(INTEGRATION_AVAILABLE)("E2E — Track F avatar endpoints", () => {
   it("usage is sandbox/uncapped by default; session-token 503s without a key", async () => {
     const prevKey = process.env.LIVEAVATAR_API_KEY;

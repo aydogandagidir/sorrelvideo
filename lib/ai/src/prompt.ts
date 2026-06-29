@@ -3,6 +3,8 @@ import type {
   BrandDna,
   ExtractBrandSignals,
   GenerateVideoIdeasInput,
+  ImageBrand,
+  ImageAspect,
 } from "./schema";
 
 const VOICE_HINTS: Record<BrandVoice, string> = {
@@ -409,5 +411,56 @@ export function buildJudgeToursUserText(input: {
       lines.push(`  - ${b.label} (at ${at}% down, ${b.seconds}s)${cap}`);
     }
   });
+  return lines.join("\n");
+}
+
+// ─────────────────────────── AI background image ────────────────────────────
+
+const ASPECT_HINT: Record<ImageAspect, string> = {
+  portrait: "a tall vertical 9:16 frame",
+  landscape: "a wide 16:9 frame",
+  square: "a 1:1 square frame",
+};
+
+/**
+ * Compose the text prompt for an AI BACKGROUND image. The image sits BEHIND a
+ * composition's headline / body / CTA, so the prompt is engineered to keep it a
+ * clean backdrop: no text, no logos, no busy focal subjects, and dark/low-
+ * contrast enough that white overlay copy stays readable. The user's brief is
+ * grounded in the Brand DNA (palette as advisory hex hints, plus style / mood /
+ * industry) so generated backgrounds feel on-brand. The brief is appended as
+ * the creative direction; the guardrails lead so they always apply.
+ */
+export function buildImagePrompt(
+  brief: string,
+  brand: ImageBrand | undefined,
+  aspect: ImageAspect,
+): string {
+  const lines: string[] = [
+    `A high-quality abstract BACKGROUND image for ${ASPECT_HINT[aspect]} of a short-form marketing video.`,
+    "It will sit behind on-screen text, so it MUST be a clean backdrop:",
+    "no text, words, letters, numbers, logos, watermarks or UI; no central focal",
+    "subject or faces; keep it atmospheric with calm negative space and a darker,",
+    "low-contrast tone so light overlay text stays readable.",
+  ];
+
+  if (brand) {
+    const palette = [brand.primaryColor, brand.secondaryColor, brand.accentColor]
+      .filter((c): c is string => !!c && c.trim().length > 0)
+      .slice(0, 3);
+    if (palette.length > 0) {
+      lines.push(`Use a color palette built around: ${palette.join(", ")}.`);
+    }
+    if (brand.imageStyle) lines.push(`Imagery style: ${brand.imageStyle}.`);
+    if (brand.industry) lines.push(`Industry / context: ${brand.industry}.`);
+    const mood = (brand.personality ?? []).filter(Boolean).slice(0, 5);
+    if (mood.length > 0) lines.push(`Mood / personality: ${mood.join(", ")}.`);
+    const themes = (brand.keywords ?? []).filter(Boolean).slice(0, 6);
+    if (themes.length > 0) lines.push(`Themes to evoke: ${themes.join(", ")}.`);
+  }
+
+  // The user's brief LAST, clearly labelled as creative direction (not an
+  // instruction that can override the guardrails above).
+  lines.push("", `Creative direction: ${brief.trim()}`);
   return lines.join("\n");
 }

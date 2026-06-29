@@ -39,14 +39,17 @@ import {
   getLatestJobForProject,
 } from "../services/renderJobsService";
 import { startProjectRender } from "../services/renderStartService";
-import { getUserPlan } from "../services/billingService";
+import { getUserPlan, checkAndIncrementAiCount } from "../services/billingService";
+import { getDefaultBrandKit } from "../services/brandKitService";
+import { supportsAiBackground } from "../services/aiBackgroundTemplates";
+import { generateBrandImage } from "@workspace/ai";
 import { findUnsafeCompositionVar } from "../lib/compositionVars";
 import { findInvalidTypedVar } from "../lib/typedVars";
 import { variablesForModule } from "../services/registryTemplates";
 import { logger } from "../lib/logger";
 import { serveTemplateAsset } from "../lib/templateAssets";
 import { resolveByteRange } from "../lib/httpRange";
-import { aiSuggestLimiter } from "../middlewares/rateLimit";
+import { aiSuggestLimiter, aiImageLimiter } from "../middlewares/rateLimit";
 import {
   refineWebsiteVideoVars,
   RefineNotApplicableError,
@@ -853,6 +856,167 @@ router.post(
           : "AI provider could not refine the video",
       });
     }
+  },
+);
+
+// POST /api/projects/:id/ai-image — generate an on-brand AI BACKGROUND image and
+// stamp it into the project's compositionVars (ai.backgroundImage, a data URI the
+// composition + live preview consume). Generative media: OpenAI-only (gpt-image-1),
+// independent of AI_PROVIDER. Owner-scoped; quota-charged AFTER success (a provider
+// 502 must not burn a Free unit — same precedent as /ai/suggest); rate-limited
+// (aiImageLimiter). Free spends 1 AI unit, Pro unlimited. Only compositions in
+// AI_BACKGROUND_MODULES (studio, brand-promo) consume the var.
+const AiImageBody = z.object({
+  prompt: z.string().min(3).max(500),
+});
+
+router.post(
+  "/projects/:id/ai-image",
+  aiImageLimiter,
+  async (req, res): Promise<void> => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+
+    const parsed = AiImageBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: parsed.error.issues[0]?.message ?? "Invalid prompt",
+      });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.id, id));
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (project.userId !== req.user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    if (!supportsAiBackground(project.module)) {
+      res.status(400).json({
+        error: "This template does not support an AI background image.",
+      });
+      return;
+    }
+    // Don't mutate the vars of a render that's mid-flight (it re-reads them).
+    if (project.status === "rendering") {
+      res.status(409).json({ error: "Project is currently rendering" });
+      return;
+    }
+
+    // Ground the image in the user's DEFAULT Brand DNA + the project's aspect, so
+    // the background matches the brand and the frame shape (minimises cropping).
+    const brand = await getDefaultBrandKit(req.user.id);
+    const resolution = resolveSettings(project.renderSettings).resolution;
+    const aspect = resolution.startsWith("landscape")
+      ? "landscape"
+      : resolution.startsWith("square")
+        ? "square"
+        : "portrait";
+
+    let result: Awaited<ReturnType<typeof generateBrandImage>>;
+    try {
+      result = await generateBrandImage({
+        prompt: parsed.data.prompt,
+        aspect,
+        brand: brand
+          ? {
+              companyName: brand.companyName ?? null,
+              industry: brand.industry ?? null,
+              primaryColor: brand.primaryColor ?? null,
+              secondaryColor: brand.secondaryColor ?? null,
+              accentColor: brand.accentColor ?? null,
+              keywords: brand.keywords ?? null,
+              personality: brand.personality ?? null,
+              imageStyle: brand.imageStyle ?? null,
+            }
+          : undefined,
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const status =
+        typeof (err as { status?: unknown }).status === "number"
+          ? (err as { status: number }).status
+          : undefined;
+      req.log.error(
+        { err, status, projectId: id },
+        `AI image generation failed: ${detail}`,
+      );
+      const notConfigured =
+        /API_KEY .*is not set|not configured/i.test(detail) || status === 401;
+      res.status(notConfigured ? 503 : 502).json({
+        error: notConfigured
+          ? "AI image generation isn't configured on the server yet. An admin needs to set OPENAI_API_KEY (or IMAGE_API_KEY)."
+          : "AI provider could not generate an image",
+      });
+      return;
+    }
+
+    req.log.info(
+      {
+        model: result.model,
+        bytes: result.bytes,
+        aspect,
+        module: project.module,
+      },
+      "AI background generated",
+    );
+
+    // Charge quota only AFTER a successful generation (mirrors /ai/suggest): a
+    // provider error must not burn a Free user's monthly unit. Abuse is bounded
+    // by aiImageLimiter, so deferring the increment past the image call is safe.
+    try {
+      await checkAndIncrementAiCount(req.user.id);
+    } catch (err) {
+      const e = err as { reason?: string; message?: string };
+      if (e.reason === "upgrade_required") {
+        res.status(403).json({
+          error: e.message ?? "AI generation limit reached",
+          reason: "upgrade_required",
+        });
+        return;
+      }
+      throw err;
+    }
+
+    // Merge the generated data URI into the project's compositionVars. Re-run the
+    // SAME write-path safety gate (belt-and-suspenders — the produced data URI is
+    // already a valid image src, so this never trips in practice).
+    const nextVars = {
+      ...(project.compositionVars ?? {}),
+      "ai.backgroundImage": result.dataUri,
+    };
+    const unsafe = findUnsafeCompositionVar(nextVars);
+    if (unsafe) {
+      req.log.error(
+        { key: unsafe.key },
+        "generated AI background failed the compositionVars safety gate",
+      );
+      res.status(502).json({ error: "Generated image failed validation" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(projectsTable)
+      .set({ compositionVars: nextVars })
+      .where(eq(projectsTable.id, id))
+      .returning();
+
+    res.status(200).json(GetProjectResponse.parse(serializeDates(updated)));
   },
 );
 

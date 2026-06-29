@@ -61,8 +61,16 @@ export {
   type ChatMessage,
   type ChatInput,
   type ChatResult,
+  ImageAspectSchema,
+  ImageBrandSchema,
+  GenerateImageInputSchema,
+  type ImageAspect,
+  type ImageBrand,
+  type GenerateImageInput,
+  type GenerateImageResult,
 } from "./schema";
 export { buildSystemPrompt, buildUserPrompt, buildAvatarSystem } from "./prompt";
+export { generateBrandImage } from "./imageGen";
 export type { AiProvider };
 
 /**

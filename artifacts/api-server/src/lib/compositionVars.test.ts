@@ -73,6 +73,42 @@ describe("findUnsafeCompositionVar — URL/attribute keys", () => {
       }),
     ).toBeNull();
   });
+
+  // ai.backgroundImage shares capture.image's "image" kind: the AI image
+  // generator writes a data URI here, and it is user-overridable via ?vars=, so
+  // it must be held to the same attribute-breakout / data-URI-subtype gate.
+  it("rejects an ai.backgroundImage that breaks out of the src=\"…\" attribute", () => {
+    expect(
+      findUnsafeCompositionVar({
+        "ai.backgroundImage": 'x" onerror="alert(1)',
+      })?.key,
+    ).toBe("ai.backgroundImage");
+  });
+
+  it("rejects a non-image / scriptable data URI for ai.backgroundImage", () => {
+    expect(
+      findUnsafeCompositionVar({
+        "ai.backgroundImage": "data:text/html,<script>alert(1)</script>",
+      })?.key,
+    ).toBe("ai.backgroundImage");
+    expect(
+      findUnsafeCompositionVar({
+        "ai.backgroundImage": "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+      })?.key,
+    ).toBe("ai.backgroundImage");
+  });
+
+  it("accepts the generator's jpeg/png/webp data URI for ai.backgroundImage", () => {
+    const b64 = Buffer.from("not-a-real-image").toString("base64");
+    expect(
+      findUnsafeCompositionVar({ "ai.backgroundImage": `data:image/jpeg;base64,${b64}` }),
+    ).toBeNull();
+    expect(
+      findUnsafeCompositionVar({ "ai.backgroundImage": `data:image/webp;base64,${b64}` }),
+    ).toBeNull();
+    // Empty = "unset" (composition's img.ai-bg[src=""] collapses it).
+    expect(findUnsafeCompositionVar({ "ai.backgroundImage": "" })).toBeNull();
+  });
 });
 
 describe("findUnsafeCompositionVar — color keys", () => {

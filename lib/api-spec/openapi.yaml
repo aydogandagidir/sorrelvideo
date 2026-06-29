@@ -738,6 +738,84 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /projects/{id}/ai-image:
+    post:
+      operationId: generateProjectAiImage
+      tags: [projects]
+      summary: Generate an AI background image for a project
+      description: >-
+        Generate an on-brand AI background image (OpenAI gpt-image-1) and stamp it
+        into the project's compositionVars (ai.backgroundImage). Only templates
+        whose composition supports it (Template.supportsAiBackground) accept this.
+        Free spends one AI unit (charged after success); Pro is unlimited.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateAiImageRequest"
+      responses:
+        "200":
+          description: The updated project, with ai.backgroundImage set in compositionVars.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Invalid prompt, or the template does not support an AI background.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: AI quota exhausted — upgrade required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Project not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Project is currently rendering.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Too many requests; back off.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: Provider call failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: AI image generation is not configured on the server.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /brand:
     get:
       operationId: getBrandKit
@@ -1864,6 +1942,14 @@ components:
             data-scene-boundary). Derived server-side from the shipped
             composition (services/transitionCapableTemplates.ts) — the editor
             disables the transitions picker when false.
+        supportsAiBackground:
+          type: boolean
+          description: >-
+            True when the template's composition declares a full-bleed
+            ai.backgroundImage layer, so POST /projects/{id}/ai-image can stamp an
+            AI-generated background into it. Derived server-side from the shipped
+            composition (services/aiBackgroundTemplates.ts) — the UI shows the
+            "AI background" control only when true.
         customizable:
           type: boolean
           description: >-
@@ -2727,6 +2813,16 @@ components:
         note:
           type: string
           description: One short sentence describing the change, in the instruction's language.
+
+    GenerateAiImageRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: What the AI background should depict (grounded in the brand DNA server-side).
 
     CheckoutRequest:
       type: object
