@@ -14,10 +14,20 @@
  *
  * NOTE: `studio-default.html`'s module is `studio` (see renderService's
  * COMPOSITION_MAP), not `studio-default`.
+ *
+ * `social-teaser` + `product-launch` join `studio`/`brand-promo` here — all four
+ * are single-scene copy templates with one `position:relative` `.scene`, so the
+ * same z-index:-1 full-bleed layer drops in cleanly. `brand-story` is
+ * deliberately EXCLUDED for now: it is transition-capable (two `position:absolute`
+ * opaque-background scenes composited by the shader-transitions bootstrap), so an
+ * AI background interacts with the shader's scene compositing and needs a
+ * render-verified per-scene design — tracked as a follow-up.
  */
 export const AI_BACKGROUND_MODULES: ReadonlySet<string> = new Set([
   "studio",
   "brand-promo",
+  "social-teaser",
+  "product-launch",
 ]);
 
 export function supportsAiBackground(module: string): boolean {
