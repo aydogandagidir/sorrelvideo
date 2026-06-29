@@ -19,6 +19,7 @@ import { Plus, Trash2, Sparkles, Music, Captions } from "lucide-react";
 import { useUpload } from "@workspace/object-storage-web";
 import {
   useGenerateCaptions,
+  useFinalizeUpload,
   type RenderSettings,
   type RenderTransition,
 } from "@workspace/api-client-react";
@@ -99,18 +100,22 @@ export function RenderSettingsForm({
   const transitions = value.transitions ?? [];
   const alphaSupported = formatSupportsAlpha(value.format);
 
-  // Background audio (Track C): the 2-phase presigned upload, then store the
-  // resulting objectPath on the settings; the render pipeline resolves + injects
-  // it as an <audio> the engine muxes.
+  // Uploads are a THREE-step flow: request-url + PUT (useUpload), then FINALIZE
+  // to stamp the owner ACL. Skipping finalize leaves the object with no ACL, and
+  // the server's canAccessObject fails closed — so the render-time owner check
+  // silently drops background audio (rendering silent) and transcribeObject 404s
+  // the caption job. We finalize in the handlers below before using the path.
+  const finalizeUpload = useFinalizeUpload();
+
+  // Background audio (Track C): upload → finalize → store the objectPath on the
+  // settings; the render pipeline resolves + injects it as an <audio> to mux.
   const audioInputRef = useRef<HTMLInputElement>(null);
   const {
     uploadFile: uploadAudio,
     isUploading: audioUploading,
     error: audioError,
-  } = useUpload({
-    onSuccess: (res) =>
-      patch({ backgroundAudio: { objectPath: res.objectPath, volume: 50 } }),
-  });
+  } = useUpload();
+  const audioBusy = audioUploading || finalizeUpload.isPending;
 
   // A Free user clicking a locked option: nudge to upgrade rather than mutate.
   const gate = (locked: boolean): boolean => {
@@ -159,7 +164,17 @@ export function RenderSettingsForm({
   async function onAudioFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file after a remove
-    if (file) await uploadAudio(file);
+    if (!file) return;
+    const res = await uploadAudio(file); // sets audioError + returns null on failure
+    if (!res) return;
+    try {
+      // Stamp the owner ACL before the path is persisted, else the render can't
+      // read it (canAccessObject fails closed → background audio renders silent).
+      await finalizeUpload.mutateAsync({ data: { objectPath: res.objectPath } });
+    } catch {
+      return; // don't store an unreadable path — leave the track unattached
+    }
+    patch({ backgroundAudio: { objectPath: res.objectPath, volume: 50 } });
   }
   function setAudioVolume(next: number) {
     if (!value.backgroundAudio) return;
@@ -172,24 +187,7 @@ export function RenderSettingsForm({
   const [captionError, setCaptionError] = useState<string | null>(null);
   const generateCaptions = useGenerateCaptions();
   const { uploadFile: uploadCaptionAudio, isUploading: captionUploading } =
-    useUpload({
-      onSuccess: async (res) => {
-        setCaptionError(null);
-        try {
-          const result = await generateCaptions.mutateAsync({
-            data: { audioObjectPath: res.objectPath },
-          });
-          patch({ captions: { words: result.words } });
-        } catch (err) {
-          const e = err as { status?: number; data?: { error?: string } };
-          if (e.status === 403) onUpgrade?.();
-          else if (e.status === 503)
-            setCaptionError("Auto-captions aren't enabled on this server.");
-          else setCaptionError(e.data?.error ?? "Could not generate captions.");
-        }
-      },
-      onError: () => setCaptionError("Audio upload failed."),
-    });
+    useUpload({ onError: () => setCaptionError("Audio upload failed.") });
   function pickCaptionAudio() {
     if (gate(isProOnly("captions", true))) return;
     setCaptionError(null);
@@ -198,10 +196,29 @@ export function RenderSettingsForm({
   async function onCaptionAudioFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file
-    if (file) await uploadCaptionAudio(file);
+    if (!file) return;
+    setCaptionError(null);
+    const res = await uploadCaptionAudio(file);
+    if (!res) return; // upload failed; onError already set captionError
+    try {
+      // Finalize (owner ACL) BEFORE transcription — transcribeObject re-checks
+      // ownership and 404s an un-finalized object.
+      await finalizeUpload.mutateAsync({ data: { objectPath: res.objectPath } });
+      const result = await generateCaptions.mutateAsync({
+        data: { audioObjectPath: res.objectPath },
+      });
+      patch({ captions: { words: result.words } });
+    } catch (err) {
+      const e = err as { status?: number; data?: { error?: string } };
+      if (e.status === 403) onUpgrade?.();
+      else if (e.status === 503)
+        setCaptionError("Auto-captions aren't enabled on this server.");
+      else setCaptionError(e.data?.error ?? "Could not generate captions.");
+    }
   }
   const captionWordCount = value.captions?.words?.length ?? 0;
-  const captionBusy = captionUploading || generateCaptions.isPending;
+  const captionBusy =
+    captionUploading || finalizeUpload.isPending || generateCaptions.isPending;
 
   function addTransition() {
     const nextLen = transitions.length + 1;
@@ -475,10 +492,10 @@ export function RenderSettingsForm({
                 variant="outline"
                 size="sm"
                 onClick={pickAudio}
-                disabled={disabled || audioUploading}
+                disabled={disabled || audioBusy}
               >
                 <Plus className="h-4 w-4" />
-                {audioUploading ? "Uploading…" : "Upload music"}
+                {audioBusy ? "Uploading…" : "Upload music"}
               </Button>
               {audioError && (
                 <p className="text-xs text-destructive">{audioError.message}</p>
@@ -573,7 +590,7 @@ export function RenderSettingsForm({
                 disabled={disabled || captionBusy}
               >
                 <Captions className="h-4 w-4" />
-                {captionUploading
+                {captionUploading || finalizeUpload.isPending
                   ? "Uploading…"
                   : generateCaptions.isPending
                     ? "Transcribing…"
