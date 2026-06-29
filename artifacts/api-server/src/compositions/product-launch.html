@@ -12,6 +12,10 @@
       }
       .scene {
         width: 100%; height: 100%; position: relative;
+        /* Stacking context so the z-index:-1 .ai-bg-layer renders ABOVE this
+           scene's own background (a negative-z child otherwise paints behind the
+           parent's opaque background — the AI image would never show). */
+        isolation: isolate;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         text-align: center; padding: 130px 90px;
         background:

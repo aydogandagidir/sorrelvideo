@@ -634,22 +634,35 @@ deterministic template rendering).
   brandExtract tier — image gen is pricier/slower than text) bounds abuse.
 - **Capability set**: only compositions that host the layer consume the var —
   `services/aiBackgroundTemplates.ts` (`AI_BACKGROUND_MODULES = {studio,
-  brand-promo, social-teaser, product-launch}` — the four single-scene copy
-  templates; the `transitionCapableTemplates.ts` pattern), surfaced as
+  brand-promo, social-teaser, product-launch, brand-story}`; the
+  `transitionCapableTemplates.ts` pattern), surfaced as
   `Template.supportsAiBackground` (read-time enrichment in `routes/templates.ts`,
   never persisted) so the project dialog shows the "AI arka plan" control only
-  where it works. Add a module + wire its composition to grow the set.
-  `brand-story` is deliberately excluded: it is transition-capable (two
-  `position:absolute` opaque-background scenes composited by the shader bootstrap),
-  so an AI background interacts with the shader compositing and needs a
-  render-verified per-scene design — a tracked follow-up.
+  where it works. Add a module + wire its composition to grow the set. The first
+  four are single-scene copy templates (one `position:relative` `.scene`).
+  `brand-story` is the TRANSITION-CAPABLE case: it carries the layer PER SCENE —
+  each of its two `position:absolute` opaque-background scenes gets its own
+  `.ai-bg-layer` at `z-index:-1` (above the scene's secondaryColor fill, below
+  content). The shader bootstrap's scene collection
+  (`querySelectorAll('.scene[id]')`) is unaffected (the layer is `.ai-bg-layer`,
+  not `.scene[id]`); the per-scene image rides each scene's html2canvas snapshot,
+  so it composites across the boundary, and in hard-cut mode the scene's
+  `autoAlpha` toggle carries the layer with it.
 - **Composition wiring**: a capable composition declares a full-bleed
   `<img class="ai-bg" src="{{ai.backgroundImage}}">` inside a `.ai-bg-layer` at
   `z-index:-1` (paints above the authored gradient, below content — no content
-  z-index edits) + a readability scrim. `STUDIO_FALLBACKS["ai.backgroundImage"]`
+  z-index edits) + a readability scrim. **CRITICAL — the `.scene` MUST set
+  `isolation: isolate`** (establish a stacking context): without it the
+  `z-index:-1` layer paints BEHIND the scene's own opaque background and the AI
+  image NEVER shows (the classic negative-z-behind-parent gotcha — render-proven,
+  not caught by the HTML substitution tests; the v1/v2 wiring shipped this bug and
+  the brand-story pass fixed all five). `STUDIO_FALLBACKS["ai.backgroundImage"]`
   (and the templates route's `PREVIEW_FALLBACKS`) default it to `""`, and
   `.ai-bg-layer:has(img[src=""]){display:none}` collapses the layer when unset —
-  so a no-AI render is **byte-identical** to the authored gradient.
+  so a no-AI render is **byte-identical** to the authored gradient. Render smokes:
+  `aiBackgroundRenderSmoke.test.ts` (single-scene studio) +
+  `transitionsRenderSmoke.test.ts`'s AI-bg case (brand-story across the shader),
+  both RENDER_SMOKE-gated, frame-grab the magenta fixture to prove it paints.
 - **Security**: the new `ai.backgroundImage` key is added to
   `lib/compositionVars.ts` `URL_ATTRIBUTE_KEYS` as kind `"image"` (same
   `isSafeImageSrc` gate as `capture.image`: http(s) URL or a raster
