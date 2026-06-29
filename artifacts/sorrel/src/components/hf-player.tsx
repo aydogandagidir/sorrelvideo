@@ -259,12 +259,37 @@ export const HfPlayer = forwardRef<HfPlayerHandle, HfPlayerProps>(function HfPla
   // observation also re-fits once the host has its laid-out size, covering the
   // ready/layout race. Body touches only refs + a stable helper, so `[]` is
   // exhaustive.
+  //
+  // Guard against a feedback loop: a re-fit only mutates the (absolutely
+  // positioned) iframe, which can't resize the host — but ignore sub-pixel box
+  // churn and coalesce bursts into one fit per frame so a refit can never drive
+  // another observation. A runaway loop here would strobe the preview.
   useEffect(() => {
     const el = elRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => forcePlayerRefit(el));
+    let lastW = -1;
+    let lastH = -1;
+    let pending = 0;
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[entries.length - 1]?.contentRect;
+      if (box) {
+        if (Math.abs(box.width - lastW) < 1 && Math.abs(box.height - lastH) < 1) {
+          return;
+        }
+        lastW = box.width;
+        lastH = box.height;
+      }
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        forcePlayerRefit(el);
+      });
+    });
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      if (pending) cancelAnimationFrame(pending);
+      observer.disconnect();
+    };
   }, []);
 
   // Reflect boolean props onto the element as attribute presence.
