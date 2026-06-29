@@ -26,14 +26,26 @@ function PreviewRenderer({
   componentPath: string;
   modules: ModuleMap;
 }) {
+  // Re-mount the loader when the requested component changes so its state
+  // resets to its initial `null` (clearing the previous preview) without
+  // synchronously calling setState inside an effect.
+  return (
+    <PreviewLoader key={componentPath} componentPath={componentPath} modules={modules} />
+  );
+}
+
+function PreviewLoader({
+  componentPath,
+  modules,
+}: {
+  componentPath: string;
+  modules: ModuleMap;
+}) {
   const [Component, setComponent] = useState<ComponentType | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    setComponent(null);
-    setError(null);
 
     async function loadComponent(): Promise<void> {
       const key = `./components/mockups/${componentPath}.tsx`;

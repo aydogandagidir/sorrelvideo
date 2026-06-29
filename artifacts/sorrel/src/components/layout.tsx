@@ -376,7 +376,7 @@ function CommandPalette({
     onOpenChange(false);
     // External entries (/editor/) need a real navigation, not a client route.
     if (item.external) {
-      window.location.href = item.href;
+      window.location.assign(item.href);
     } else {
       setLocation(item.href);
     }
