@@ -61,7 +61,27 @@
         padding: 8% 9%;
         background-color: {{brand.secondaryColor}};
         overflow: hidden;
+        /* Establish a stacking context so the z-index:-1 .ai-bg-layer below
+           resolves ABOVE this scene's own background (without it, a negative-z
+           child paints BEHIND the parent's opaque background — the AI image
+           would never be visible). */
+        isolation: isolate;
       }
+      /* AI background image (generative media), PER SCENE — z-index:-1 paints
+         above the scene's secondaryColor fill but below the content + glow; a
+         scrim keeps the white copy readable. ai.backgroundImage unset → src=""
+         collapses the layer, so a no-AI render is byte-identical. Lives inside
+         each .scene so it rides that scene's html2canvas snapshot (shader mode)
+         and its autoAlpha toggle (hard-cut mode). */
+      .ai-bg-layer { position: absolute; inset: 0; z-index: -1; }
+      .ai-bg-layer img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .ai-bg-layer::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(7, 7, 11, 0.5), rgba(7, 7, 11, 0.72));
+      }
+      .ai-bg-layer:has(img[src=""]) { display: none; }
       .glow {
         position: absolute;
         width: 72vmin;
@@ -165,6 +185,14 @@
       data-scene-boundary="4"
     >
       <section class="scene" id="scene-intro">
+        <div class="ai-bg-layer">
+          <img
+            class="ai-bg"
+            src="{{ai.backgroundImage}}"
+            alt=""
+            onerror="this.parentElement.style.display='none'"
+          />
+        </div>
         <div class="glow"></div>
         <div class="badge">
           <img src="{{brand.logoUrl}}" alt="" />
@@ -175,6 +203,14 @@
       </section>
 
       <section class="scene" id="scene-outro">
+        <div class="ai-bg-layer">
+          <img
+            class="ai-bg"
+            src="{{ai.backgroundImage}}"
+            alt=""
+            onerror="this.parentElement.style.display='none'"
+          />
+        </div>
         <div class="glow"></div>
         <p class="body-text">{{user.bodyText}}</p>
         <div class="cta">{{user.ctaText}}</div>

@@ -224,6 +224,9 @@ describe.each([
   "brand-promo.html",
   "social-teaser.html",
   "product-launch.html",
+  // brand-story carries the layer PER SCENE (two scenes) — the generic
+  // assertions below hold for both occurrences.
+  "brand-story.html",
 ])(
   "AI-background composition %s",
   (file) => {
@@ -236,6 +239,10 @@ describe.each([
       expect(html).toContain('src="{{ai.backgroundImage}}"');
       // The collapse rule is what guarantees a no-image render is unchanged.
       expect(html).toMatch(/\.ai-bg-layer:has\(img\[src=""\]\)\s*\{\s*display:\s*none/);
+      // The scene MUST establish a stacking context, else the z-index:-1 layer
+      // paints BEHIND the scene's opaque background and the AI image never shows
+      // (render-proven). Guards against a future edit dropping the isolation.
+      expect(html).toContain("isolation: isolate");
     });
 
     it("substitutes an unset var to src=\"\" (collapsed) and a data URI through", () => {

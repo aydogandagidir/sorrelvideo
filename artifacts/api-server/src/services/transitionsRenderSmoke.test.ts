@@ -48,6 +48,15 @@ const SMOKE_VARS: Record<string, string> = {
   "sorrel.transitionsActive": "1",
 };
 
+/**
+ * A solid-magenta 48×48 JPEG data URI — a deliberately UNMISTAKABLE AI background
+ * (not a brand color) so the extracted frames make it obvious the per-scene
+ * ai.backgroundImage layer (a) shows in both scenes and (b) composites across the
+ * shader boundary. The readability scrim darkens it to a deep purple.
+ */
+const AI_BG_DATA_URI =
+  "data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzYyLjExLjEwMAD/2wBDAAgMDA4MDhAQEBAQEBMSExQUFBMTExMUFBQVFRUZGRkVFRUUFBUVGBgZGRscGxoaGRocHB4eHiQkIiIqKiszMz7/xABMAAEBAAAAAAAAAAAAAAAAAAAABQEBAQAAAAAAAAAAAAAAAAAAAAcQAQAAAAAAAAAAAAAAAAAAAAARAQAAAAAAAAAAAAAAAAAAAAD/wAARCAAwADADASIAAhEAAxEA/9oADAMBAAIRAxEAPwCQAqi1gAAAAAAAAAAAAAAAP//Z";
+
 describe.runIf(SMOKE)("brand-story shader transition render smoke", () => {
   it(
     "renders to a playable mp4 with the HyperShader bootstrap injected",
@@ -124,6 +133,89 @@ describe.runIf(SMOKE)("brand-story shader transition render smoke", () => {
 
       if (process.env.KEEP_SMOKE_OUTPUT === "1") {
         console.log(`[m8-smoke] output kept at: ${dir}`);
+      } else {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    300_000,
+  );
+
+  it(
+    "composites the per-scene AI background across the transition",
+    async () => {
+      const src = fs.readFileSync(
+        path.resolve(__dirname, "../compositions/brand-story.html"),
+        "utf-8",
+      );
+      const settings = resolveSettings({
+        transitions: [
+          { time: 4, shader: "whip-pan", duration: 0.6, ease: "power2.inOut" },
+        ],
+      });
+
+      // Same render-path vars, but with an AI background set — the magenta layer
+      // must land in BOTH scenes (brand-story carries the layer per scene).
+      let html = renderCompositionTemplate(src, {
+        ...SMOKE_VARS,
+        "ai.backgroundImage": AI_BG_DATA_URI,
+      });
+      const occurrences = html.split(`src="${AI_BG_DATA_URI}"`).length - 1;
+      expect(occurrences).toBe(2); // one ai-bg layer per scene
+      expect(html).not.toContain("{{ai.backgroundImage}}");
+
+      const injection = buildTransitionsInjection(
+        html,
+        settings.transitions ?? [],
+      );
+      const bodyEnd = html.toLowerCase().lastIndexOf("</body>");
+      html = html.slice(0, bodyEnd) + injection + html.slice(bodyEnd);
+
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sorrel-aibg-smoke-"));
+      fs.writeFileSync(path.join(dir, "composition.html"), html, "utf-8");
+      const outputPath = path.join(dir, "output.mp4");
+
+      const job = createRenderJob(toEngineConfig(settings, "composition.html"));
+      await executeRenderJob(job, dir, outputPath);
+
+      // The AI background must not break the shader render: still a playable mp4.
+      const stat = fs.statSync(outputPath);
+      expect(stat.size).toBeGreaterThan(50_000);
+      const probed = execFileSync(
+        "ffprobe",
+        [
+          "-v",
+          "error",
+          "-show_entries",
+          "format=duration",
+          "-of",
+          "csv=p=0",
+          outputPath,
+        ],
+        { encoding: "utf-8" },
+      ).trim();
+      expect(Math.abs(parseFloat(probed) - 8)).toBeLessThan(0.5);
+
+      // Frames for the eyeball pass: the magenta AI bg (darkened by the scrim)
+      // should be visible behind BOTH scenes and during the mid-transition blend.
+      for (const [name, t] of [
+        ["aibg-scene-a", "2.0"],
+        ["aibg-mid-transition", "4.0"],
+        ["aibg-scene-b", "6.0"],
+      ] as const) {
+        execFileSync("ffmpeg", [
+          "-y",
+          "-ss",
+          t,
+          "-i",
+          outputPath,
+          "-frames:v",
+          "1",
+          path.join(dir, `${name}.png`),
+        ]);
+      }
+
+      if (process.env.KEEP_SMOKE_OUTPUT === "1") {
+        console.log(`[aibg-smoke] output kept at: ${dir}`);
       } else {
         fs.rmSync(dir, { recursive: true, force: true });
       }

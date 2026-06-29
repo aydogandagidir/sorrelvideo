@@ -15,19 +15,25 @@
  * NOTE: `studio-default.html`'s module is `studio` (see renderService's
  * COMPOSITION_MAP), not `studio-default`.
  *
- * `social-teaser` + `product-launch` join `studio`/`brand-promo` here — all four
- * are single-scene copy templates with one `position:relative` `.scene`, so the
- * same z-index:-1 full-bleed layer drops in cleanly. `brand-story` is
- * deliberately EXCLUDED for now: it is transition-capable (two `position:absolute`
- * opaque-background scenes composited by the shader-transitions bootstrap), so an
- * AI background interacts with the shader's scene compositing and needs a
- * render-verified per-scene design — tracked as a follow-up.
+ * `social-teaser` + `product-launch` join `studio`/`brand-promo` here — all are
+ * single-scene copy templates with one `position:relative` `.scene`, so the same
+ * z-index:-1 full-bleed layer drops in cleanly.
+ *
+ * `brand-story` is included too, but as the TRANSITION-CAPABLE case it carries the
+ * layer PER SCENE: each of its two `position:absolute` opaque-background scenes
+ * (`#scene-intro`/`#scene-outro`) gets its own `.ai-bg-layer` at `z-index:-1`
+ * (above the scene's secondaryColor fill, below content). The scene-collection
+ * the shader bootstrap does (`querySelectorAll('.scene[id]')`) is unaffected (the
+ * layer is `.ai-bg-layer`, not `.scene[id]`), and the per-scene image rides each
+ * scene's html2canvas snapshot, so it composites correctly across the boundary;
+ * in hard-cut mode the scene's `autoAlpha` toggle carries the layer with it.
  */
 export const AI_BACKGROUND_MODULES: ReadonlySet<string> = new Set([
   "studio",
   "brand-promo",
   "social-teaser",
   "product-launch",
+  "brand-story",
 ]);
 
 export function supportsAiBackground(module: string): boolean {
