@@ -482,20 +482,35 @@ export function injectFitScript(html: string): string {
 // "Composition timeline not found". Verified against @hyperframes/player@0.6.120's
 // `_resolveDirectTimelineAdapterFromWindow` + `_tryDirectTimeline*`.
 //
-// So this bridge does TWO things, both safe on every composition:
-//  1. If the composition exposed a legacy `window.__hf` but no timeline yet,
-//     adapt it into the TimelineLike the player's DIRECT adapter drives
-//     (`seek(s,suppress)` / `pause` / `play` / `duration` / `time`, GSAP-shaped,
-//     SECONDS). The closure keeps a reference to `hf`, so the timeline keeps
-//     working after step 2 removes the global.
-//  2. STRIP `window.__hf` (and any leftover `window.__player`) so the player
-//     stops treating the composition as a runtime bridge and resolves the
-//     `__timelines` entry. The RENDER engine drives `__timelines`, NOT `__hf`
-//     (core/dist never reads `__hf`), so this is render-safe.
+// So this bridge:
+//  1. Adapts a legacy `window.__hf` into the TimelineLike the player's DIRECT
+//     adapter drives (`seek(s,suppress)` / `pause` / `play` / `duration` /
+//     `time`, GSAP-shaped, SECONDS) when no timeline is registered for the id
+//     yet. The closure keeps a reference to `hf`, so the timeline keeps working
+//     even after step 2 removes the global.
+//  2. STRIPS `window.__hf` (+ any leftover `__player`) — but ONLY on the PREVIEW
+//     path (`stripLegacyHost`). The RENDER path MUST KEEP `__hf`: the producer's
+//     OWN runtime initializes + drives it (`window.__hf || (window.__hf = {})`,
+//     `__hfTimelinesBuilding`) to build its timeline, so stripping it there
+//     produces a BLANK render — the regression #162 caused and this gate fixes.
 // No-op for GSAP compositions (they expose neither global, register their own
 // timeline). rAF advances via the callback's own timestamp — no wall-clock
 // (performance.now/Date.now), which the engine's determinism lint forbids.
-const TIMELINE_BRIDGE = `<script data-sorrel-timeline-bridge>
+function buildTimelineBridge(stripLegacyHost: boolean): string {
+  // PREVIEW ONLY — @hyperframes/player treats window.__hf/window.__player as a
+  // "runtime bridge" and then SKIPS the direct window.__timelines adapter, yet
+  // can't drive a bare __hf, so the preview dead-ends ("timeline not found after
+  // 8s"). Strip the legacy globals so the player resolves the __timelines entry
+  // registered above. MUST NOT run on the RENDER path: the producer's OWN runtime
+  // initializes/drives window.__hf to build its timeline (window.__hf ||
+  // (window.__hf = {}), __hfTimelinesBuilding), so removing it produces a blank
+  // render — the regression this gate fixes.
+  const strip = stripLegacyHost
+    ? `
+  try { delete window.__hf; } catch (e) { window.__hf = undefined; }
+  try { delete window.__player; } catch (e2) { window.__player = undefined; }`
+    : "";
+  return `<script data-sorrel-timeline-bridge>
 (function () {
   var root = document.querySelector("[data-composition-id]");
   var id = (root && root.getAttribute("data-composition-id")) || "root";
@@ -534,21 +549,23 @@ const TIMELINE_BRIDGE = `<script data-sorrel-timeline-bridge>
       duration: function () { return DUR; },
       isActive: function () { return playing; }
     };
-  }
-  // Drop the legacy globals so the player uses the direct __timelines adapter.
-  try { delete window.__hf; } catch (e) { window.__hf = undefined; }
-  try { delete window.__player; } catch (e2) { window.__player = undefined; }
+  }${strip}
 })();
 </script>`;
+}
 
 /**
  * Inject the legacy-`__hf` → `__timelines` bridge before the last `</body>` (so
- * it runs AFTER the composition's own script has set `window.__hf`). Pure;
- * builds a timeline from `__hf` when needed and ALWAYS strips the legacy globals
- * that block the preview player's direct `__timelines` adapter.
+ * it runs AFTER the composition's own script has set `window.__hf`). Always
+ * registers a `__timelines` entry from a legacy `__hf`; strips the legacy globals
+ * ONLY when `stripLegacyHost` (the PREVIEW path) — never on render, where the
+ * producer drives `window.__hf`.
  */
-export function injectTimelineBridge(html: string): string {
-  return injectBeforeBodyEnd(html, TIMELINE_BRIDGE);
+export function injectTimelineBridge(
+  html: string,
+  stripLegacyHost = false,
+): string {
+  return injectBeforeBodyEnd(html, buildTimelineBridge(stripLegacyHost));
 }
 
 /** Map an uploaded audio object's content-type to a file extension. */
@@ -983,21 +1000,31 @@ async function loadBrandKit(
  * never went through Studio (and the smoke-test default with compositionHtml
  * null) renders byte-for-byte as before this branch existed.
  */
-export async function buildCompositionHtml(project: {
-  id: number;
-  userId: string;
-  module: string;
-  compositionVars: Record<string, string> | null;
-  compositionHtml?: string | null;
-  brandKitId?: number | null;
-  renderSettings?: RenderSettings | null;
-}): Promise<string> {
+export async function buildCompositionHtml(
+  project: {
+    id: number;
+    userId: string;
+    module: string;
+    compositionVars: Record<string, string> | null;
+    compositionHtml?: string | null;
+    brandKitId?: number | null;
+    renderSettings?: RenderSettings | null;
+  },
+  // PREVIEW path passes `{ preview: true }` so the timeline bridge strips the
+  // legacy `__hf`/`__player` host (the player needs them gone to resolve the
+  // timeline). The RENDER path omits it: the producer drives `__hf`, so stripping
+  // it would blank the render.
+  opts?: { preview?: boolean },
+): Promise<string> {
   if (
     typeof project.compositionHtml === "string" &&
     project.compositionHtml.length > 0
   ) {
     return injectFitScript(
-      injectTimelineBridge(inlineVendorScripts(project.compositionHtml)),
+      injectTimelineBridge(
+        inlineVendorScripts(project.compositionHtml),
+        opts?.preview,
+      ),
     );
   }
 
@@ -1030,6 +1057,7 @@ export async function buildCompositionHtml(project: {
   return injectFitScript(
     injectTimelineBridge(
       inlineVendorScripts(renderCompositionTemplate(source, vars)),
+      opts?.preview,
     ),
   );
 }

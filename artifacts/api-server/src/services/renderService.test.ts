@@ -97,21 +97,30 @@ describe("injectFitScript", () => {
 });
 
 describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
-  it("injects the bridge just before </body>, content untouched", () => {
-    const out = injectTimelineBridge("<html><body><div>x</div></body></html>");
-    expect(out).toContain("data-sorrel-timeline-bridge");
-    expect(out.indexOf("data-sorrel-timeline-bridge")).toBeLessThan(
-      out.indexOf("</body>"),
+  it("injects before </body>; strips legacy globals ONLY in preview mode", () => {
+    const render = injectTimelineBridge(
+      "<html><body><div>x</div></body></html>",
     );
-    expect(out).toContain("<div>x</div>");
+    expect(render).toContain("data-sorrel-timeline-bridge");
+    expect(render.indexOf("data-sorrel-timeline-bridge")).toBeLessThan(
+      render.indexOf("</body>"),
+    );
+    expect(render).toContain("<div>x</div>");
+    // RENDER path (default) must NOT strip window.__hf — the producer drives it.
+    expect(render).not.toContain("delete window.__hf");
+    // PREVIEW path strips it so the player resolves the __timelines adapter.
+    expect(injectTimelineBridge("<body></body>", true)).toContain(
+      "delete window.__hf",
+    );
   });
 
   // Extract + run the bridge IIFE against mocked browser globals.
   function runBridge(
     win: Record<string, unknown>,
     compositionId: string | null,
+    preview = false,
   ): void {
-    const js = injectTimelineBridge("<body></body>")
+    const js = injectTimelineBridge("<body></body>", preview)
       .replace(/^[\s\S]*?<script data-sorrel-timeline-bridge>/, "")
       .replace(/<\/script>[\s\S]*$/, "");
     const doc = {
@@ -129,10 +138,24 @@ describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
     )(win, doc, raf, caf);
   }
 
-  it("adapts window.__hf into a TimelineLike AND strips window.__hf so the player resolves it", () => {
+  it("RENDER mode (no strip): adapts __hf into a TimelineLike but KEEPS window.__hf", () => {
+    // The producer's runtime drives window.__hf, so the render path must NOT
+    // strip it — stripping it blanked the render (the regression).
     const seek = vi.fn();
     const win: Record<string, unknown> = { __hf: { duration: 5, seek } };
-    runBridge(win, "studio");
+    runBridge(win, "studio"); // preview = false
+    expect(win.__hf).toBeDefined();
+    const tl = (win.__timelines as Record<string, any>).studio;
+    expect(tl).toBeTruthy();
+    expect(tl.duration()).toBe(5);
+    tl.seek(2);
+    expect(seek).toHaveBeenCalledWith(2);
+  });
+
+  it("PREVIEW mode (strip): adapts __hf into a TimelineLike AND strips window.__hf", () => {
+    const seek = vi.fn();
+    const win: Record<string, unknown> = { __hf: { duration: 5, seek } };
+    runBridge(win, "studio", true);
     // The legacy global is GONE — @hyperframes/player only uses the direct
     // __timelines adapter when no __hf/__player "runtime bridge" is present.
     expect(win.__hf).toBeUndefined();
@@ -140,22 +163,21 @@ describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
     expect(tl).toBeTruthy();
     expect(tl.duration()).toBe(5);
     expect(tl.isActive()).toBe(false);
-    // seek still delegates to the original hf.seek (kept alive by the closure)
-    // even though window.__hf was deleted.
+    // seek still delegates to the original hf.seek (kept alive by the closure).
     tl.seek(2);
     expect(seek).toHaveBeenCalledWith(2);
     expect(tl.time()).toBe(2);
   });
 
-  it("strips window.__hf even when a real timeline is already registered (studio-default-timelines)", () => {
-    // That seed exposes BOTH a real __timelines entry AND a legacy __hf back-compat
-    // shim — the __hf alone would still block the player's direct adapter.
+  it("PREVIEW mode strips __hf even when a real timeline is already registered", () => {
+    // studio-default-timelines exposes BOTH a real __timelines entry AND a legacy
+    // __hf shim — the __hf alone would still block the player's direct adapter.
     const existing = { id: "studio", real: true };
     const win: Record<string, unknown> = {
       __hf: { duration: 5, seek: () => undefined },
       __timelines: { studio: existing },
     };
-    runBridge(win, "studio");
+    runBridge(win, "studio", true);
     expect((win.__timelines as Record<string, unknown>).studio).toBe(existing);
     expect(win.__hf).toBeUndefined();
   });
@@ -165,7 +187,7 @@ describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
     const win: Record<string, unknown> = {
       __timelines: { "brand-story": existing },
     };
-    runBridge(win, "brand-story");
+    runBridge(win, "brand-story", true);
     expect((win.__timelines as Record<string, unknown>)["brand-story"]).toBe(
       existing,
     );

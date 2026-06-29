@@ -108,14 +108,19 @@ router.get(
         ? (rawRes as RenderResolution)
         : DEFAULT_RENDER_SETTINGS.resolution;
 
-    const html = await buildCompositionHtml({
-      id: 0,
-      userId: req.user.id,
-      module,
-      compositionVars: overrides,
-      brandKitId: null, // → the user's default kit (loadBrandKit), like the render
-      renderSettings: { ...DEFAULT_RENDER_SETTINGS, resolution },
-    });
+    const html = await buildCompositionHtml(
+      {
+        id: 0,
+        userId: req.user.id,
+        module,
+        compositionVars: overrides,
+        brandKitId: null, // → the user's default kit (loadBrandKit), like the render
+        renderSettings: { ...DEFAULT_RENDER_SETTINGS, resolution },
+      },
+      // Preview: strip the legacy __hf/__player host so the <hyperframes-player>
+      // resolves the timeline (it skips the __timelines adapter otherwise).
+      { preview: true },
+    );
 
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
