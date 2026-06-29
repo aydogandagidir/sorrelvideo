@@ -1139,6 +1139,19 @@ upload-sourcemaps` in the deploy workflow + strip `.map` from the
     in a root `vitest.config.ts`). Deferred to a focused change that compares the
     4-project test **count** (not just green) before/after, since a botched
     migration can silently skip whole projects.
+    - **`eslint-plugin-react-hooks` 5 → 7 (deferred, same reason).** v7 moves the
+      four React-Compiler rules (`set-state-in-effect`, `purity`, `immutability`,
+      `refs`) into the `recommended` preset our `eslint.config.mjs` spreads, so the
+      bump turns them on at `error` and surfaces **11 real anti-patterns** across
+      the SPA (render-loop `setState`, impure calls / ref access during render,
+      mutating immutables). These are behavioral refactors needing per-file
+      verification — NOT a mechanical autofix — so the Dependabot PR was held at
+      `^5.2.0`. Re-attempt as a dedicated "adopt React Compiler lint rules"
+      migration that bumps the dep AND fixes the 11 violations (verified with the
+      full pre-push suite). A blanket `eslint-disable` is banned (see "Don't do
+      this"); the only non-disable stopgap would be turning those 4 rules `off` in
+      config with rationale, which ships a major whose headline feature is off —
+      hence the defer.
 11. **Website→Video — AI section mode + interactive crop UI** (backend mostly
     landed): four "which section to feature" modes ship today — whole page,
     drag-selected region (the `/website-to-video/preview` two-step flow),

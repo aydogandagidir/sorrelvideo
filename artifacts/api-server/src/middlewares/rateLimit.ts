@@ -1,4 +1,9 @@
-import { rateLimit, type Options, type Store } from "express-rate-limit";
+import {
+  rateLimit,
+  ipKeyGenerator,
+  type Options,
+  type Store,
+} from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 import IORedis, { type Redis } from "ioredis";
 import type { Request } from "express";
@@ -79,7 +84,11 @@ function createLimiter(opts: {
   };
   if (opts.keyByEmail) {
     config.keyGenerator = (req: Request) => {
-      const ip = req.ip ?? "unknown";
+      // express-rate-limit v8 masks IPv6 to a /56 subnet in its default key
+      // generator and warns (ERR_ERL_KEY_GEN_IPV6) if a CUSTOM generator uses a
+      // raw `req.ip`. Route the IP through the exported `ipKeyGenerator` so IPv6
+      // clients bucket by /56 (matching the default) instead of per-exact-address.
+      const ip = ipKeyGenerator(req.ip ?? "unknown");
       const body = (req.body ?? {}) as { email?: unknown };
       const email =
         typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
