@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildAssSubtitles, type CaptionWord } from "./videoTrimService";
+import {
+  buildAssSubtitles,
+  encodeSmartTrimPayload,
+  decodeSmartTrimPayload,
+  type CaptionWord,
+} from "./videoTrimService";
 
 const WORDS: CaptionWord[] = [
   { text: "the", start: 0.0, end: 0.3 },
@@ -68,5 +73,62 @@ describe("buildAssSubtitles", () => {
     ]);
     expect(ass.match(/^Dialogue:/gm)?.length).toBe(1);
     expect(ass).toContain(",OK");
+  });
+});
+
+describe("smart trim payload codec", () => {
+  const payload = {
+    source: "/objects/uploads/abc-123",
+    segments: [
+      { start: 0, end: 1.08 },
+      { start: 3.3, end: 4.88 },
+    ],
+  };
+
+  it("round-trips encode → decode", () => {
+    const decoded = decodeSmartTrimPayload(encodeSmartTrimPayload(payload));
+    expect(decoded).toEqual(payload);
+  });
+
+  it("rejects a non-objects source path", () => {
+    const b64 = encodeSmartTrimPayload({
+      source: "https://evil.example/x",
+      segments: [{ start: 0, end: 1 }],
+    });
+    expect(decodeSmartTrimPayload(b64)).toBeNull();
+  });
+
+  it("rejects garbage / non-base64", () => {
+    expect(decodeSmartTrimPayload("not base64 @@@")).toBeNull();
+    expect(decodeSmartTrimPayload("")).toBeNull();
+  });
+
+  it("drops malformed segments and returns null when none survive", () => {
+    const b64 = encodeSmartTrimPayload({
+      source: "/objects/uploads/x",
+      segments: [{ start: 2, end: 1 }],
+    });
+    expect(decodeSmartTrimPayload(b64)).toBeNull();
+  });
+
+  it("keeps only the well-formed segments", () => {
+    const raw = Buffer.from(
+      JSON.stringify({
+        source: "/objects/uploads/x",
+        segments: [
+          { start: 0, end: 1 },
+          { start: 5, end: 4 }, // dropped (end ≤ start)
+          { start: 2, end: 3 },
+        ],
+      }),
+      "utf-8",
+    ).toString("base64");
+    expect(decodeSmartTrimPayload(raw)).toEqual({
+      source: "/objects/uploads/x",
+      segments: [
+        { start: 0, end: 1 },
+        { start: 2, end: 3 },
+      ],
+    });
   });
 });

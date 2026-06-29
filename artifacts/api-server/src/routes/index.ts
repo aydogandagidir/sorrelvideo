@@ -15,6 +15,7 @@ import avatarRouter from "./avatar";
 import compositionsRouter from "./compositions";
 import studioRouter from "./studio";
 import websiteToVideoRouter from "./websiteToVideo";
+import smartTrimRouter from "./smartTrim";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(avatarRouter);
 router.use(compositionsRouter);
 router.use(studioRouter);
 router.use(websiteToVideoRouter);
+router.use(smartTrimRouter);
 
 export default router;

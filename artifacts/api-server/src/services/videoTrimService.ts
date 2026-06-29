@@ -23,6 +23,52 @@ import { spawn } from "node:child_process";
 import { logger } from "../lib/logger";
 import { totalKeptDuration, type Segment } from "../lib/smartTrimEdl";
 
+/** The project `module` string for transcript-driven footage trims. */
+export const SMART_TRIM_MODULE = "smart-trim";
+
+/**
+ * The render-input contract for a smart-trim project: the source object to
+ * re-fetch + the keep-EDL. Stored base64 in `compositionVars["smarttrim.payload"]`
+ * (base64 survives the {{key}} substitution byte-identical) by smartTrimService
+ * and decoded by the executeRender smart-trim branch. Lives here (a leaf module
+ * both sides already import) to avoid a renderService↔smartTrimService cycle.
+ */
+export interface SmartTrimPayload {
+  source: string;
+  segments: Segment[];
+}
+
+export function encodeSmartTrimPayload(payload: SmartTrimPayload): string {
+  return Buffer.from(JSON.stringify(payload), "utf-8").toString("base64");
+}
+
+export function decodeSmartTrimPayload(b64: string): SmartTrimPayload | null {
+  try {
+    const obj = JSON.parse(Buffer.from(b64, "base64").toString("utf-8")) as unknown;
+    if (!obj || typeof obj !== "object") return null;
+    const o = obj as { source?: unknown; segments?: unknown };
+    if (typeof o.source !== "string" || !o.source.startsWith("/objects/")) {
+      return null;
+    }
+    if (!Array.isArray(o.segments)) return null;
+    const segments = o.segments
+      .map((s) => s as { start?: unknown; end?: unknown })
+      .filter(
+        (s) =>
+          typeof s.start === "number" &&
+          typeof s.end === "number" &&
+          Number.isFinite(s.start) &&
+          Number.isFinite(s.end) &&
+          (s.end as number) > (s.start as number),
+      )
+      .map((s) => ({ start: s.start as number, end: s.end as number }));
+    if (segments.length === 0) return null;
+    return { source: o.source, segments };
+  } catch {
+    return null;
+  }
+}
+
 /** A caption word on the TRIMMED timeline (RenderCaptionWord-shaped). */
 export interface CaptionWord {
   text: string;
@@ -48,6 +94,25 @@ export class VideoTrimAbortedError extends Error {
 
 /** 30ms fade at each cut — long enough to kill a click, short enough to be invisible. */
 const FADE_SEC = 0.03;
+
+/**
+ * drawtext needs a font. Prefer a known TTF on the render box (Debian ships
+ * DejaVu/Liberation for Chromium), else fall back to the fontconfig `sans`
+ * family. Linux paths have no `:` so no filter-escaping is needed.
+ */
+const WATERMARK_FONT_CANDIDATES = [
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+  "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+];
+
+function resolveWatermarkFontArg(): string {
+  for (const p of WATERMARK_FONT_CANDIDATES) {
+    if (fs.existsSync(p)) return `fontfile=${p}`;
+  }
+  return "font=sans";
+}
 
 /**
  * Run ffmpeg with the given args, abortable. Resolves on exit 0; rejects with
@@ -234,6 +299,8 @@ export interface TrimVideoOptions {
   captions?: readonly CaptionWord[];
   /** Brand accent (#RRGGBB) for the caption outline. */
   brandColor?: string;
+  /** Burn the "Made with Sorrel" watermark (Free tier). Default false. */
+  watermark?: boolean;
   signal?: AbortSignal;
 }
 
@@ -277,9 +344,13 @@ export async function trimVideo(
     `${concatInputs.join("")}concat=n=${segments.length}:v=1:a=1[vcat][aout]`,
   );
 
+  // Apply the optional video overlays in order: captions, then watermark. Each
+  // stage consumes the current label and emits a new one; with neither, the
+  // mapped label stays the concat output [vcat].
+  let videoLabel = "[vcat]";
+
   // Burn captions by writing the .ass next to the work dir and referencing it by
   // basename (ffmpeg cwd = workDir), avoiding `subtitles=` path-escaping on Windows.
-  let videoLabel = "[vcat]";
   if (opts.captions && opts.captions.length > 0) {
     const assName = "captions.ass";
     fs.writeFileSync(
@@ -287,8 +358,21 @@ export async function trimVideo(
       buildAssSubtitles(opts.captions, { accentColor: opts.brandColor }),
       "utf-8",
     );
-    parts.push(`[vcat]subtitles=${assName}[vout]`);
-    videoLabel = "[vout]";
+    parts.push(`${videoLabel}subtitles=${assName}[vcap]`);
+    videoLabel = "[vcap]";
+  }
+
+  // "Made with Sorrel" watermark — the Free-tier monetization lever, removable on
+  // Pro (mirrors the composition path's injectWatermark, but burned via drawtext
+  // since smart-trim never enters the HTML pipeline). Fixed text → no escaping.
+  if (opts.watermark) {
+    const fontArg = resolveWatermarkFontArg();
+    parts.push(
+      `${videoLabel}drawtext=${fontArg}:text='Made with Sorrel':` +
+        `fontcolor=white@0.92:fontsize=h/26:box=1:boxcolor=black@0.42:boxborderw=12:` +
+        `x=w-tw-28:y=h-th-28[vwm]`,
+    );
+    videoLabel = "[vwm]";
   }
 
   const filterComplex = parts.join(";");

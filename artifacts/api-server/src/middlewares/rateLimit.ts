@@ -150,6 +150,16 @@ export const brandExtractLimiter = createLimiter({
   name: "brand-extract",
 });
 
+// Authenticated Smart Trim. Each call downloads a user video, extracts + Whisper-
+// transcribes its audio, then runs an FFmpeg re-encode — heavy on both CPU and the
+// ASR provider — so cap a single client to a handful per window (the monthly AI
+// quota is still enforced separately in billingService).
+export const smartTrimLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  name: "smart-trim",
+});
+
 // Authenticated AI background-image generation. Each call hits an image model
 // (gpt-image-1) which is materially pricier + slower than the text endpoints, so
 // cap a single client tighter than aiSuggest (matches brandExtract: 10 / window).

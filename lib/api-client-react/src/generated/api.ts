@@ -69,6 +69,8 @@ import type {
   ResendVerificationRequest,
   ResetPasswordRequest,
   SignupRequest,
+  SmartTrimRequest,
+  SmartTrimResponse,
   Template,
   TemplateInput,
   UploadUrlRequest,
@@ -3558,6 +3560,79 @@ export const useCreateAvatarVideo = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getCreateAvatarVideoMutationOptions(options));
+    }
+
+export const getSmartTrimUrl = () => {
+
+
+
+
+  return `/api/smart-trim`
+}
+
+/**
+ * Transcript-driven cleanup of a user-uploaded talking-head video: Whisper word-times the audio, an EDL drops filler words + over-long silences, and FFmpeg cuts/concatenates the survivors into a tightened, branded mp4. The source must already be uploaded via the storage two-phase flow; pass its `/objects/...` path. Costs one AI quota unit on Free (charged after transcription succeeds); the render start additionally consumes the regular render quota — when that quota is exhausted the project is still created as a draft and `renderStarted` is false. Burned captions are a Pro feature (ignored for Free so the trim still renders).
+
+ * @summary Trim a raw uploaded video by transcript (filler + silence removal; auto-renders)
+ */
+export const smartTrim = async (smartTrimRequest: SmartTrimRequest, options?: RequestInit): Promise<SmartTrimResponse> => {
+
+  return customFetch<SmartTrimResponse>(getSmartTrimUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      smartTrimRequest,)
+  }
+);}
+
+
+
+
+export const getSmartTrimMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof smartTrim>>, TError,{data: BodyType<SmartTrimRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof smartTrim>>, TError,{data: BodyType<SmartTrimRequest>}, TContext> => {
+
+const mutationKey = ['smartTrim'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof smartTrim>>, {data: BodyType<SmartTrimRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  smartTrim(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SmartTrimMutationResult = NonNullable<Awaited<ReturnType<typeof smartTrim>>>
+    export type SmartTrimMutationBody = BodyType<SmartTrimRequest>
+    export type SmartTrimMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Trim a raw uploaded video by transcript (filler + silence removal; auto-renders)
+ */
+export const useSmartTrim = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof smartTrim>>, TError,{data: BodyType<SmartTrimRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof smartTrim>>,
+        TError,
+        {data: BodyType<SmartTrimRequest>},
+        TContext
+      > => {
+      return useMutation(getSmartTrimMutationOptions(options));
     }
 
 export const getCreateCheckoutSessionUrl = () => {
