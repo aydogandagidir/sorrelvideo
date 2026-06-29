@@ -119,8 +119,16 @@ function thumbProps(project: Project, brand?: BrandKit) {
  */
 function captureImageSrc(project: Project): string | null {
   const v = (project.compositionVars ?? {}) as Record<string, unknown>;
+  // Legacy projects inline the screenshot as a data URI; newer ones keep it in
+  // object storage and reference it (capture.imageObject) — served by the
+  // owner-scoped /capture-image route so the row + list payload stay lean.
   const img = v["capture.image"];
-  return typeof img === "string" && img.startsWith("data:image/") ? img : null;
+  if (typeof img === "string" && img.startsWith("data:image/")) return img;
+  const ref = v["capture.imageObject"];
+  if (typeof ref === "string" && ref.length > 0) {
+    return `/api/projects/${project.id}/capture-image`;
+  }
+  return null;
 }
 
 function StatusDot({ status }: { status: string }) {

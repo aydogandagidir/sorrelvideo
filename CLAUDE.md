@@ -435,12 +435,21 @@ stored; we only need the identity for sign-in.
 a draft project from the branded `website-showcase` composition, returned so the
 SPA (`pages/website-to-video.tsx`) navigates straight to it. The flow:
 `websiteToVideoService.createWebsiteVideoProject` →
-`websiteCaptureService.captureWebsite` (headless Chrome via Puppeteer) → embeds
-the **full-page** screenshot as a `capture.image` **JPEG data URI** in
-`compositionVars` (+ `capture.height`/`title`/`url`), at the composition's native
-1920×1080. `renderService` substitutes those (HTML-escaping the untrusted
+`websiteCaptureService.captureWebsite` (headless Chrome via Puppeteer) → the
+**full-page** screenshot (native 1920×1080). **Storage = object storage** (the
+same model as the AI background, see "AI background"): the screenshot is kept OUT
+of the project row — `storeCaptureImage` writes `renders/<id>/capture-image.<ext>`
++ a private GCS object when configured, and `compositionVars` carries only the
+small reference `capture.imageObject` (+ `capture.height`/`title`/`url`), NOT a
+~1MB base64 data URI (that bloated the row AND every `GET /projects` payload).
+`buildCompositionHtml` calls `resolveCaptureImageDataUri` to substitute the real
+`{{capture.image}}` data URI at render/preview time (HTML-escaping the untrusted
 title/url) into `compositions/website-showcase.html` (intro → mac-style browser
-scrolling the screenshot → outro CTA).
+scrolling the screenshot → outro CTA); the owner-scoped
+`GET /projects/:id/capture-image` route streams it to the SPA's truthful preview.
+A LEGACY inline `capture.image` data URI (projects from before this) is detected
+and used as-is. `capture.imageObject` is gated in `compositionVars.ts`
+(`OBJECT_REF_KEYS`, shared with `ai.backgroundObject`).
 
 **Brand wiring (the showcase is actually branded).** The intro card and stage
 glow read `brand.primaryColor`/`secondaryColor`/`companyName`, which come from the
@@ -473,9 +482,10 @@ bluedev.dev).** Three layers:
   settles 500ms — otherwise IntersectionObserver-gated sections never paint and
   the showcase video "scrolls through blank white" below the hero.
 - **Truthful previews**: the projects grid + video-dialog placeholder render the
-  REAL `compositionVars["capture.image"]` when present instead of the generic
-  `CompositionThumb` mock (which fabricates a letter badge + "Learn more" CTA +
-  a project-name headline — users read the mock as broken output).
+  REAL screenshot when present (`captureImageSrc` → the `/projects/:id/capture-image`
+  route for an object-stored capture, or a legacy inline `capture.image` data URI)
+  instead of the generic `CompositionThumb` mock (which fabricates a letter badge +
+  "Learn more" CTA + a project-name headline — users read the mock as broken output).
 - **Real logo + palette**: `website-showcase`'s intro leads with
   `<img src="{{brand.logoUrl}}">` (CSS `[src=""]` + `onerror` collapse it when
   absent/broken). `pickBrandColors` requires a vivid runner-up to carry

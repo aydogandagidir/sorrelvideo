@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { eq } from "drizzle-orm";
 import { db, projectsTable, DEFAULT_RENDER_SETTINGS } from "@workspace/db";
 import {
   captureWebsite,
@@ -7,6 +8,7 @@ import {
   type CaptureMediaType,
   type ScrapedBrandSignals,
 } from "./websiteCaptureService";
+import { storeCaptureImage } from "./renderService";
 import { getProvider, type SectionPick } from "@workspace/ai";
 import { assertSafeCompositionVars } from "../lib/compositionVars";
 import {
@@ -513,7 +515,6 @@ export async function createWebsiteVideoProject(
     }
 
     const compositionVars: Record<string, string> = {
-      "capture.image": dataUri(cap.screenshotPath, cap.mediaType),
       "capture.height": String(cap.height),
       "capture.url": cap.url,
       "capture.title": cap.title,
@@ -533,8 +534,8 @@ export async function createWebsiteVideoProject(
     };
 
     // Defense in depth: route this server-built map through the same injection
-    // gate the project write routes use (the image is a data URI, title/url are
-    // captured text, numbers are clamped — so this never throws in practice).
+    // gate the project write routes use (title/url are captured text, numbers are
+    // clamped — so this never throws in practice).
     assertSafeCompositionVars(compositionVars);
 
     const [project] = await db
@@ -551,7 +552,29 @@ export async function createWebsiteVideoProject(
       })
       .returning();
 
-    return project;
+    // Store the screenshot OUT of the row (render-dir file + a private GCS object
+    // when configured), then reference it — a ~1MB base64 data URI in
+    // compositionVars otherwise bloated the row AND the GET /projects list
+    // payload. buildCompositionHtml resolves capture.imageObject back to a data
+    // URI at render/preview time; the owner-scoped /projects/:id/capture-image
+    // route serves it to the SPA's truthful preview. Needs the project id, so it
+    // runs after the insert (the screenshot file is still in cap.cleanupDir,
+    // removed in the finally below). Done before the SPA ever sees the project.
+    const { ref } = await storeCaptureImage(
+      project.id,
+      userId,
+      cap.screenshotPath,
+      cap.mediaType,
+    );
+    const nextVars = { ...compositionVars, "capture.imageObject": ref };
+    assertSafeCompositionVars(nextVars);
+    const [updated] = await db
+      .update(projectsTable)
+      .set({ compositionVars: nextVars })
+      .where(eq(projectsTable.id, project.id))
+      .returning();
+
+    return updated;
   } finally {
     fs.rmSync(cap.cleanupDir, { recursive: true, force: true });
   }

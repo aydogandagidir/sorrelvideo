@@ -628,3 +628,35 @@ describe("Projects — refine (website→video, no regenerate)", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("Projects — website→video truthful preview (object-storage)", () => {
+  it("points the card image at the /capture-image route when the screenshot is object-stored", async () => {
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      listRoute([
+        w2vProject({
+          // Object-storage reference (newer projects) — NOT an inline data URI.
+          compositionVars: {
+            "capture.imageObject": "/objects/uploads/abc",
+            "capture.height": "4000",
+            "capture.url": "https://acme.test",
+            "capture.title": "Acme",
+            duration: "38",
+          },
+        }),
+      ]),
+    ]);
+
+    renderWithProviders(<Projects />, { route: "/projects" });
+
+    const img = await screen.findByAltText("Site Video");
+    expect(img.getAttribute("src")).toBe("/api/projects/9/capture-image");
+  });
+
+  it("still inlines a LEGACY capture.image data URI (pre-object-storage projects)", async () => {
+    fetchMock = installApiFetchMock([...LAYOUT_ROUTES, listRoute([w2vProject()])]);
+    renderWithProviders(<Projects />, { route: "/projects" });
+    const img = await screen.findByAltText("Site Video");
+    expect(img.getAttribute("src")).toBe("data:image/jpeg;base64,AAAA");
+  });
+});

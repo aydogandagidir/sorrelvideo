@@ -27,6 +27,7 @@ import {
   getRenderArtifact,
   buildCompositionHtml,
   storeAiBackground,
+  resolveCaptureImageBytes,
   RENDERS_DIR,
 } from "../services/renderService";
 import { getThumbnailPath } from "../services/thumbnailService";
@@ -1073,6 +1074,49 @@ router.get("/projects/:id/assets/:name", async (req, res): Promise<void> => {
     ? req.params.name[0]
     : req.params.name;
   serveTemplateAsset(res, project.module, name);
+});
+
+// GET /api/projects/:id/capture-image — stream the website→video screenshot.
+// The screenshot is kept OUT of the project row (render-dir file / private GCS
+// object, referenced by compositionVars["capture.imageObject"]); the SPA's
+// truthful preview points its <img> here instead of inlining a ~1MB data URI in
+// every GET /projects payload. SPEC-EXEMPT (browser sub-resource, like
+// /assets/:name). Auth + ownership mirror the assets/video routes; the bytes
+// resolver re-checks the object ACL against the project owner.
+router.get("/projects/:id/capture-image", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid project id" });
+    return;
+  }
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (project.userId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const found = await resolveCaptureImageBytes(project);
+  if (!found) {
+    res.status(404).json({ error: "Capture image not available" });
+    return;
+  }
+  // Owner-scoped + stable per project (a re-capture makes a NEW project) → cache
+  // privately for a day.
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.setHeader("Content-Type", found.mediaType);
+  res.send(found.buffer);
 });
 
 // GET /api/projects/:id/thumbnail — stream the rendered poster frame (PNG).

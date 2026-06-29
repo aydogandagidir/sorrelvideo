@@ -15,9 +15,11 @@ import {
   renderDirFor,
   renderFailureMessage,
   resolveAiBackgroundDataUri,
+  resolveCaptureImageBytes,
   resolveEntryFile,
   resolveVoiceoverTag,
   storeAiBackground,
+  storeCaptureImage,
   RENDERS_DIR,
   VOICEOVER_FILENAME,
   VoiceoverUnavailableError,
@@ -340,6 +342,31 @@ describe("AI background store ↔ resolve (local, no GCS)", () => {
     await expect(
       storeAiBackground(projectId, "u", "data:text/html;base64,PG90Pg=="),
     ).rejects.toThrow(/valid image data URI/);
+  });
+
+  it("stores a website→video screenshot from a FILE and resolves its bytes back", async () => {
+    const src = path.join(os.tmpdir(), `cap-src-${projectId}.jpg`);
+    fs.writeFileSync(src, Buffer.from("fake-screenshot-bytes"));
+    try {
+      const { ref } = await storeCaptureImage(
+        projectId,
+        "user-1",
+        src,
+        "image/jpeg",
+      );
+      expect(ref).toBe("local");
+      expect(fs.existsSync(path.join(dir, "capture-image.jpg"))).toBe(true);
+
+      const found = await resolveCaptureImageBytes({
+        id: projectId,
+        userId: "user-1",
+        compositionVars: { "capture.imageObject": ref },
+      });
+      expect(found?.mediaType).toBe("image/jpeg");
+      expect(found?.buffer.toString()).toBe("fake-screenshot-bytes");
+    } finally {
+      fs.rmSync(src, { force: true });
+    }
   });
 });
 

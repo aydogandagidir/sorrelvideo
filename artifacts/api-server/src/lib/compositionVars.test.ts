@@ -125,6 +125,13 @@ describe("findUnsafeCompositionVar — object-reference keys", () => {
       }),
     ).toBeNull();
     expect(findUnsafeCompositionVar({ "ai.backgroundObject": "" })).toBeNull();
+    // capture.imageObject (website→video screenshot) shares the same gate.
+    expect(
+      findUnsafeCompositionVar({ "capture.imageObject": "/objects/uploads/x" }),
+    ).toBeNull();
+    expect(
+      findUnsafeCompositionVar({ "capture.imageObject": "local" }),
+    ).toBeNull();
   });
 
   it("rejects a non-/objects reference (e.g. a scheme or breakout)", () => {
