@@ -762,16 +762,21 @@ router.get("/projects/:id/composition", async (req, res): Promise<void> => {
   // the template so the `?vars=` live-edit overrides take effect (passing a
   // saved doc would return it verbatim). brandKitId IS passed so the preview
   // uses the project's pinned kit (or the user's default), matching the render.
-  const html = await buildCompositionHtml({
-    id: project.id,
-    userId: project.userId,
-    module: project.module,
-    compositionVars: mergedVars,
-    brandKitId: project.brandKitId,
-    // Lay the preview out at the project's chosen aspect, so what you see here
-    // matches the rendered mp4 (and the Studio editor seed below).
-    renderSettings: project.renderSettings,
-  });
+  const html = await buildCompositionHtml(
+    {
+      id: project.id,
+      userId: project.userId,
+      module: project.module,
+      compositionVars: mergedVars,
+      brandKitId: project.brandKitId,
+      // Lay the preview out at the project's chosen aspect, so what you see here
+      // matches the rendered mp4 (and the Studio editor seed below).
+      renderSettings: project.renderSettings,
+    },
+    // Preview: strip the legacy __hf/__player host so the <hyperframes-player>
+    // resolves the timeline (it skips the __timelines adapter otherwise).
+    { preview: true },
+  );
 
   // Preview must reflect live edits, never a cached copy.
   res.setHeader("Cache-Control", "no-store");
