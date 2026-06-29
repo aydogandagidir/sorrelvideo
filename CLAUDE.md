@@ -656,6 +656,57 @@ deterministic template rendering).
   `data:image/*;base64,…`, no attribute-breakout chars) — server-produced today
   but user-overridable via the `?vars=` preview path, so it must be gated.
 
+## Smart Trim (transcript-driven footage trim)
+
+`POST /api/smart-trim { videoObjectPath, removeFillers?, removeSilences?,
+silenceThresholdMs?, captions?, brandKitId? }` cleans up a user-uploaded raw
+talking-head clip (inspired by `browser-use/video-use`):
+`smartTrimService.createSmartTrimVideo` owner-checks + size-gates the source,
+downloads it, extracts a mono 16k audio track, word-times it with `transcribeBuffer`
+(the shared Whisper core), computes a keep-EDL, creates a `smart-trim` project, and
+**auto-starts the render** via `startProjectRender`. The SPA page is `/smart-trim`
+(`useSmartTrim`) and lands on `/projects?focus=<id>` where the normal 3s polling +
+video dialog take over. It is the inverse of talking-host (footage→video, not
+script→video).
+
+- **The one direct-FFmpeg path**: this is the ONLY render that re-encodes an
+  EXISTING video — every other module rasterizes HTML via `@hyperframes/producer`
+  (ffmpeg is otherwise thumbnail-only). `services/videoTrimService.ts` (`trimVideo`)
+  is a single ffmpeg pass: per-segment `trim`/`atrim` + a 30 ms `afade` at each join
+  → `concat` → optional ASS caption burn (`buildAssSubtitles`, 2-word UPPERCASE) +
+  `drawtext` watermark; re-encoded to a faststart mp4. Abortable — an aborted signal
+  kills the child → `VideoTrimAbortedError`, which the render branch maps to the
+  engine's `RenderCancelledError` (rollback to draft).
+- **EDL is pure + safe**: `lib/smartTrimEdl.ts` (`computeKeepSegments`,
+  `remapWordsToTrimmed`) is a dependency-free interval-subtract over the transcript
+  — drops filler words (default `DEFAULT_FILLER_WORDS`: um/uh/er…, deliberately NOT
+  "like"/"you know") + over-long silences (default >0.6s). Safe-by-construction:
+  empty / all-filler / degenerate input keeps the WHOLE clip rather than emit a
+  silence-only stub.
+- **Render wiring with NO schema change**: `executeRender` branches on
+  `module === "smart-trim"` → `runSmartTrimRender` (re-download the source with an
+  ACL re-check, FFmpeg-trim to the EDL); the rest of the render LIFECYCLE (claim →
+  quota → ledger → enqueue → worker → polling → thumbnail → cancel → refund →
+  `work-*` cleanup) is shared VERBATIM. The keep-EDL rides
+  `compositionVars["smarttrim.payload"]` (base64, like `host.payload`); the caption
+  words reuse the existing `renderSettings.captions` field; the output is forced to
+  `mp4`. `module` is a free string + the blobs are jsonb, so nothing migrates.
+- **Gating** (like `/avatar/video`, NOT Pro-gated): Free spends **1 AI unit**
+  charged AFTER transcription succeeds (a provider error never burns it); the
+  auto-render consumes the render quota and degrades to a **draft** when exhausted.
+  Burned captions are Pro and **dropped for Free at create time** — a Free caption
+  request must not 403 the render-time gate AFTER the AI unit was spent and strand
+  the just-paid draft. Watermark is the Free lever (`drawtext`, font-probe +
+  fontconfig fallback). `smartTrimLimiter` (5 / 15 min) bounds the heavy
+  download + encode.
+- **Limits**: source ≤500 MB and ≤30 min (the mono-16k audio extract keeps Whisper
+  under its 25 MB cap). No new env. There is NO gallery template — the module needs
+  an upload, so it ships as a page, not a seeded composition.
+- **Verified** by `lib/smartTrimEdl.test.ts` (EDL), `services/videoTrimService.test.ts`
+  (ASS builder + the `smarttrim.payload` codec), and the `RENDER_SMOKE`-gated
+  `services/videoTrimSmoke.test.ts` (real ffmpeg cuts a synthetic clip → a valid,
+  shorter mp4 with both streams + burned captions).
+
 ## Billing
 
 - Stripe is the source of truth; locally we cache subscription state in
@@ -715,7 +766,9 @@ deterministic template rendering).
 - Worker + recovery: `startRenderWorker()` (in-process; no-op without Redis)
   consumes jobs; `recoverStuckRenders()` on boot resets orphaned `rendering` rows
 - Service: `executeRender` in `services/renderService.ts` runs the Hyperframes
-  producer (the work half)
+  producer (the work half) — EXCEPT for `module === "smart-trim"`, which branches
+  to `runSmartTrimRender` (a direct-FFmpeg re-encode of an uploaded video; see
+  **Smart Trim**) and shares the same finalize (thumbnail + ready + ledger)
 - Output: `artifacts/api-server/renders/<projectId>/output.mp4`
 - Streaming: `GET /api/projects/:id/video` ranges over the file
 - Polling: frontend re-queries project status every 3 seconds
@@ -929,6 +982,16 @@ deterministic template rendering).
   from `.env.example` — base64 service-account JSON for containers,
   `GOOGLE_APPLICATION_CREDENTIALS` for local dev, or ADC for workload
   identity
+- **A client upload MUST be FINALIZED before its path is used.** The 2-phase flow
+  is `request-url` → client PUT → **`PUT /storage/uploads/finalize`**, and ONLY
+  finalize stamps the `owner` ACL. `canAccessObject` fails CLOSED on an object with
+  no ACL — so an un-finalized object is silently dropped at render
+  (`resolveBackgroundAudioTag` renders silent) or 404s (`transcribeObject`). The
+  web `useUpload` hook does request-url + PUT but NOT finalize; callers must invoke
+  `useFinalizeUpload` after it (smart-trim's `/smart-trim` page and
+  `render-settings-form`'s background-audio + caption uploaders do — a missing
+  finalize was a real bug, fixed in #168). Server-side `uploadPrivateObject`
+  (talking-host TTS) stamps the ACL itself, so it needs no finalize.
 
 ## Don't do this
 
