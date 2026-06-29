@@ -13,6 +13,7 @@ import {
   useAiSuggest,
   useAiEdit,
   useCreateProject,
+  useGenerateProjectAiImage,
   useGetBrandKit,
   useStartProjectRender,
   useUpdateProjectRenderSettings,
@@ -40,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { b64UrlVars } from "@/lib/preview-vars";
 import { useBillingInfo } from "@/hooks/useBilling";
+import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_ACCENT = "#cdfb45";
 const COMP_BG = "#0d1110";
@@ -91,11 +93,27 @@ const STUDIO_TEMPLATES = [
 
 type StudioModule = (typeof STUDIO_TEMPLATES)[number]["module"];
 
+/**
+ * Modules that host an AI background layer — mirrors the server's
+ * AI_BACKGROUND_MODULES (services/aiBackgroundTemplates.ts). Every STUDIO_TEMPLATES
+ * copy module currently supports it; the spotlight-clip path (video-spotlight)
+ * does not, so the control is hidden when a clip is attached.
+ */
+const AI_BG_MODULES = new Set<StudioModule>([
+  "studio",
+  "product-launch",
+  "brand-promo",
+  "social-teaser",
+  "brand-story",
+]);
+
 export default function StudioPage() {
   const [, setLocation] = useLocation();
   const { data: brandKit } = useGetBrandKit();
   const { data: billing } = useBillingInfo();
   const createProject = useCreateProject();
+  const aiImage = useGenerateProjectAiImage();
+  const { toast } = useToast();
   const startRender = useStartProjectRender();
   const queryClient = useQueryClient();
   const updateRenderSettings = useUpdateProjectRenderSettings();
@@ -116,6 +134,9 @@ export default function StudioPage() {
   // copy per an instruction (/ai/edit). Same card, same quota, same undo.
   const [aiMode, setAiMode] = useState<"draft" | "edit">("draft");
   const [aiPrompt, setAiPrompt] = useState("");
+  // Optional AI background brief — generated AFTER create (needs a project id),
+  // before the auto-render, so it bakes into the first render.
+  const [aiBgPrompt, setAiBgPrompt] = useState("");
   const [headline, setHeadline] = useState(DEFAULT_HEADLINE);
   const [bodyText, setBodyText] = useState(DEFAULT_BODY);
   const [ctaText, setCtaText] = useState(DEFAULT_CTA);
@@ -200,6 +221,10 @@ export default function StudioPage() {
     (STUDIO_TEMPLATES.find((t) => t.module === selectedModule)
       ?.supportsTransitions ??
       false);
+  // AI background is offered for the copy templates (all support the layer); a
+  // spotlight clip forces video-spotlight, which does not host it.
+  const supportsAiBg = !spotlightClip && AI_BG_MODULES.has(selectedModule);
+
   function pickTemplate(module: StudioModule) {
     setSelectedModule(module);
     const supports =
@@ -308,6 +333,27 @@ export default function StudioPage() {
             : compositionVars,
         },
       });
+      // Optional AI background: needs the project id and must land BEFORE the
+      // auto-render so it bakes into the first render. Best-effort — a quota /
+      // provider failure must not block the video; render it without the
+      // background and tell the user (a toast survives the navigation below).
+      if (supportsAiBg && aiBgPrompt.trim()) {
+        try {
+          await aiImage.mutateAsync({
+            id: project.id,
+            data: { prompt: aiBgPrompt.trim() },
+          });
+        } catch (bgErr) {
+          const e = bgErr as { status?: number; data?: { reason?: string } };
+          toast({
+            title:
+              e.status === 403 && e.data?.reason === "upgrade_required"
+                ? "AI arka plan atlandı — AI limitin dolu"
+                : "AI arka plan üretilemedi — video arka plansız oluşturuldu",
+            variant: "destructive",
+          });
+        }
+      }
       await updateRenderSettings.mutateAsync({
         id: project.id,
         data: renderSettings,
@@ -608,6 +654,29 @@ export default function StudioPage() {
                       maxLength={48}
                     />
                   </div>
+                  {supportsAiBg && (
+                    <div className="space-y-2">
+                      <Label htmlFor="aiBg" className="flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" /> AI arka
+                        plan{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (opsiyonel)
+                        </span>
+                      </Label>
+                      <Textarea
+                        id="aiBg"
+                        rows={2}
+                        value={aiBgPrompt}
+                        onChange={(e) => setAiBgPrompt(e.target.value)}
+                        maxLength={500}
+                        placeholder="örn. koyu degrade üzerinde soyut yeşil ışık çizgileri"
+                      />
+                      <p className="text-[11.5px] text-muted-foreground">
+                        Oluştururken markana uygun bir görsel üretilip yazının
+                        arkasına konur (canlı önizlemede görünmez).
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
