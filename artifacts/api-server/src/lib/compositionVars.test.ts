@@ -111,6 +111,39 @@ describe("findUnsafeCompositionVar — URL/attribute keys", () => {
   });
 });
 
+describe("findUnsafeCompositionVar — object-reference keys", () => {
+  // ai.backgroundObject is server-managed (set by POST /projects/:id/ai-image)
+  // and read server-side to fetch the stored image; constrain it to the shapes
+  // the resolver accepts so a PATCH/?vars override can't smuggle something else.
+  it("accepts the local sentinel, an /objects path, and empty", () => {
+    expect(
+      findUnsafeCompositionVar({ "ai.backgroundObject": "local" }),
+    ).toBeNull();
+    expect(
+      findUnsafeCompositionVar({
+        "ai.backgroundObject": "/objects/uploads/abc-123",
+      }),
+    ).toBeNull();
+    expect(findUnsafeCompositionVar({ "ai.backgroundObject": "" })).toBeNull();
+  });
+
+  it("rejects a non-/objects reference (e.g. a scheme or breakout)", () => {
+    expect(
+      findUnsafeCompositionVar({
+        "ai.backgroundObject": "javascript:alert(1)",
+      })?.key,
+    ).toBe("ai.backgroundObject");
+    expect(
+      findUnsafeCompositionVar({
+        "ai.backgroundObject": '/objects/x" onerror="y',
+      })?.key,
+    ).toBe("ai.backgroundObject");
+    expect(
+      findUnsafeCompositionVar({ "ai.backgroundObject": "/etc/passwd" })?.key,
+    ).toBe("ai.backgroundObject");
+  });
+});
+
 describe("findUnsafeCompositionVar — color keys", () => {
   it("rejects a color that injects a CSS url() for exfiltration", () => {
     expect(

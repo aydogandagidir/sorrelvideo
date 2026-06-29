@@ -118,6 +118,20 @@ const TOKEN_KEYS: readonly string[] = ["layout.aspect"];
  */
 const FONT_KEYS: readonly string[] = ["brand.fontFamily"];
 
+/**
+ * compositionVars keys holding a SERVER-managed object reference — never injected
+ * into the composition HTML (no `{{…}}` placeholder reads them), but read
+ * server-side to fetch a private object, so they are constrained to the shapes
+ * the resolver accepts: empty, the local sentinel `local`, or an `/objects/…`
+ * entity path. (The object fetch also re-checks ownership, so this is
+ * defence-in-depth, not the only guard.) `ai.backgroundObject` is set by
+ * POST /projects/:id/ai-image and points at the render-dir file / GCS object.
+ */
+const OBJECT_REF_KEYS: readonly string[] = ["ai.backgroundObject"];
+
+/** Allowed object reference: empty, `local`, or `/objects/<path>` (no breakout chars). */
+const OBJECT_REF_TOKEN = /^(local|\/objects\/[A-Za-z0-9._/-]+)$/;
+
 /** A bare number: integer or decimal — no sign, exponent, quote, or whitespace. */
 const NUMERIC_TOKEN = /^\d+(\.\d+)?$/;
 
@@ -235,6 +249,17 @@ export function findUnsafeCompositionVar(
       return {
         key,
         reason: `${key} must be a plain font name (letters, digits, spaces, "-", "_")`,
+      };
+    }
+
+    if (
+      OBJECT_REF_KEYS.includes(key) &&
+      value !== "" &&
+      !OBJECT_REF_TOKEN.test(value)
+    ) {
+      return {
+        key,
+        reason: `${key} must be "local" or an /objects/… entity path`,
       };
     }
   }

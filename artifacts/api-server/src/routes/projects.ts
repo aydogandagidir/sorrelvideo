@@ -26,6 +26,7 @@ import {
   renderFileExistsAsync,
   getRenderArtifact,
   buildCompositionHtml,
+  storeAiBackground,
   RENDERS_DIR,
 } from "../services/renderService";
 import { getThumbnailPath } from "../services/thumbnailService";
@@ -865,12 +866,14 @@ router.post(
 );
 
 // POST /api/projects/:id/ai-image — generate an on-brand AI BACKGROUND image and
-// stamp it into the project's compositionVars (ai.backgroundImage, a data URI the
-// composition + live preview consume). Generative media: OpenAI-only (gpt-image-1),
-// independent of AI_PROVIDER. Owner-scoped; quota-charged AFTER success (a provider
-// 502 must not burn a Free unit — same precedent as /ai/suggest); rate-limited
-// (aiImageLimiter). Free spends 1 AI unit, Pro unlimited. Only compositions in
-// AI_BACKGROUND_MODULES (studio, brand-promo) consume the var.
+// store it OUT of the project row (a render-dir file + a private GCS object when
+// configured); compositionVars carries only a small reference (ai.backgroundObject),
+// which buildCompositionHtml resolves to a data URI at render/preview time.
+// Generative media: OpenAI-only (gpt-image-1), independent of AI_PROVIDER.
+// Owner-scoped; quota-charged AFTER generation + storage succeed (an error must not
+// burn a Free unit — /ai/suggest precedent); rate-limited (aiImageLimiter). Free
+// spends 1 AI unit, Pro unlimited. Only AI_BACKGROUND_MODULES compositions
+// (studio, brand-promo, social-teaser, product-launch, brand-story) host the layer.
 const AiImageBody = z.object({
   prompt: z.string().min(3).max(500),
 });
@@ -981,9 +984,23 @@ router.post(
       "AI background generated",
     );
 
-    // Charge quota only AFTER a successful generation (mirrors /ai/suggest): a
-    // provider error must not burn a Free user's monthly unit. Abuse is bounded
-    // by aiImageLimiter, so deferring the increment past the image call is safe.
+    // Persist the image OUT of the project row: a render-dir file + (when object
+    // storage is configured) a private GCS object. compositionVars carries only
+    // the small reference (ai.backgroundObject), NOT a ~1MB data URI —
+    // buildCompositionHtml resolves it back to a data URI at render/preview time.
+    // Done BEFORE the quota charge so a storage failure never burns a Free unit.
+    let ref: string;
+    try {
+      ({ ref } = await storeAiBackground(id, req.user.id, result.dataUri));
+    } catch (err) {
+      req.log.error({ err, projectId: id }, "AI background store failed");
+      res.status(502).json({ error: "Could not store the generated image" });
+      return;
+    }
+
+    // Charge quota only AFTER generation AND storage succeed (mirrors /ai/suggest):
+    // an error must not burn a Free user's monthly unit. Abuse is bounded by
+    // aiImageLimiter, so deferring the increment is safe.
     try {
       await checkAndIncrementAiCount(req.user.id);
     } catch (err) {
@@ -998,13 +1015,11 @@ router.post(
       throw err;
     }
 
-    // Merge the generated data URI into the project's compositionVars. Re-run the
-    // SAME write-path safety gate (belt-and-suspenders — the produced data URI is
-    // already a valid image src, so this never trips in practice).
-    const nextVars = {
-      ...(project.compositionVars ?? {}),
-      "ai.backgroundImage": result.dataUri,
-    };
+    // Store the reference; drop any legacy inline data URI from before
+    // object-storage. Re-run the write-path safety gate (belt-and-suspenders).
+    const nextVars = { ...(project.compositionVars ?? {}) };
+    delete nextVars["ai.backgroundImage"];
+    nextVars["ai.backgroundObject"] = ref;
     const unsafe = findUnsafeCompositionVar(nextVars);
     if (unsafe) {
       req.log.error(
