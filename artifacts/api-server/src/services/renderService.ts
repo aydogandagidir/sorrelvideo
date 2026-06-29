@@ -47,6 +47,12 @@ import {
 } from "./registryTemplates";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import {
+  trimVideo,
+  decodeSmartTrimPayload,
+  VideoTrimAbortedError,
+  SMART_TRIM_MODULE,
+} from "./videoTrimService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -723,6 +729,72 @@ async function downloadSpotlightVideo(
 }
 
 /**
+ * Render a `smart-trim` project: re-fetch the uploaded source (ownership
+ * re-checked), then FFmpeg-cut it to the stored EDL with brand-accent captions
+ * (Pro, from settings.captions) and the Free watermark. This is the ONE render
+ * path that re-encodes an EXISTING video instead of rasterizing a composition.
+ * An aborted signal surfaces as RenderCancelledError so executeRender's catch
+ * rolls the project back to a draft (identical to the engine's own cancel).
+ */
+async function runSmartTrimRender(
+  project: {
+    id: number;
+    userId: string;
+    compositionVars: Record<string, string> | null;
+    brandKitId: number | null;
+  },
+  settings: RenderSettings,
+  outputDir: string,
+  signal: AbortSignal,
+): Promise<{ outputPath: string; duration: number }> {
+  const payloadRaw = project.compositionVars?.["smarttrim.payload"];
+  const payload = payloadRaw ? decodeSmartTrimPayload(payloadRaw) : null;
+  if (!payload) throw new Error("Smart trim payload missing or invalid");
+
+  const workDir = path.join(outputDir, "work-smarttrim");
+  fs.mkdirSync(workDir, { recursive: true });
+
+  // Re-fetch the source (ownership re-checked). A smart-trim render is worthless
+  // without it, so any failure is a hard error → failed + refund (unlike the
+  // best-effort spotlight clip, which degrades to a frame-only render).
+  const storage = new ObjectStorageService();
+  const file = await storage.getObjectEntityFile(payload.source);
+  const canRead = await storage.canAccessObjectEntity({
+    userId: project.userId,
+    objectFile: file,
+    requestedPermission: ObjectPermission.READ,
+  });
+  if (!canRead) throw new Error("Smart trim source not accessible");
+  const sourcePath = path.join(workDir, "source");
+  await file.download({ destination: sourcePath });
+
+  // Brand accent for the burned caption outline (Pro captions only).
+  const kit =
+    (project.brandKitId != null
+      ? await getBrandKit(project.userId, project.brandKitId)
+      : null) ?? (await getDefaultBrandKit(project.userId));
+
+  const outputPath = outputPathFor(outputDir, "mp4");
+  try {
+    return await trimVideo({
+      sourcePath,
+      segments: payload.segments,
+      outputPath,
+      workDir,
+      captions: settings.captions?.words,
+      brandColor: kit?.primaryColor ?? undefined,
+      watermark: settings.watermark,
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof VideoTrimAbortedError) {
+      throw new RenderCancelledError("Smart trim cancelled");
+    }
+    throw err;
+  }
+}
+
+/**
  * The `@hyperframes/shader-transitions` IIFE bundle (defines
  * `window.HyperShader`), read from node_modules and INLINED into the per-render
  * composition — the engine's file server only serves the render dir, and the
@@ -1200,99 +1272,148 @@ export async function executeRender(
     // the badge is burned into the per-project composition.html.
     const settings = resolveSettings(project.renderSettings);
 
-    // Burn the watermark into composition.html when settings say so (always for
-    // Free — the monetization lever; removable on Pro).
-    const { dir, file } = await prepareCompositionFor(project, {
-      watermark: settings.watermark,
-      backgroundAudio: settings.backgroundAudio,
-      captions: settings.captions,
-      voiceover: settings.voiceover,
-      transitions: settings.transitions,
-    });
-
-    const format = settings.format;
-    // Format drives the artifact path: mp4 → output.mp4 (unchanged default),
-    // webm/mov → output.<ext> (file), png-sequence → frames/ (directory).
-    const outputPath = outputPathFor(outputDir, format);
-    const config = toEngineConfig(settings, file);
-    // Also pass compositionVars as NATIVE engine variables: Hyperframes injects
-    // them as window.__hfVariables and merges them over a composition's declared
-    // `data-composition-variables` defaults (typed: string|number|color|boolean|
-    // enum). Inert for the current {{key}}-substituted compositions (which don't
-    // declare typed variables), additive for typed / __timelines compositions —
-    // this enables the native typed-variable path (M3) without changing the
-    // verified default render.
-    if (project.compositionVars) {
-      config.variables = project.compositionVars;
-    }
-
-    const job = createRenderJob(config);
-
     // Cancellation: the cancel route flags `render_jobs.cancelRequested`; the
-    // engine only stops if it's handed an AbortSignal. Each progress tick polls
-    // the flag and aborts the controller, which makes executeRenderJob throw a
-    // RenderCancelledError (caught below → rollback to draft + markCancelled).
+    // work half only stops if it's handed an AbortSignal. Created BEFORE the
+    // branch so both the Hyperframes producer and the smart-trim FFmpeg engine
+    // share one controller (aborting → RenderCancelledError → rollback to draft).
     const abortController = new AbortController();
 
-    await executeRenderJob(
-      job,
-      dir,
-      outputPath,
-      (j, msg) => {
-        // `j.progress` is already a 0–100 PERCENT from the producer (verified
-        // against 0.6.91: e.g. 25 at "Starting frame capture", 70 at the last
-        // frame, 100 at "Render complete") — NOT a 0–1 fraction. The old
-        // `* 100` pushed every tick to 500–10000, which markProgress clamped to
-        // 100, so the bar sat at 100% for the whole render.
-        logger.debug(
-          { projectId, percent: Math.round(j.progress), msg },
-          "Render progress",
+    // Two work halves: the smart-trim module re-encodes an uploaded video via
+    // FFmpeg (runSmartTrimRender); every other module rasterizes its HTML
+    // composition via the Hyperframes producer. Both yield the artifact path,
+    // format, and duration that the shared finalize below consumes.
+    let outputPath: string;
+    let format: RenderFormat;
+    let renderedDuration: number | undefined;
+
+    if (project.module === SMART_TRIM_MODULE) {
+      format = "mp4";
+      outputPath = outputPathFor(outputDir, format);
+      // The FFmpeg pass is one shot (no per-frame progress), so just move the bar
+      // off 0 and poll the cancel flag for the duration of the encode.
+      let cancelPoll: ReturnType<typeof setInterval> | undefined;
+      if (renderJobId) {
+        await markProgress(renderJobId, 10).catch(() => undefined);
+        cancelPoll = setInterval(() => {
+          void isCancelRequested(renderJobId)
+            .then((cancel) => {
+              if (cancel && !abortController.signal.aborted) {
+                logger.info(
+                  { projectId, renderJobId },
+                  "Cancel requested — aborting smart trim",
+                );
+                abortController.abort();
+              }
+            })
+            .catch(() => undefined);
+        }, 1500);
+      }
+      try {
+        const r = await runSmartTrimRender(
+          project,
+          settings,
+          outputDir,
+          abortController.signal,
         );
-        if (renderJobId) {
-          void markProgress(renderJobId, j.progress).catch(
-            (err) =>
-              logger.warn(
-                { renderJobId, err },
-                "Could not persist render progress",
-              ),
+        renderedDuration = r.duration > 0 ? Math.round(r.duration) : undefined;
+      } finally {
+        if (cancelPoll) clearInterval(cancelPoll);
+      }
+    } else {
+      // Burn the watermark into composition.html when settings say so (always for
+      // Free — the monetization lever; removable on Pro).
+      const { dir, file } = await prepareCompositionFor(project, {
+        watermark: settings.watermark,
+        backgroundAudio: settings.backgroundAudio,
+        captions: settings.captions,
+        voiceover: settings.voiceover,
+        transitions: settings.transitions,
+      });
+
+      format = settings.format;
+      // Format drives the artifact path: mp4 → output.mp4 (unchanged default),
+      // webm/mov → output.<ext> (file), png-sequence → frames/ (directory).
+      outputPath = outputPathFor(outputDir, format);
+      const config = toEngineConfig(settings, file);
+      // Also pass compositionVars as NATIVE engine variables: Hyperframes injects
+      // them as window.__hfVariables and merges them over a composition's declared
+      // `data-composition-variables` defaults (typed: string|number|color|boolean|
+      // enum). Inert for the current {{key}}-substituted compositions (which don't
+      // declare typed variables), additive for typed / __timelines compositions —
+      // this enables the native typed-variable path (M3) without changing the
+      // verified default render.
+      if (project.compositionVars) {
+        config.variables = project.compositionVars;
+      }
+
+      const job = createRenderJob(config);
+
+      await executeRenderJob(
+        job,
+        dir,
+        outputPath,
+        (j, msg) => {
+          // `j.progress` is already a 0–100 PERCENT from the producer (verified
+          // against 0.6.91: e.g. 25 at "Starting frame capture", 70 at the last
+          // frame, 100 at "Render complete") — NOT a 0–1 fraction. The old
+          // `* 100` pushed every tick to 500–10000, which markProgress clamped to
+          // 100, so the bar sat at 100% for the whole render.
+          logger.debug(
+            { projectId, percent: Math.round(j.progress), msg },
+            "Render progress",
           );
-          if (!abortController.signal.aborted) {
-            void isCancelRequested(renderJobId)
-              .then((cancel) => {
-                if (cancel && !abortController.signal.aborted) {
-                  logger.info(
-                    { projectId, renderJobId },
-                    "Cancel requested — aborting render",
-                  );
-                  abortController.abort();
-                }
-              })
-              .catch((err) =>
+          if (renderJobId) {
+            void markProgress(renderJobId, j.progress).catch(
+              (err) =>
                 logger.warn(
                   { renderJobId, err },
-                  "Could not check cancel flag",
+                  "Could not persist render progress",
                 ),
-              );
+            );
+            if (!abortController.signal.aborted) {
+              void isCancelRequested(renderJobId)
+                .then((cancel) => {
+                  if (cancel && !abortController.signal.aborted) {
+                    logger.info(
+                      { projectId, renderJobId },
+                      "Cancel requested — aborting render",
+                    );
+                    abortController.abort();
+                  }
+                })
+                .catch((err) =>
+                  logger.warn(
+                    { renderJobId, err },
+                    "Could not check cancel flag",
+                  ),
+                );
+            }
           }
-        }
-      },
-      abortController.signal,
-    );
+        },
+        abortController.signal,
+      );
+
+      // Real clip length comes from the composition's window.__hf.duration,
+      // surfaced on the job after render. Fall back to undefined (null in DB)
+      // rather than a misleading constant.
+      renderedDuration =
+        typeof job.duration === "number" && job.duration > 0
+          ? Math.round(job.duration)
+          : undefined;
+    }
 
     const videoUrl = `/api/projects/${projectId}/video`;
-    // Real clip length comes from the composition's window.__hf.duration,
-    // surfaced on the job after render. Fall back to undefined (null in DB)
-    // rather than a misleading constant.
-    const renderedDuration =
-      typeof job.duration === "number" && job.duration > 0
-        ? Math.round(job.duration)
-        : undefined;
 
     // Best-effort poster frame. A thumbnail failure must NEVER fail the render,
     // so swallow everything here and only set thumbnailUrl when one was written.
     let thumbnailUrl: string | undefined;
     try {
-      const thumb = await generateThumbnail(projectId, dir, outputPath, format);
+      const thumb = await generateThumbnail(
+        projectId,
+        outputDir,
+        outputPath,
+        format,
+      );
       if (thumb) thumbnailUrl = `/api/projects/${projectId}/thumbnail`;
     } catch (thumbErr) {
       logger.warn(

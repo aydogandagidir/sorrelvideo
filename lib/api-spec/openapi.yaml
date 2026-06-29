@@ -1383,6 +1383,83 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  /smart-trim:
+    post:
+      operationId: smartTrim
+      tags: [projects]
+      summary: Trim a raw uploaded video by transcript (filler + silence removal; auto-renders)
+      description: >
+        Transcript-driven cleanup of a user-uploaded talking-head video: Whisper
+        word-times the audio, an EDL drops filler words + over-long silences, and
+        FFmpeg cuts/concatenates the survivors into a tightened, branded mp4. The
+        source must already be uploaded via the storage two-phase flow; pass its
+        `/objects/...` path. Costs one AI quota unit on Free (charged after
+        transcription succeeds); the render start additionally consumes the
+        regular render quota — when that quota is exhausted the project is still
+        created as a draft and `renderStarted` is false. Burned captions are a Pro
+        feature (ignored for Free so the trim still renders).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmartTrimRequest"
+      responses:
+        "201":
+          description: Project created (render auto-started when quota allowed).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmartTrimResponse"
+        "400":
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: AI quota exceeded (reason `upgrade_required`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: The source video object was not found or is not owned by the caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "413":
+          description: The source video is too large or too long to process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Unexpected error creating the video.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "502":
+          description: Transcription failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Transcription is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /billing/checkout:
     post:
       operationId: createCheckoutSession
@@ -2610,6 +2687,50 @@ components:
           type: integer
           description: Brand kit to style the host with. Omitted → the user's default.
     AvatarVideoResponse:
+      type: object
+      required: [project, renderStarted]
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+        renderStarted:
+          type: boolean
+          description: >
+            False → the project was created as a draft (e.g. render quota
+            exhausted); render it manually from Projects.
+        renderMessage:
+          type: ["string", "null"]
+          description: User-facing explanation when the render did not start.
+
+    SmartTrimRequest:
+      type: object
+      required: [videoObjectPath]
+      properties:
+        videoObjectPath:
+          type: string
+          minLength: 1
+          description: "/objects/... path of the uploaded source video."
+        removeFillers:
+          type: boolean
+          default: true
+          description: Drop non-lexical filler words ("um", "uh", …).
+        removeSilences:
+          type: boolean
+          default: true
+          description: Cut the dead air in pauses longer than the threshold.
+        silenceThresholdMs:
+          type: integer
+          minimum: 200
+          maximum: 5000
+          default: 600
+          description: A pause longer than this (milliseconds) is trimmed.
+        captions:
+          type: boolean
+          default: false
+          description: Burn word-timed captions (Pro; ignored for Free).
+        brandKitId:
+          type: integer
+          description: Brand kit for the caption accent. Omitted → the user's default.
+    SmartTrimResponse:
       type: object
       required: [project, renderStarted]
       properties:

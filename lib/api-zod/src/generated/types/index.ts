@@ -100,6 +100,8 @@ export * from './renderTransition';
 export * from './resendVerificationRequest';
 export * from './resetPasswordRequest';
 export * from './signupRequest';
+export * from './smartTrimRequest';
+export * from './smartTrimResponse';
 export * from './template';
 export * from './templateInput';
 export * from './uploadUrlRequest';

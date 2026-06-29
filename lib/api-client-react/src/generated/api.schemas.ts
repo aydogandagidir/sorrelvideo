@@ -783,6 +783,40 @@ export interface AvatarVideoResponse {
   renderMessage?: string | null;
 }
 
+export interface SmartTrimRequest {
+  /**
+     * /objects/... path of the uploaded source video.
+     * @minLength 1
+     */
+  videoObjectPath: string;
+  /** Drop non-lexical filler words ("um", "uh", …). */
+  removeFillers?: boolean;
+  /** Cut the dead air in pauses longer than the threshold. */
+  removeSilences?: boolean;
+  /**
+     * A pause longer than this (milliseconds) is trimmed.
+     * @minimum 200
+     * @maximum 5000
+     */
+  silenceThresholdMs?: number;
+  /** Burn word-timed captions (Pro; ignored for Free). */
+  captions?: boolean;
+  /** Brand kit for the caption accent. Omitted → the user's default. */
+  brandKitId?: number;
+}
+
+export interface SmartTrimResponse {
+  project: Project;
+  /** False → the project was created as a draft (e.g. render quota exhausted); render it manually from Projects.
+   */
+  renderStarted: boolean;
+  /**
+     * User-facing explanation when the render did not start.
+     * @nullable
+     */
+  renderMessage?: string | null;
+}
+
 export interface GenerateCaptionsRequest {
   /**
      * /objects/... path of the user's uploaded audio object.

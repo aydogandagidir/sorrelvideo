@@ -1316,6 +1316,30 @@ export const CreateAvatarVideoBody = zod.object({
 
 
 /**
+ * Transcript-driven cleanup of a user-uploaded talking-head video: Whisper word-times the audio, an EDL drops filler words + over-long silences, and FFmpeg cuts/concatenates the survivors into a tightened, branded mp4. The source must already be uploaded via the storage two-phase flow; pass its `/objects/...` path. Costs one AI quota unit on Free (charged after transcription succeeds); the render start additionally consumes the regular render quota — when that quota is exhausted the project is still created as a draft and `renderStarted` is false. Burned captions are a Pro feature (ignored for Free so the trim still renders).
+
+ * @summary Trim a raw uploaded video by transcript (filler + silence removal; auto-renders)
+ */
+
+export const smartTrimBodyRemoveFillersDefault = true;
+export const smartTrimBodyRemoveSilencesDefault = true;
+export const smartTrimBodySilenceThresholdMsDefault = 600;
+export const smartTrimBodySilenceThresholdMsMin = 200;
+export const smartTrimBodySilenceThresholdMsMax = 5000;
+
+export const smartTrimBodyCaptionsDefault = false;
+
+export const SmartTrimBody = zod.object({
+  "videoObjectPath": zod.string().min(1).describe('\/objects\/... path of the uploaded source video.'),
+  "removeFillers": zod.boolean().default(smartTrimBodyRemoveFillersDefault).describe('Drop non-lexical filler words (\"um\", \"uh\", …).'),
+  "removeSilences": zod.boolean().default(smartTrimBodyRemoveSilencesDefault).describe('Cut the dead air in pauses longer than the threshold.'),
+  "silenceThresholdMs": zod.number().min(smartTrimBodySilenceThresholdMsMin).max(smartTrimBodySilenceThresholdMsMax).default(smartTrimBodySilenceThresholdMsDefault).describe('A pause longer than this (milliseconds) is trimmed.'),
+  "captions": zod.boolean().default(smartTrimBodyCaptionsDefault).describe('Burn word-timed captions (Pro; ignored for Free).'),
+  "brandKitId": zod.number().optional().describe('Brand kit for the caption accent. Omitted → the user\'s default.')
+})
+
+
+/**
  * @summary Create a Stripe Checkout session for upgrading to Pro
  */
 export const CreateCheckoutSessionBody = zod.object({
