@@ -114,6 +114,33 @@ function setBooleanAttr(el: HTMLElement, name: string, on: boolean | undefined):
   else el.removeAttribute(name);
 }
 
+/**
+ * Force the player web component to re-fit its composition to the host's CURRENT
+ * size.
+ *
+ * `@hyperframes/player` scales the composition (rendered at its authored pixel
+ * size, e.g. 1080×1920) to fit the host via `transform: scale()`, computing the
+ * factor from the host's `offsetWidth/Height` at the instant its internal fit
+ * routine runs. Two things make that instant unreliable here:
+ *  - The fit-on-`ready` fires before the surrounding grid/flex has sized the
+ *    host, so the factor is computed against a transient (tiny, or full-width
+ *    pre-clamp) box and then frozen.
+ *  - The element's own ResizeObserver does NOT reliably re-fit on later layout
+ *    changes (window resize, opening devtools, toggling a side panel) — verified
+ *    against @hyperframes/player@0.6.120: the host grows/shrinks but the scale
+ *    stays stale.
+ * Either leaves the live preview frozen at the wrong scale — a tiny composition
+ * lost in a black box, or one zoomed past the frame and clipped (the "screen
+ * breaks for a moment" report). `_rescale()` is the element's internal fit; we
+ * drive it ourselves on every host resize + after each load settles. The dep is
+ * pinned EXACT, so the minified name is stable — guard defensively and
+ * re-verify on any @hyperframes/player bump.
+ */
+export function forcePlayerRefit(el: HyperframesPlayerElement | null): void {
+  const fit = (el as unknown as { _rescale?: () => void } | null)?._rescale;
+  if (typeof fit === "function") fit.call(el);
+}
+
 export const HfPlayer = forwardRef<HfPlayerHandle, HfPlayerProps>(function HfPlayer(
   {
     src,
@@ -190,6 +217,13 @@ export const HfPlayer = forwardRef<HfPlayerHandle, HfPlayerProps>(function HfPla
       // carries the duration; fall back to the element property.
       const duration = ev.detail?.duration ?? el.duration;
       handlers.current.onTimeUpdate?.(el.currentTime, duration);
+      // The element's own fit-on-ready races the host's layout (see
+      // forcePlayerRefit). Re-fit on the next frames, once the surrounding
+      // layout has settled, so the composition isn't frozen at a stale scale.
+      requestAnimationFrame(() => {
+        forcePlayerRefit(el);
+        requestAnimationFrame(() => forcePlayerRefit(el));
+      });
     };
     const handleTimeUpdate = (ev: CustomEvent<{ currentTime: number }>) => {
       // `timeupdate` carries only currentTime; duration comes from the element
@@ -217,6 +251,20 @@ export const HfPlayer = forwardRef<HfPlayerHandle, HfPlayerProps>(function HfPla
       el.removeEventListener("ended", handleEnded);
       el.removeEventListener("error", handleError);
     };
+  }, []);
+
+  // Keep the composition fitted to the host across layout changes. The element's
+  // own ResizeObserver doesn't reliably re-fit (see forcePlayerRefit), so we
+  // observe the host ourselves and drive its fit on every resize. The initial
+  // observation also re-fits once the host has its laid-out size, covering the
+  // ready/layout race. Body touches only refs + a stable helper, so `[]` is
+  // exhaustive.
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => forcePlayerRefit(el));
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   // Reflect boolean props onto the element as attribute presence.
