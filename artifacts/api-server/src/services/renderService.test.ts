@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildTransitionsInjection,
   copyTemplateAssets,
@@ -14,8 +14,10 @@ import {
   renderCompositionTemplate,
   renderDirFor,
   renderFailureMessage,
+  resolveAiBackgroundDataUri,
   resolveEntryFile,
   resolveVoiceoverTag,
+  storeAiBackground,
   RENDERS_DIR,
   VOICEOVER_FILENAME,
   VoiceoverUnavailableError,
@@ -261,6 +263,85 @@ describe.each([
     });
   },
 );
+
+// AI background object-storage (the lean reference model): the project row stores
+// only a small reference; storeAiBackground writes the render-dir file and
+// resolveAiBackgroundDataUri reads it back to a data URI at build time. This
+// exercises the local (no-GCS) round trip; the GCS fallback is the same
+// ownership-checked download as resolveVoiceoverTag.
+describe("AI background store ↔ resolve (local, no GCS)", () => {
+  const projectId = 990001;
+  const dir = path.join(RENDERS_DIR, String(projectId));
+  let prevPriv: string | undefined;
+
+  beforeEach(() => {
+    prevPriv = process.env.PRIVATE_OBJECT_DIR;
+    delete process.env.PRIVATE_OBJECT_DIR; // force local-only (no GCS upload)
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  afterEach(() => {
+    if (prevPriv === undefined) delete process.env.PRIVATE_OBJECT_DIR;
+    else process.env.PRIVATE_OBJECT_DIR = prevPriv;
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("stores a render-dir file (ref='local') and resolves it back to the data URI", async () => {
+    const dataUri =
+      "data:image/jpeg;base64," +
+      Buffer.from("fake-jpeg-bytes").toString("base64");
+
+    const { ref } = await storeAiBackground(projectId, "user-1", dataUri);
+    expect(ref).toBe("local");
+    expect(fs.existsSync(path.join(dir, "ai-bg.jpg"))).toBe(true);
+
+    const resolved = await resolveAiBackgroundDataUri({
+      id: projectId,
+      userId: "user-1",
+      compositionVars: { "ai.backgroundObject": ref },
+    });
+    expect(resolved).toBe(dataUri);
+  });
+
+  it("returns null when the project has no ai.backgroundObject", async () => {
+    expect(
+      await resolveAiBackgroundDataUri({
+        id: projectId,
+        userId: "u",
+        compositionVars: {},
+      }),
+    ).toBeNull();
+    expect(
+      await resolveAiBackgroundDataUri({
+        id: projectId,
+        userId: "u",
+        compositionVars: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("clears a stale other-format local file when re-storing", async () => {
+    await storeAiBackground(
+      projectId,
+      "u",
+      "data:image/png;base64," + Buffer.from("png").toString("base64"),
+    );
+    expect(fs.existsSync(path.join(dir, "ai-bg.png"))).toBe(true);
+
+    await storeAiBackground(
+      projectId,
+      "u",
+      "data:image/jpeg;base64," + Buffer.from("jpg").toString("base64"),
+    );
+    expect(fs.existsSync(path.join(dir, "ai-bg.jpg"))).toBe(true);
+    expect(fs.existsSync(path.join(dir, "ai-bg.png"))).toBe(false);
+  });
+
+  it("rejects a non-image data URI", async () => {
+    await expect(
+      storeAiBackground(projectId, "u", "data:text/html;base64,PG90Pg=="),
+    ).rejects.toThrow(/valid image data URI/);
+  });
+});
 
 describe("isContentCustomizable", () => {
   it("is true for templates that consume brand/user content or declare variables", () => {

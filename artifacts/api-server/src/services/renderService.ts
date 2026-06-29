@@ -926,6 +926,123 @@ interface BrandKitSnapshot {
   logoUrl: string | null;
 }
 
+// ───────────────────────────── AI background store ──────────────────────────
+// The AI background image is kept OUT of the project row: persisting a ~1MB
+// base64 data URI in compositionVars bloated both the row and the GET /projects
+// LIST payload (every project shipped its full image). Instead the project
+// persists a small reference (`ai.backgroundObject` = "/objects/<…>" or "local")
+// and the image lives as a render-dir file + (when configured) a private GCS
+// object — exactly the talking-host voiceover dual-write. `buildCompositionHtml`
+// resolves the reference back to a self-contained data URI at BUILD time, so both
+// the render and the live preview embed the image identically.
+
+/** media type → render-dir file extension. */
+const AI_BG_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+/** Parse a `data:image/<jpeg|png|webp>;base64,<b64>` URI → bytes + media type. */
+function parseImageDataUri(
+  dataUri: string,
+): { buffer: Buffer; mediaType: string } | null {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+=*)$/.exec(
+    dataUri,
+  );
+  if (!m) return null;
+  return { buffer: Buffer.from(m[2], "base64"), mediaType: m[1] };
+}
+
+/**
+ * Persist a generated AI background out of the project row: ALWAYS a render-dir
+ * file (`renders/<id>/ai-bg.<ext>`, so dev needs no GCS) AND — when object
+ * storage is configured (`PRIVATE_OBJECT_DIR`) — a private, owner-ACL'd GCS
+ * object for durable re-renders after the local scratch is reclaimed. Returns the
+ * reference to store in `compositionVars["ai.backgroundObject"]`: the
+ * "/objects/…" path, or "local" when GCS is off. Mirrors the voiceover dual-write.
+ */
+export async function storeAiBackground(
+  projectId: number,
+  userId: string,
+  dataUri: string,
+): Promise<{ ref: string; bytes: number }> {
+  const parsed = parseImageDataUri(dataUri);
+  if (!parsed) throw new Error("AI background is not a valid image data URI");
+  const { buffer, mediaType } = parsed;
+  const ext = AI_BG_EXT[mediaType] ?? "jpg";
+
+  const dir = path.join(RENDERS_DIR, String(projectId));
+  fs.mkdirSync(dir, { recursive: true });
+  // One canonical local file per project — drop any other-ext leftover so the
+  // resolver's ext scan never picks up a stale image from a prior format.
+  for (const e of Object.values(AI_BG_EXT)) {
+    if (e !== ext) {
+      const stale = path.join(dir, `ai-bg.${e}`);
+      if (fs.existsSync(stale)) fs.rmSync(stale, { force: true });
+    }
+  }
+  fs.writeFileSync(path.join(dir, `ai-bg.${ext}`), buffer);
+
+  let ref = "local";
+  if (process.env.PRIVATE_OBJECT_DIR) {
+    const storage = new ObjectStorageService();
+    ref = await storage.uploadPrivateObject(buffer, mediaType, {
+      owner: userId,
+      visibility: "private",
+    });
+  }
+  return { ref, bytes: buffer.length };
+}
+
+/**
+ * Resolve a project's persisted AI-background reference to a self-contained image
+ * data URI for the composition `<img src>`. Prefers the render-dir file (fast, no
+ * GCS cost) and falls back to the private GCS object (ownership re-checked, like
+ * resolveVoiceoverTag). Returns null when there's no AI background or it can't be
+ * resolved (→ the `.ai-bg-layer` collapses, render byte-identical to no-AI).
+ */
+export async function resolveAiBackgroundDataUri(project: {
+  id: number;
+  userId: string;
+  compositionVars: Record<string, string> | null;
+}): Promise<string | null> {
+  const ref = project.compositionVars?.["ai.backgroundObject"];
+  if (!ref) return null;
+
+  const dir = path.join(RENDERS_DIR, String(project.id));
+  for (const [mediaType, ext] of Object.entries(AI_BG_EXT)) {
+    const local = path.join(dir, `ai-bg.${ext}`);
+    if (fs.existsSync(local)) {
+      return `data:${mediaType};base64,${fs.readFileSync(local).toString("base64")}`;
+    }
+  }
+
+  if (ref.startsWith("/objects/")) {
+    try {
+      const storage = new ObjectStorageService();
+      const file = await storage.getObjectEntityFile(ref);
+      const canRead = await storage.canAccessObjectEntity({
+        userId: project.userId,
+        objectFile: file,
+        requestedPermission: ObjectPermission.READ,
+      });
+      if (!canRead) return null;
+      const [buffer] = await file.download();
+      const [meta] = await file.getMetadata();
+      const mediaType = (meta.contentType as string) || "image/jpeg";
+      return `data:${mediaType};base64,${buffer.toString("base64")}`;
+    } catch (err) {
+      logger.warn(
+        { err, projectId: project.id },
+        "AI background object could not be resolved",
+      );
+      return null;
+    }
+  }
+  return null;
+}
+
 function buildVarMap(
   brand: BrandKitSnapshot | null,
   compositionVars: Record<string, string> | null | undefined,
@@ -1053,6 +1170,16 @@ export async function buildCompositionHtml(
   vars["layout.height"] = String(height);
   vars["layout.aspect"] =
     width > height ? "landscape" : width < height ? "portrait" : "square";
+
+  // AI background: the project persists only a small reference
+  // (ai.backgroundObject); resolve it to a self-contained data URI here so the
+  // render and the live preview both embed the image while the row + /projects
+  // list payload stay lean. A legacy inline ai.backgroundImage data URI (created
+  // before object-storage) is already in `vars` from the merge and used as-is.
+  if (!String(vars["ai.backgroundImage"] ?? "").startsWith("data:image/")) {
+    const dataUri = await resolveAiBackgroundDataUri(project);
+    if (dataUri) vars["ai.backgroundImage"] = dataUri;
+  }
 
   return injectFitScript(
     injectTimelineBridge(

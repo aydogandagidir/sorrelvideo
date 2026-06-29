@@ -610,12 +610,26 @@ SPA panel lives on `/avatar` (`useCreateAvatarVideo`) and lands on
 ## AI background image (generative media)
 
 `POST /api/projects/:id/ai-image { prompt }` generates an on-brand BACKGROUND
-image and stamps it into the project's `compositionVars["ai.backgroundImage"]`
-(a data URI, the SAME channel website→video uses for `capture.image`), so the
-live preview + render pipeline need no new asset plumbing. The route lives in
+image (OpenAI `gpt-image-1`) for a project. The route lives in
 `routes/projects.ts`; the live preview reflects it immediately and `POST /render`
 bakes it in. This is Sorrel's first GENERATIVE-media feature (everything else is
 deterministic template rendering).
+
+- **Storage — OUT of the project row (object storage)**: the image is NOT a data
+  URI in `compositionVars` (that bloated the row AND the `GET /projects` LIST
+  payload — every project shipped its full ~1MB base64). Instead `storeAiBackground`
+  (`renderService`) writes a render-dir file `renders/<id>/ai-bg.<ext>` AND — when
+  `PRIVATE_OBJECT_DIR` is set — uploads a private, owner-ACL'd GCS object (the
+  talking-host voiceover dual-write). compositionVars carries only a small
+  reference `ai.backgroundObject` = `/objects/…` (or `"local"` when GCS is off);
+  `buildCompositionHtml` calls `resolveAiBackgroundDataUri` (render-dir file first,
+  GCS fallback with an ownership re-check) to turn it back into a self-contained
+  `ai.backgroundImage` data URI at BUILD time — so render + live preview embed the
+  image identically while the row/list stay lean. A LEGACY inline
+  `ai.backgroundImage` data URI (projects created before this) is detected and used
+  as-is. `ai.backgroundObject` is gated in `compositionVars.ts` (`OBJECT_REF_KEYS`:
+  empty / `local` / `/objects/…`) — it's read server-side to fetch the object, never
+  injected into HTML.
 
 - **OpenAI-only, off the AiProvider interface**: image generation is OpenAI's
   `gpt-image-1` (Anthropic has no image API), so it is a standalone
