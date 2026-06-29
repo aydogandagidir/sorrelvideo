@@ -13,6 +13,7 @@ import {
   Film,
   Clapperboard,
   Bot,
+  Scissors,
   Search,
   Bell,
   ChevronRight,
@@ -79,6 +80,7 @@ const NAV: NavEntry[] = [
 // deep links. Re-add them here (with a `soon` badge or as live) when complete.
 const MODULES: NavEntry[] = [
   { href: "/website-to-video", label: "Website → Video", icon: Globe },
+  { href: "/smart-trim", label: "Smart Trim", icon: Scissors },
   { href: "/avatar", label: "Live Avatar", icon: Bot },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
