@@ -125,9 +125,13 @@ const FONT_KEYS: readonly string[] = ["brand.fontFamily"];
  * the resolver accepts: empty, the local sentinel `local`, or an `/objects/…`
  * entity path. (The object fetch also re-checks ownership, so this is
  * defence-in-depth, not the only guard.) `ai.backgroundObject` is set by
- * POST /projects/:id/ai-image and points at the render-dir file / GCS object.
+ * POST /projects/:id/ai-image; `capture.imageObject` by websiteToVideoService —
+ * both point at the render-dir file / GCS object holding the real image.
  */
-const OBJECT_REF_KEYS: readonly string[] = ["ai.backgroundObject"];
+const OBJECT_REF_KEYS: readonly string[] = [
+  "ai.backgroundObject",
+  "capture.imageObject",
+];
 
 /** Allowed object reference: empty, `local`, or `/objects/<path>` (no breakout chars). */
 const OBJECT_REF_TOKEN = /^(local|\/objects\/[A-Za-z0-9._/-]+)$/;

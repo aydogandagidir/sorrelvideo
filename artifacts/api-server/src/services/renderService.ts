@@ -926,18 +926,18 @@ interface BrandKitSnapshot {
   logoUrl: string | null;
 }
 
-// ───────────────────────────── AI background store ──────────────────────────
-// The AI background image is kept OUT of the project row: persisting a ~1MB
-// base64 data URI in compositionVars bloated both the row and the GET /projects
-// LIST payload (every project shipped its full image). Instead the project
-// persists a small reference (`ai.backgroundObject` = "/objects/<…>" or "local")
-// and the image lives as a render-dir file + (when configured) a private GCS
-// object — exactly the talking-host voiceover dual-write. `buildCompositionHtml`
-// resolves the reference back to a self-contained data URI at BUILD time, so both
-// the render and the live preview embed the image identically.
+// ─────────────────────────── Project image object-store ─────────────────────
+// Big per-project images (the AI background, the website→video screenshot) are
+// kept OUT of the project row: a ~1MB base64 data URI in compositionVars bloated
+// both the row AND the GET /projects LIST payload (every project shipped its full
+// image). Instead the project persists a small reference (`<key>` = "/objects/…"
+// or "local") and the image lives as a render-dir file + (when object storage is
+// configured) a private, owner-ACL'd GCS object — the talking-host voiceover
+// dual-write. The bytes are resolved back at BUILD time (render + preview embed a
+// data URI) or streamed by an owner-scoped route (the frontend's `<img>`).
 
-/** media type → render-dir file extension. */
-const AI_BG_EXT: Record<string, string> = {
+/** media type → render-dir file extension (the formats our generators emit). */
+const IMG_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
@@ -955,34 +955,31 @@ function parseImageDataUri(
 }
 
 /**
- * Persist a generated AI background out of the project row: ALWAYS a render-dir
- * file (`renders/<id>/ai-bg.<ext>`, so dev needs no GCS) AND — when object
- * storage is configured (`PRIVATE_OBJECT_DIR`) — a private, owner-ACL'd GCS
- * object for durable re-renders after the local scratch is reclaimed. Returns the
- * reference to store in `compositionVars["ai.backgroundObject"]`: the
- * "/objects/…" path, or "local" when GCS is off. Mirrors the voiceover dual-write.
+ * Persist a per-project image OUT of the row, keyed by a `slug` (the render-dir
+ * filename stem): ALWAYS a render-dir file `renders/<id>/<slug>.<ext>` (dev needs
+ * no GCS) AND — when `PRIVATE_OBJECT_DIR` is set — a private, owner-ACL'd GCS
+ * object for durability after the local scratch is reclaimed. Returns the
+ * reference to persist in compositionVars: the "/objects/…" path, or "local".
  */
-export async function storeAiBackground(
+async function storeProjectImage(
   projectId: number,
   userId: string,
-  dataUri: string,
+  buffer: Buffer,
+  mediaType: string,
+  slug: string,
 ): Promise<{ ref: string; bytes: number }> {
-  const parsed = parseImageDataUri(dataUri);
-  if (!parsed) throw new Error("AI background is not a valid image data URI");
-  const { buffer, mediaType } = parsed;
-  const ext = AI_BG_EXT[mediaType] ?? "jpg";
-
+  const ext = IMG_EXT[mediaType] ?? "jpg";
   const dir = path.join(RENDERS_DIR, String(projectId));
   fs.mkdirSync(dir, { recursive: true });
-  // One canonical local file per project — drop any other-ext leftover so the
+  // One canonical local file per slug — drop any other-ext leftover so the
   // resolver's ext scan never picks up a stale image from a prior format.
-  for (const e of Object.values(AI_BG_EXT)) {
+  for (const e of Object.values(IMG_EXT)) {
     if (e !== ext) {
-      const stale = path.join(dir, `ai-bg.${e}`);
+      const stale = path.join(dir, `${slug}.${e}`);
       if (fs.existsSync(stale)) fs.rmSync(stale, { force: true });
     }
   }
-  fs.writeFileSync(path.join(dir, `ai-bg.${ext}`), buffer);
+  fs.writeFileSync(path.join(dir, `${slug}.${ext}`), buffer);
 
   let ref = "local";
   if (process.env.PRIVATE_OBJECT_DIR) {
@@ -996,25 +993,25 @@ export async function storeAiBackground(
 }
 
 /**
- * Resolve a project's persisted AI-background reference to a self-contained image
- * data URI for the composition `<img src>`. Prefers the render-dir file (fast, no
- * GCS cost) and falls back to the private GCS object (ownership re-checked, like
- * resolveVoiceoverTag). Returns null when there's no AI background or it can't be
- * resolved (→ the `.ai-bg-layer` collapses, render byte-identical to no-AI).
+ * Resolve a persisted project-image reference to raw bytes + media type. Prefers
+ * the render-dir file (fast, no GCS cost), falls back to the private GCS object
+ * (ownership re-checked, like resolveVoiceoverTag). Returns null when there's no
+ * reference or it can't be resolved. Shared by the build-time data-URI resolution
+ * and the owner-scoped serve route.
  */
-export async function resolveAiBackgroundDataUri(project: {
-  id: number;
-  userId: string;
-  compositionVars: Record<string, string> | null;
-}): Promise<string | null> {
-  const ref = project.compositionVars?.["ai.backgroundObject"];
+export async function resolveProjectImageBytes(
+  project: { id: number; userId: string; compositionVars: Record<string, string> | null },
+  slug: string,
+  refKey: string,
+): Promise<{ buffer: Buffer; mediaType: string } | null> {
+  const ref = project.compositionVars?.[refKey];
   if (!ref) return null;
 
   const dir = path.join(RENDERS_DIR, String(project.id));
-  for (const [mediaType, ext] of Object.entries(AI_BG_EXT)) {
-    const local = path.join(dir, `ai-bg.${ext}`);
+  for (const [mediaType, ext] of Object.entries(IMG_EXT)) {
+    const local = path.join(dir, `${slug}.${ext}`);
     if (fs.existsSync(local)) {
-      return `data:${mediaType};base64,${fs.readFileSync(local).toString("base64")}`;
+      return { buffer: fs.readFileSync(local), mediaType };
     }
   }
 
@@ -1030,17 +1027,84 @@ export async function resolveAiBackgroundDataUri(project: {
       if (!canRead) return null;
       const [buffer] = await file.download();
       const [meta] = await file.getMetadata();
-      const mediaType = (meta.contentType as string) || "image/jpeg";
-      return `data:${mediaType};base64,${buffer.toString("base64")}`;
+      return { buffer, mediaType: (meta.contentType as string) || "image/jpeg" };
     } catch (err) {
       logger.warn(
-        { err, projectId: project.id },
-        "AI background object could not be resolved",
+        { err, projectId: project.id, refKey },
+        "project image object could not be resolved",
       );
       return null;
     }
   }
   return null;
+}
+
+async function resolveProjectImageDataUri(
+  project: { id: number; userId: string; compositionVars: Record<string, string> | null },
+  slug: string,
+  refKey: string,
+): Promise<string | null> {
+  const found = await resolveProjectImageBytes(project, slug, refKey);
+  if (!found) return null;
+  return `data:${found.mediaType};base64,${found.buffer.toString("base64")}`;
+}
+
+// ── AI background (`ai.backgroundObject` ⇄ renders/<id>/ai-bg.<ext>) ──
+export async function storeAiBackground(
+  projectId: number,
+  userId: string,
+  dataUri: string,
+): Promise<{ ref: string; bytes: number }> {
+  const parsed = parseImageDataUri(dataUri);
+  if (!parsed) throw new Error("AI background is not a valid image data URI");
+  return storeProjectImage(
+    projectId,
+    userId,
+    parsed.buffer,
+    parsed.mediaType,
+    "ai-bg",
+  );
+}
+
+export function resolveAiBackgroundDataUri(project: {
+  id: number;
+  userId: string;
+  compositionVars: Record<string, string> | null;
+}): Promise<string | null> {
+  return resolveProjectImageDataUri(project, "ai-bg", "ai.backgroundObject");
+}
+
+// ── website→video screenshot (`capture.imageObject` ⇄ renders/<id>/capture-image.<ext>) ──
+export async function storeCaptureImage(
+  projectId: number,
+  userId: string,
+  filePath: string,
+  mediaType: string,
+): Promise<{ ref: string; bytes: number }> {
+  return storeProjectImage(
+    projectId,
+    userId,
+    fs.readFileSync(filePath),
+    mediaType,
+    "capture-image",
+  );
+}
+
+export function resolveCaptureImageDataUri(project: {
+  id: number;
+  userId: string;
+  compositionVars: Record<string, string> | null;
+}): Promise<string | null> {
+  return resolveProjectImageDataUri(project, "capture-image", "capture.imageObject");
+}
+
+/** Resolve the website→video screenshot bytes for the owner-scoped serve route. */
+export function resolveCaptureImageBytes(project: {
+  id: number;
+  userId: string;
+  compositionVars: Record<string, string> | null;
+}): Promise<{ buffer: Buffer; mediaType: string } | null> {
+  return resolveProjectImageBytes(project, "capture-image", "capture.imageObject");
 }
 
 function buildVarMap(
@@ -1171,14 +1235,18 @@ export async function buildCompositionHtml(
   vars["layout.aspect"] =
     width > height ? "landscape" : width < height ? "portrait" : "square";
 
-  // AI background: the project persists only a small reference
-  // (ai.backgroundObject); resolve it to a self-contained data URI here so the
-  // render and the live preview both embed the image while the row + /projects
-  // list payload stay lean. A legacy inline ai.backgroundImage data URI (created
-  // before object-storage) is already in `vars` from the merge and used as-is.
+  // Big per-project images are persisted as small references (object storage),
+  // resolved to self-contained data URIs here so the render and the live preview
+  // both embed them while the row + /projects list payload stay lean. A LEGACY
+  // inline data URI (project created before object-storage) is already in `vars`
+  // from the merge and used as-is.
   if (!String(vars["ai.backgroundImage"] ?? "").startsWith("data:image/")) {
     const dataUri = await resolveAiBackgroundDataUri(project);
     if (dataUri) vars["ai.backgroundImage"] = dataUri;
+  }
+  if (!String(vars["capture.image"] ?? "").startsWith("data:image/")) {
+    const dataUri = await resolveCaptureImageDataUri(project);
+    if (dataUri) vars["capture.image"] = dataUri;
   }
 
   return injectFitScript(

@@ -183,7 +183,12 @@ describe.runIf(INTEGRATION_AVAILABLE)(
       expect(vars["capture.tour"]).toBeUndefined();
       // Whole-page scroll (no crop) — a usable video, not a hard failure.
       expect(vars["capture.cropX"]).toBeUndefined();
-      expect(vars["capture.image"]).toContain("data:image/jpeg;base64,");
+      // The screenshot is kept OUT of the row now: a small reference, not a ~1MB
+      // data URI (no GCS in tests → the "local" render-dir file). The image is
+      // resolved back to a data URI at render/preview time + served by the
+      // /capture-image route.
+      expect(vars["capture.image"]).toBeUndefined();
+      expect(vars["capture.imageObject"]).toBe("local");
     });
 
     it("honors the vision judge's pick among distinct candidates", async () => {
