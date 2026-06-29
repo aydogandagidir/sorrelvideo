@@ -129,26 +129,27 @@ describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
     )(win, doc, raf, caf);
   }
 
-  it("adapts window.__hf into a full TimelineLike on window.__timelines[id]", () => {
+  it("adapts window.__hf into a TimelineLike AND strips window.__hf so the player resolves it", () => {
     const seek = vi.fn();
     const win: Record<string, unknown> = { __hf: { duration: 5, seek } };
     runBridge(win, "studio");
+    // The legacy global is GONE — @hyperframes/player only uses the direct
+    // __timelines adapter when no __hf/__player "runtime bridge" is present.
+    expect(win.__hf).toBeUndefined();
     const tl = (win.__timelines as Record<string, any>).studio;
     expect(tl).toBeTruthy();
     expect(tl.duration()).toBe(5);
     expect(tl.isActive()).toBe(false);
+    // seek still delegates to the original hf.seek (kept alive by the closure)
+    // even though window.__hf was deleted.
     tl.seek(2);
     expect(seek).toHaveBeenCalledWith(2);
     expect(tl.time()).toBe(2);
   });
 
-  it("is a no-op when the composition exposes no __hf (a GSAP composition)", () => {
-    const win: Record<string, unknown> = {};
-    runBridge(win, "brand-story");
-    expect(win.__timelines).toBeUndefined();
-  });
-
-  it("never overwrites a timeline the composition already registered", () => {
+  it("strips window.__hf even when a real timeline is already registered (studio-default-timelines)", () => {
+    // That seed exposes BOTH a real __timelines entry AND a legacy __hf back-compat
+    // shim — the __hf alone would still block the player's direct adapter.
     const existing = { id: "studio", real: true };
     const win: Record<string, unknown> = {
       __hf: { duration: 5, seek: () => undefined },
@@ -156,6 +157,19 @@ describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
     };
     runBridge(win, "studio");
     expect((win.__timelines as Record<string, unknown>).studio).toBe(existing);
+    expect(win.__hf).toBeUndefined();
+  });
+
+  it("leaves a GSAP composition's own timeline intact (nothing to adapt or strip)", () => {
+    const existing = { id: "brand-story", real: true };
+    const win: Record<string, unknown> = {
+      __timelines: { "brand-story": existing },
+    };
+    runBridge(win, "brand-story");
+    expect((win.__timelines as Record<string, unknown>)["brand-story"]).toBe(
+      existing,
+    );
+    expect(win.__hf).toBeUndefined();
   });
 
   // Real-file quality gate: the legacy copy compositions must satisfy the bridge's

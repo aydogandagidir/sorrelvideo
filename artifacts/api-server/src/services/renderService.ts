@@ -467,62 +467,79 @@ export function injectFitScript(html: string): string {
 // A few hand-rolled copy compositions (studio-default / brand-promo /
 // product-launch / social-teaser) drive playback through a LEGACY
 // `window.__hf.seek(seconds)` host and never register `window.__timelines`. The
-// preview player (`<hyperframes-player>`) and the Studio transport poll for
-// `window.__timelines[<data-composition-id>]` and, not finding it, fail after 8s
-// with "Composition timeline not found" — a dead preview. This bridge adapts a
-// legacy `window.__hf` into the FULL TimelineLike contract the player needs
-// (play/pause/seek/time/duration/isActive, all in SECONDS). It is a NO-OP when
-// the composition already registered a real timeline (GSAP-based ones) or
-// exposes no `__hf`, so it's safe to inject into every composition. rAF advances
-// via the callback's own timestamp — no wall-clock (performance.now/Date.now),
-// which the engine's determinism lint forbids.
+// preview player (`<hyperframes-player>`) resolves a composition's timeline from
+// `window.__timelines[<data-composition-id>]` — BUT only when no "runtime
+// bridge" is present: `hasRuntimeBridge = window.__hf !== undefined ||
+// isPlayer(window.__player)`, and when that's true it SKIPS the direct
+// `__timelines` adapter and tries to drive `__hf`/`__player` instead — which a
+// plain `__hf` can't satisfy, so the preview dead-ends after 8s with
+// "Composition timeline not found". Verified against @hyperframes/player@0.6.120's
+// `_resolveDirectTimelineAdapterFromWindow` + `_tryDirectTimeline*`.
+//
+// So this bridge does TWO things, both safe on every composition:
+//  1. If the composition exposed a legacy `window.__hf` but no timeline yet,
+//     adapt it into the TimelineLike the player's DIRECT adapter drives
+//     (`seek(s,suppress)` / `pause` / `play` / `duration` / `time`, GSAP-shaped,
+//     SECONDS). The closure keeps a reference to `hf`, so the timeline keeps
+//     working after step 2 removes the global.
+//  2. STRIP `window.__hf` (and any leftover `window.__player`) so the player
+//     stops treating the composition as a runtime bridge and resolves the
+//     `__timelines` entry. The RENDER engine drives `__timelines`, NOT `__hf`
+//     (core/dist never reads `__hf`), so this is render-safe.
+// No-op for GSAP compositions (they expose neither global, register their own
+// timeline). rAF advances via the callback's own timestamp — no wall-clock
+// (performance.now/Date.now), which the engine's determinism lint forbids.
 const TIMELINE_BRIDGE = `<script data-sorrel-timeline-bridge>
 (function () {
-  var hf = window.__hf;
-  if (!hf || typeof hf.seek !== "function") return;
   var root = document.querySelector("[data-composition-id]");
   var id = (root && root.getAttribute("data-composition-id")) || "root";
   window.__timelines = window.__timelines || {};
-  if (window.__timelines[id]) return;
-  var DUR = Number(hf.duration) > 0 ? Number(hf.duration) : 5;
-  var now = 0, playing = false, rafId = null, lastTick = null;
-  function tick(ts) {
-    if (!playing) return;
-    if (lastTick === null) lastTick = ts;
-    now += (ts - lastTick) / 1000;
-    lastTick = ts;
-    if (now >= DUR) { now = DUR; playing = false; hf.seek(now); return; }
-    hf.seek(now);
-    rafId = requestAnimationFrame(tick);
-  }
-  window.__timelines[id] = {
-    id: id,
-    play: function () {
-      if (playing) return;
-      if (now >= DUR) now = 0;
-      playing = true; lastTick = null;
-      rafId = requestAnimationFrame(tick);
-    },
-    pause: function () {
-      playing = false;
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = null;
-    },
-    seek: function (s) {
-      now = Math.max(0, Math.min(DUR, Number(s) || 0));
+  var hf = window.__hf;
+  if (!window.__timelines[id] && hf && typeof hf.seek === "function") {
+    var DUR = Number(hf.duration) > 0 ? Number(hf.duration) : 5;
+    var now = 0, playing = false, rafId = null, lastTick = null;
+    var tick = function (ts) {
+      if (!playing) return;
+      if (lastTick === null) lastTick = ts;
+      now += (ts - lastTick) / 1000;
+      lastTick = ts;
+      if (now >= DUR) { now = DUR; playing = false; hf.seek(now); return; }
       hf.seek(now);
-    },
-    time: function () { return now; },
-    duration: function () { return DUR; },
-    isActive: function () { return playing; }
-  };
+      rafId = requestAnimationFrame(tick);
+    };
+    window.__timelines[id] = {
+      id: id,
+      play: function () {
+        if (playing) return;
+        if (now >= DUR) now = 0;
+        playing = true; lastTick = null;
+        rafId = requestAnimationFrame(tick);
+      },
+      pause: function () {
+        playing = false;
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        rafId = null;
+      },
+      seek: function (s) {
+        now = Math.max(0, Math.min(DUR, Number(s) || 0));
+        hf.seek(now);
+      },
+      time: function () { return now; },
+      duration: function () { return DUR; },
+      isActive: function () { return playing; }
+    };
+  }
+  // Drop the legacy globals so the player uses the direct __timelines adapter.
+  try { delete window.__hf; } catch (e) { window.__hf = undefined; }
+  try { delete window.__player; } catch (e2) { window.__player = undefined; }
 })();
 </script>`;
 
 /**
  * Inject the legacy-`__hf` → `__timelines` bridge before the last `</body>` (so
- * it runs AFTER the composition's own script has set `window.__hf`). Pure +
- * idempotent at runtime (no-op when a real timeline is already registered).
+ * it runs AFTER the composition's own script has set `window.__hf`). Pure;
+ * builds a timeline from `__hf` when needed and ALWAYS strips the legacy globals
+ * that block the preview player's direct `__timelines` adapter.
  */
 export function injectTimelineBridge(html: string): string {
   return injectBeforeBodyEnd(html, TIMELINE_BRIDGE);
