@@ -135,4 +135,52 @@ describe("Studio — template picker", () => {
     const post = postCalls().find((c) => /\/api\/projects$/.test(c.url));
     expect((post?.body as { module?: string }).module).toBe("brand-promo");
   });
+
+  it("generates an AI background (with the prompt) before rendering when one is set", async () => {
+    const user = userEvent.setup();
+    fetchMock = installApiFetchMock([
+      ...LAYOUT_ROUTES,
+      {
+        url: /\/api\/projects$/,
+        method: "POST",
+        status: 201,
+        json: { id: 1, name: "x", status: "draft", module: "studio" },
+      },
+      {
+        url: /\/projects\/1\/ai-image$/,
+        method: "POST",
+        status: 200,
+        json: { id: 1, status: "draft", module: "studio" },
+      },
+      {
+        url: /\/projects\/1\/render-settings$/,
+        method: "PATCH",
+        status: 200,
+        json: {},
+      },
+      { url: /\/projects\/1\/render$/, method: "POST", status: 202, json: {} },
+      { url: /\/api\/projects$/, method: "GET", json: [] },
+    ]);
+
+    renderWithProviders(<Studio />, { route: "/studio" });
+
+    // Default module = studio (supports AI background) → the control is shown.
+    await user.type(
+      screen.getByPlaceholderText(/koyu degrade/i),
+      "neon grid backdrop",
+    );
+    await user.click(screen.getByRole("button", { name: /create & render/i }));
+
+    await waitFor(() =>
+      expect(
+        postCalls().some((c) => /\/projects\/1\/ai-image$/.test(c.url)),
+      ).toBe(true),
+    );
+    const bg = postCalls().find((c) => /\/projects\/1\/ai-image$/.test(c.url));
+    expect((bg?.body as { prompt?: string }).prompt).toBe("neon grid backdrop");
+    // …and the render still fires (AI bg is a pre-render step, not a gate).
+    expect(postCalls().some((c) => /\/projects\/1\/render$/.test(c.url))).toBe(
+      true,
+    );
+  });
 });
