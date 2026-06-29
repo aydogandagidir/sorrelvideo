@@ -219,7 +219,12 @@ describe("injectTimelineBridge (legacy __hf → __timelines)", () => {
 // full-bleed ai.backgroundImage layer that collapses when the var is unset, so a
 // no-AI render stays byte-identical. Real-file gate so a composition edit can't
 // silently break the contract.
-describe.each(["studio-default.html", "brand-promo.html"])(
+describe.each([
+  "studio-default.html",
+  "brand-promo.html",
+  "social-teaser.html",
+  "product-launch.html",
+])(
   "AI-background composition %s",
   (file) => {
     const html = fs.readFileSync(

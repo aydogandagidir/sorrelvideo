@@ -634,10 +634,15 @@ deterministic template rendering).
   brandExtract tier — image gen is pricier/slower than text) bounds abuse.
 - **Capability set**: only compositions that host the layer consume the var —
   `services/aiBackgroundTemplates.ts` (`AI_BACKGROUND_MODULES = {studio,
-  brand-promo}`, the `transitionCapableTemplates.ts` pattern), surfaced as
+  brand-promo, social-teaser, product-launch}` — the four single-scene copy
+  templates; the `transitionCapableTemplates.ts` pattern), surfaced as
   `Template.supportsAiBackground` (read-time enrichment in `routes/templates.ts`,
   never persisted) so the project dialog shows the "AI arka plan" control only
   where it works. Add a module + wire its composition to grow the set.
+  `brand-story` is deliberately excluded: it is transition-capable (two
+  `position:absolute` opaque-background scenes composited by the shader bootstrap),
+  so an AI background interacts with the shader compositing and needs a
+  render-verified per-scene design — a tracked follow-up.
 - **Composition wiring**: a capable composition declares a full-bleed
   `<img class="ai-bg" src="{{ai.backgroundImage}}">` inside a `.ai-bg-layer` at
   `z-index:-1` (paints above the authored gradient, below content — no content
