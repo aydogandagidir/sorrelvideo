@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,15 +21,11 @@ function readDismissed(): boolean {
  * dismissal is remembered in localStorage so it shows once per browser.
  */
 export function CookieConsent() {
-  // Start hidden; reveal after mount so we never flash the banner for visitors
-  // who already dismissed it (and so the build has no window access at import).
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (!readDismissed()) {
-      setVisible(true);
-    }
-  }, []);
+  // Client-only SPA: localStorage exists at first render. Lazy-init the
+  // visibility from the stored flag so we never flash the banner for visitors
+  // who already dismissed it (the initializer runs once, during the first
+  // render — never at module import).
+  const [visible, setVisible] = useState(() => !readDismissed());
 
   if (!visible) return null;
 

@@ -75,8 +75,15 @@ export function useAuth(): AuthState {
 
   useEffect(() => {
     let cancelled = false;
-    refresh().catch(() => {
-      if (!cancelled) setUser(null);
+    // Defer the kickoff to a microtask so refresh()'s synchronous
+    // setIsLoading(true) doesn't run during the effect body (the eager setState
+    // the react-hooks rule flags). isLoading already starts `true`, so the
+    // visible loading state is unchanged; the fetch still fires on mount.
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      refresh().catch(() => {
+        if (!cancelled) setUser(null);
+      });
     });
     return () => {
       cancelled = true;

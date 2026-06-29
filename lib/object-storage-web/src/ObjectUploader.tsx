@@ -71,12 +71,27 @@ export function ObjectUploader({
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { onGetUploadParametersRef.current = onGetUploadParameters; }, [onGetUploadParameters]);
 
+  // Restrictions are captured once (matching the previous lazy-init semantics);
+  // holding them in refs keeps the create-once effect free of reactive deps.
+  const maxNumberOfFilesRef = useRef(maxNumberOfFiles);
+  const maxFileSizeRef = useRef(maxFileSize);
+
   const [showModal, setShowModal] = useState(false);
-  const [uppy] = useState(() =>
-    new Uppy({
+  // Create the Uppy instance in an effect (not a render-time initializer) so the
+  // handler closures can read the latest-callback refs at event time without
+  // touching `.current` during render (react-hooks/refs).
+  const [uppy, setUppy] = useState<Uppy<
+    Record<string, unknown>,
+    Record<string, unknown>
+  > | null>(null);
+  useEffect(() => {
+    const instance = new Uppy<
+      Record<string, unknown>,
+      Record<string, unknown>
+    >({
       restrictions: {
-        maxNumberOfFiles,
-        maxFileSize,
+        maxNumberOfFiles: maxNumberOfFilesRef.current,
+        maxFileSize: maxFileSizeRef.current,
       },
       autoProceed: false,
     })
@@ -86,8 +101,12 @@ export function ObjectUploader({
       })
       .on("complete", (result) => {
         onCompleteRef.current?.(result);
-      })
-  );
+      });
+    setUppy(instance);
+    return () => {
+      instance.destroy();
+    };
+  }, []);
 
   return (
     <div>
@@ -95,12 +114,14 @@ export function ObjectUploader({
         {children}
       </button>
 
-      <DashboardModal
-        uppy={uppy}
-        open={showModal}
-        onRequestClose={() => setShowModal(false)}
-        proudlyDisplayPoweredByUppy={false}
-      />
+      {uppy && (
+        <DashboardModal
+          uppy={uppy}
+          open={showModal}
+          onRequestClose={() => setShowModal(false)}
+          proudlyDisplayPoweredByUppy={false}
+        />
+      )}
     </div>
   );
 }
