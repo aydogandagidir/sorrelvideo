@@ -5,6 +5,8 @@ import {
   parseToHex,
   saturation,
   isNeutral,
+  luminance,
+  ensureReadableOnDark,
   mergeCandidates,
   pickBrandColors,
   sanitizeFontFamily,
@@ -130,5 +132,34 @@ describe("sanitizeFontFamily", () => {
     expect(sanitizeFontFamily("Inter'; background:url(x)")).toBeNull();
     expect(sanitizeFontFamily("")).toBeNull();
     expect(sanitizeFontFamily(null)).toBeNull();
+  });
+});
+
+describe("ensureReadableOnDark", () => {
+  it("lightens a near-black brand accent to a readable luminance", () => {
+    // The real regression: aremka.com auto-extracted #1f1f1f as its accent, so
+    // the headline gradient (white → accent) + CTA rendered all but invisible.
+    const fixed = ensureReadableOnDark("#1f1f1f");
+    expect(luminance("#1f1f1f")).toBeLessThan(0.15);
+    expect(luminance(fixed)).toBeGreaterThanOrEqual(0.4);
+    // still a neutral grey (hue preserved), just lighter.
+    expect(saturation(fixed)).toBeLessThan(0.1);
+  });
+
+  it("preserves hue when lightening a dark colored brand", () => {
+    const fixed = ensureReadableOnDark("#0a1a3f"); // very dark navy
+    expect(luminance(fixed)).toBeGreaterThanOrEqual(0.4);
+    const rgb = parseCssColor(fixed)!;
+    expect(rgb.b).toBeGreaterThan(rgb.r); // still blue-dominant
+  });
+
+  it("leaves bright/mid colors and the studio defaults untouched", () => {
+    for (const hex of ["#f59e0b", "#6366f1", "#979797", "#cdfb45", "#ffffff"]) {
+      expect(ensureReadableOnDark(hex)).toBe(hex);
+    }
+  });
+
+  it("returns the input unchanged when it can't be parsed", () => {
+    expect(ensureReadableOnDark("not-a-color")).toBe("not-a-color");
   });
 });

@@ -22,6 +22,7 @@ import {
 import { logger } from "../lib/logger";
 import { cleanupProjectWorkDirs } from "../lib/renderDiskCleanup";
 import { buildCaptionOverlay } from "../lib/captionStyles";
+import { ensureReadableOnDark } from "../lib/brandColors";
 import { getBrandKit, getDefaultBrandKit } from "./brandKitService";
 import {
   resolveSettings,
@@ -1129,6 +1130,17 @@ function buildVarMap(
       if (typeof v === "string" && v.length > 0) map[k] = v;
     }
   }
+  // Keep brand colors readable on the dark composition canvas. A mono/grey brand
+  // auto-extracts a near-black accent (e.g. #1f1f1f), which makes the headline
+  // gradient (`white → accent`) + CTA all but invisible — the "everything renders
+  // dark / broken" report. Lighten ONLY genuinely-dark colors (bright/mid brands
+  // and the defaults are untouched — see ensureReadableOnDark). Applied after the
+  // compositionVars merge so a `?vars=` brand override is normalised too. The
+  // secondary color is left raw — it's the intended-dark canvas base.
+  if (map["brand.primaryColor"])
+    map["brand.primaryColor"] = ensureReadableOnDark(map["brand.primaryColor"]);
+  if (map["brand.accentColor"])
+    map["brand.accentColor"] = ensureReadableOnDark(map["brand.accentColor"]);
   return map;
 }
 
