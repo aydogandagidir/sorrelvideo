@@ -1,4 +1,4 @@
-import { useState, useRef, type FormEvent, type ChangeEvent } from "react";
+import { useMemo, useState, useRef, type FormEvent, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import {
   Loader2,
@@ -237,10 +237,14 @@ export default function StudioPage() {
   // preview route (no project id exists until submit; a spotlight clip's hero is
   // materialized only at render time). Debounce the user.* vars so a burst of
   // keystrokes is one composition fetch; a changed `src` reloads the iframe.
-  const previewVars = useDebouncedValue(
-    { "user.headline": headline, "user.bodyText": bodyText, "user.ctaText": ctaText },
-    600,
+  // Memoize the vars object so its identity is stable while the copy is
+  // unchanged — otherwise a fresh literal every render keeps `useDebouncedValue`
+  // from ever settling, which re-renders the page every 600ms forever.
+  const previewVarsInput = useMemo(
+    () => ({ "user.headline": headline, "user.bodyText": bodyText, "user.ctaText": ctaText }),
+    [headline, bodyText, ctaText],
   );
+  const previewVars = useDebouncedValue(previewVarsInput, 600);
   const previewSrc = `/api/compositions/${effectiveModule}/preview?resolution=${selectedAspect}&vars=${b64UrlVars(previewVars)}`;
 
   function undoAiFill() {
@@ -857,12 +861,16 @@ export default function StudioPage() {
                   })}
                 </div>
                 <div className="mx-auto w-full max-w-[300px] md:max-w-[380px] lg:max-w-[420px]">
+                  {/* No autoplay/loop: the composition's t=0 frame is its
+                      intro-start (all copy at opacity 0 — a dark frame), so an
+                      auto-loop strobes dark→content→dark every cycle. Held at
+                      its content-visible CSS default instead; `controls` lets
+                      the user play/scrub the intro on demand (matches the
+                      projects detail preview). */}
                   <HfPlayer
                     src={previewSrc}
                     aspect={ratioLabel}
                     muted
-                    autoplay
-                    loop
                     controls
                     className="w-full overflow-hidden rounded-xl border"
                   />
