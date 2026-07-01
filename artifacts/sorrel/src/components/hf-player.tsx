@@ -141,6 +141,34 @@ export function forcePlayerRefit(el: HyperframesPlayerElement | null): void {
   if (typeof fit === "function") fit.call(el);
 }
 
+/**
+ * Re-fit every animation frame until the host's laid-out width stops changing
+ * (or a short cap), then stop. `ready` can fire before the surrounding grid/flex
+ * has sized the host — a single fit-on-ready then freezes the scale against a
+ * transient box, and ResizeObserver delivery is not guaranteed to catch the
+ * settle. Polling a handful of frames lands the scale on the FINAL size without
+ * depending on the observer firing. Bounded (≈1.5s) and self-cancelling on
+ * unmount, so it can't run away.
+ */
+function settleRefit(el: HyperframesPlayerElement): void {
+  let lastWidth = -1;
+  let stableFrames = 0;
+  let frames = 0;
+  const step = (): void => {
+    if (!el.isConnected) return;
+    const width = el.offsetWidth;
+    forcePlayerRefit(el);
+    if (width > 0 && width === lastWidth) stableFrames += 1;
+    else {
+      stableFrames = 0;
+      lastWidth = width;
+    }
+    frames += 1;
+    if (stableFrames < 3 && frames < 90) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 export const HfPlayer = forwardRef<HfPlayerHandle, HfPlayerProps>(function HfPlayer(
   {
     src,
@@ -218,12 +246,9 @@ export const HfPlayer = forwardRef<HfPlayerHandle, HfPlayerProps>(function HfPla
       const duration = ev.detail?.duration ?? el.duration;
       handlers.current.onTimeUpdate?.(el.currentTime, duration);
       // The element's own fit-on-ready races the host's layout (see
-      // forcePlayerRefit). Re-fit on the next frames, once the surrounding
-      // layout has settled, so the composition isn't frozen at a stale scale.
-      requestAnimationFrame(() => {
-        forcePlayerRefit(el);
-        requestAnimationFrame(() => forcePlayerRefit(el));
-      });
+      // forcePlayerRefit / settleRefit). Re-fit until the host's size settles so
+      // the composition isn't frozen at a stale (transient) scale.
+      settleRefit(el);
     };
     const handleTimeUpdate = (ev: CustomEvent<{ currentTime: number }>) => {
       // `timeupdate` carries only currentTime; duration comes from the element
@@ -290,6 +315,16 @@ export const HfPlayer = forwardRef<HfPlayerHandle, HfPlayerProps>(function HfPla
       if (pending) cancelAnimationFrame(pending);
       observer.disconnect();
     };
+  }, []);
+
+  // Belt-and-suspenders for the ResizeObserver: a window `resize` fires on the
+  // most common host-size change (the browser window / a devtools split) and
+  // can't feed back into a resize loop, so re-fit on it directly. Cheap, and
+  // covers browsers/timings where the observer's delivery is missed.
+  useEffect(() => {
+    const onResize = () => forcePlayerRefit(elRef.current);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   // Reflect boolean props onto the element as attribute presence.
