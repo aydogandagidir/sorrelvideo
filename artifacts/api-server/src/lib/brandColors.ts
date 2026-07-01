@@ -164,6 +164,36 @@ export function darken(hex: string, amount: number): string {
   return toHex({ r: rgb.r * f, g: rgb.g * f, b: rgb.b * f, a: 1 });
 }
 
+/**
+ * Lighten a brand color just enough to stay readable when used as TEXT or an
+ * accent on the dark composition canvas (~#07070b). A near-black brand accent
+ * (e.g. `#1f1f1f`, as auto-extracted for a mono/grey brand) otherwise renders
+ * the composition's headline gradient (`white → accent`) and CTA all but
+ * INVISIBLE — the "everything is dark / unreadable" report. Only genuinely dark
+ * colors (relative luminance below `floor`) are touched, so bright and mid
+ * brands — and the studio defaults (`#6366f1`/`#f59e0b`, both well above the
+ * floor) — pass through byte-for-byte unchanged. The hue is preserved by
+ * blending toward white to reach `target` luminance. Returns the input unchanged
+ * if unparseable (the composition still substitutes the raw value).
+ */
+export function ensureReadableOnDark(
+  hex: string,
+  floor = 0.22,
+  target = 0.45,
+): string {
+  const rgb = parseCssColor(hex);
+  if (!rgb) return hex;
+  const lum = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+  if (lum >= floor) return hex;
+  const t = Math.min(1, Math.max(0, (target - lum) / (1 - lum)));
+  return toHex({
+    r: rgb.r + (255 - rgb.r) * t,
+    g: rgb.g + (255 - rgb.g) * t,
+    b: rgb.b + (255 - rgb.b) * t,
+    a: 1,
+  });
+}
+
 const SOURCE_BOOST: Record<string, number> = {
   "theme-color": 0.4,
   cta: 0.5,
