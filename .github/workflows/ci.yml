@@ -97,7 +97,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Build through the `build` stage of the SAME Dockerfile Railway deploys.
       # The `validate` job never builds the Dockerfile, so a whole class of
