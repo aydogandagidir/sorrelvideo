@@ -109,7 +109,7 @@ jobs:
       # shell step — every step that has bitten us — while skipping the slow
       # runtime apt layer. GHA cache keeps warm runs to a few minutes.
       - name: Build the Docker `build` stage (deploy parity)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: build
