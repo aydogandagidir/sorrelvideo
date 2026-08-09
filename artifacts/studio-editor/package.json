@@ -9,9 +9,9 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@hyperframes/core": "0.6.120",
-    "@hyperframes/player": "0.6.120",
-    "@hyperframes/studio": "0.6.91",
+    "@hyperframes/core": "0.7.94",
+    "@hyperframes/player": "0.7.94",
+    "@hyperframes/studio": "0.7.94",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zustand": "^5.0.8"
@@ -21,10 +21,10 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^4.7.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.5.6",
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.26",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.3",
-    "vite": "^6.4.2"
+    "vite": "^6.4.3"
   }
 }
